@@ -34,11 +34,12 @@ const UNDER_CONSTRUCTION = `
     }
   </style>
 </head>
-
 <body>
   <div class="box">
-    <h1>网站建设中</h1>
-    <p>Website Under Construction</p>
+    <div class="box">
+      <h1>网站建设中</h1>
+      <p>Website Under Construction</p>
+    </div>
   </div>
 </body>
 </html>
@@ -53,10 +54,10 @@ function hasPreviewCookie(request) {
 }
 
 export default {
-  async fetch(request, env, ctx) {
+  async fetch(request, env) {
     const url = new URL(request.url);
 
-    // 特殊 URL
+    // 特殊 URL，开启预览
     if (url.searchParams.get("preview") === PREVIEW_TOKEN) {
       url.searchParams.delete("preview");
 
@@ -77,7 +78,7 @@ export default {
       });
     }
 
-    // 已经获得预览权限
+    // 已经进入预览模式
     if (hasPreviewCookie(request)) {
       return env.ASSETS.fetch(request);
     }
