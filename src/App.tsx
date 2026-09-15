@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import './App.css'
 import ContainerScene, { type View } from './components/ContainerScene'
 import CargoProperties from './components/CargoProperties'
 import CenterOfGravity from './components/CenterOfGravity'
