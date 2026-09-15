@@ -31,8 +31,10 @@ function DoorFrame({container}:{container:Container}){
  const L=container.outerLength*S,W=container.outerWidth*S,H=container.outerHeight*S,x=L/2+0.006,post=0.10,header=0.13,dw=container.doorWidth*S,dh=container.doorHeight*S,upperH=H-dh
  return <group>
   <Beam position={[x,-W/2+post/2,H/2]} size={[post,post,H]}/><Beam position={[x,W/2-post/2,H/2]} size={[post,post,H]}/>
-  <Beam position={[x,0,dh]} size={[post,dw+post,header]}/>
-  {upperH>0&&<Beam position={[x,0,dh+upperH/2]} size={[post,W*0.94,upperH]} color="#3b6e93" opacity={1}/>} 
+  <mesh position={[x,0,dh+(upperH>0?upperH/2:0)]} castShadow>
+    <boxGeometry args={[post,W*0.94,Math.max(0.08,upperH)]}/>
+    <meshStandardMaterial color="#3b6e93" metalness={0.12} roughness={0.58}/>
+  </mesh>
   <Beam position={[x,0,0.045]} size={[post,dw+post,0.09]}/>
  </group>
 }

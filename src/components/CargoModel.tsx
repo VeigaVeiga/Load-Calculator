@@ -3,7 +3,7 @@ import { Html } from '@react-three/drei'
 import type { Container, PlacedCargo } from '../types'
 import { dims } from '../packing/geometry'
 const S=.001
-const GAP=8
+const GAP=16
 export default function CargoModel({p,container,selected,onPointerDown,onPointerUp,onPointerMove,onClick,showName=false}:{p:PlacedCargo;container:Container;selected:boolean;onPointerDown:(e:any)=>void;onPointerUp:(e:any)=>void;onPointerMove:(e:any)=>void;onClick:(e:any)=>void;showName?:boolean}){
  const d=dims(p)
  const pos:[number,number,number]=[(p.x+d.length/2-container.length/2)*S,(p.y+d.width/2-container.width/2)*S,(p.z+p.height/2)*S]

@@ -1,6 +1,6 @@
 import React from 'react'
 import { Canvas, useThree, useFrame } from '@react-three/fiber'
-import { OrbitControls, Environment } from '@react-three/drei'
+import { OrbitControls, Environment, Line, Html } from '@react-three/drei'
 import { useEffect, useRef, useState } from 'react'
 import * as THREE from 'three'
 import type { Cargo, Container, PlacedCargo, SecuringItem } from '../types'
@@ -24,59 +24,53 @@ function CameraRig({view,container,dragging,cameraQuaternion}:{view:View;contain
  return <><OrbitControls ref={controls} makeDefault enabled={!dragging} enableDamping dampingFactor={.09} rotateSpeed={.55} zoomSpeed={.9} panSpeed={.7} minDistance={1.2} maxDistance={24}/><CameraQuaternionSync target={cameraQuaternion}/></>
 }
 function CameraQuaternionSync({target}:{target:React.MutableRefObject<THREE.Quaternion>}){const {camera}=useThree(); useFrame(()=>target.current.copy(camera.quaternion)); return null}
-function CargoInteraction({p,container,selected,onSelect,onMove,onDragState,showName}:{p:PlacedCargo;container:Container;selected:boolean;onSelect:()=>void;onMove:(id:string,x:number,y:number,z:number)=>void;onDragState:(v:boolean)=>void;showName:boolean}){
+function CoordinateAxes({container,lang}:{container:Container;lang:'zh'|'en'}){
+ const L=container.length*S,W=container.width*S,H=container.height*S
+ const p:[number,number,number]=[-L/2,-W/2,0.02]
+ const len=Math.min(.9,Math.max(.45,Math.min(L,W)*.7))
+ return <group position={p}>
+   <Line points={[[0,0,0],[len,0,0]]} color="#b4473d" lineWidth={2}/>
+   <Line points={[[0,0,0],[0,len,0]]} color="#4d8052" lineWidth={2}/>
+   <Line points={[[0,0,0],[0,0,len]]} color="#3f6f9e" lineWidth={2}/>
+   <Html position={[len,0,0]} center><div className="axis-label axis-x">X {lang==='zh'?'长度':'Length'} →</div></Html>
+   <Html position={[0,len,0]} center><div className="axis-label axis-y">Y {lang==='zh'?'宽度':'Width'} →</div></Html>
+   <Html position={[0,0,len]} center><div className="axis-label axis-z">Z {lang==='zh'?'高度':'Height'} ↑</div></Html>
+ </group>
+}
+function CargoInteraction({p,container,selected,onSelect,onMove,onDragState,showName,freePlacement}:{p:PlacedCargo;container:Container;selected:boolean;onSelect:()=>void;onMove:(id:string,x:number,y:number,z:number)=>void;onDragState:(v:boolean)=>void;showName:boolean;freePlacement:boolean}){
  const [draggingLocal,setDraggingLocal]=useState(false)
  const plane=useRef(new THREE.Plane(new THREE.Vector3(0,0,1),0))
  const offset=useRef(new THREE.Vector3())
  const lastMove=useRef({x:Number.NaN,y:Number.NaN})
  const d=dims(p)
- const point=(e:any)=>{
-  const out=new THREE.Vector3()
-  plane.current.set(new THREE.Vector3(0,0,1),-(p.z*S))
-  return e.ray.intersectPlane(plane.current,out)?out:null
- }
+ const point=(e:any)=>{const out=new THREE.Vector3();plane.current.set(new THREE.Vector3(0,0,1),-(p.z*S));return e.ray.intersectPlane(plane.current,out)?out:null}
  const down=(e:any)=>{
-  if(p.locked)return
-  e.stopPropagation()
-  onSelect()
-  const pt=point(e)
-  if(!pt)return
+  e.stopPropagation(); onSelect()
+  if(!freePlacement||p.locked)return
+  const pt=point(e);if(!pt)return
   const cargoCenter=new THREE.Vector3((p.x+d.length/2-container.length/2)*S,(p.y+d.width/2-container.width/2)*S,(p.z+p.height/2)*S)
-  offset.current.copy(cargoCenter).sub(pt)
-  setDraggingLocal(true)
-  onDragState(true)
-  e.target.setPointerCapture?.(e.pointerId)
+  offset.current.copy(cargoCenter).sub(pt);lastMove.current={x:Number.NaN,y:Number.NaN};setDraggingLocal(true);onDragState(true);e.target.setPointerCapture?.(e.pointerId)
  }
  const move=(e:any)=>{
-  if(!draggingLocal||p.locked)return
-  e.stopPropagation()
-  const pt=point(e)
-  if(!pt)return
+  if(!draggingLocal||p.locked)return;e.stopPropagation();const pt=point(e);if(!pt)return
   const world=pt.clone().add(offset.current)
   const nx=Math.round((world.x+d.length*S/2+container.length*S/2)/(S*10))*10
   const ny=Math.round((world.y+d.width*S/2+container.width*S/2)/(S*10))*10
   if(nx===lastMove.current.x&&ny===lastMove.current.y)return
-  lastMove.current={x:nx,y:ny}
-  onMove(p.id,nx,ny,p.z)
+  lastMove.current={x:nx,y:ny};onMove(p.id,nx,ny,p.z)
  }
- const up=(e:any)=>{
-  if(!draggingLocal)return
-  e.stopPropagation()
-  setDraggingLocal(false)
-  onDragState(false)
-  e.target.releasePointerCapture?.(e.pointerId)
- }
- return <CargoModel p={p} container={container} selected={selected} onPointerDown={down} onPointerMove={move} onPointerUp={up} onClick={e=>{e.stopPropagation();onSelect()}}/>
+ const up=(e:any)=>{if(!draggingLocal)return;e.stopPropagation();setDraggingLocal(false);onDragState(false);e.target.releasePointerCapture?.(e.pointerId)}
+ return <CargoModel p={p} container={container} selected={selected} onPointerDown={down} onPointerMove={move} onPointerUp={up} onClick={e=>{e.stopPropagation();onSelect()}} showName={showName}/>
 }
-function Scene({container,items,materials,selectedId,onSelect,onMove,onMaterialMove,view,dragging,onDragState,cameraQuaternion,cargo,lang}:{container:Container;items:PlacedCargo[];materials:SecuringItem[];selectedId:string|null;onSelect:(id:string|null)=>void;onMove:(id:string,x:number,y:number,z:number)=>void;onMaterialMove:(id:string,x:number,y:number)=>void;view:View;dragging:boolean;onDragState:(v:boolean)=>void;cameraQuaternion:React.MutableRefObject<THREE.Quaternion>;cargo:Cargo[];lang:'zh'|'en'}){
+function Scene({container,items,materials,selectedId,onSelect,onMove,onMaterialMove,view,dragging,onDragState,cameraQuaternion,cargo,lang,freePlacement}:{container:Container;items:PlacedCargo[];materials:SecuringItem[];selectedId:string|null;onSelect:(id:string|null)=>void;onMove:(id:string,x:number,y:number,z:number)=>void;onMaterialMove:(id:string,x:number,y:number)=>void;view:View;dragging:boolean;onDragState:(v:boolean)=>void;cameraQuaternion:React.MutableRefObject<THREE.Quaternion>;cargo:Cargo[];lang:'zh'|'en';freePlacement:boolean}){
  return <>
   <color attach="background" args={['#edf0f1']}/><ambientLight intensity={1.7}/><directionalLight position={[6,8,10]} intensity={2.1} castShadow/><Environment preset="city"/>
-  <ContainerStructure container={container} lang={lang}/><ContainerFloor container={container}/>
-  {items.map(p=><CargoInteraction key={p.id} p={p} container={container} selected={p.id===selectedId} onSelect={()=>onSelect(p.id)} onMove={onMove} onDragState={onDragState} showName={!!cargo.find(c=>c.id===p.cargoId)?.showName}/>) }
-  {materials.map(m=><SecuringModel key={m.id} item={m} container={container} onMove={onMaterialMove} onDragState={onDragState}/>)}
+  <ContainerStructure container={container} lang={lang}/><ContainerFloor container={container}/><CoordinateAxes container={container} lang={lang}/>
+  {items.map(p=><CargoInteraction key={p.id} p={p} container={container} selected={p.id===selectedId} onSelect={()=>onSelect(p.id)} onMove={onMove} onDragState={onDragState} showName={!!cargo.find(c=>c.id===p.cargoId)?.showName} freePlacement={freePlacement}/>)}
+  {materials.map(m=><SecuringModel key={m.id} item={m} container={container} onMove={onMaterialMove} onDragState={onDragState}/>) }
   <CameraRig view={view} container={container} dragging={dragging} cameraQuaternion={cameraQuaternion}/>
  </>
 }
-export default function ContainerScene(props:{container:Container;items:PlacedCargo[];materials:SecuringItem[];selectedId:string|null;onSelect:(id:string|null)=>void;onMove:(id:string,x:number,y:number,z:number)=>void;onMaterialMove:(id:string,x:number,y:number)=>void;view:View;dragging:boolean;onDragState:(v:boolean)=>void;onView:(v:View)=>void;cargo:Cargo[];lang:'zh'|'en'}){
+export default function ContainerScene(props:{container:Container;items:PlacedCargo[];materials:SecuringItem[];selectedId:string|null;onSelect:(id:string|null)=>void;onMove:(id:string,x:number,y:number,z:number)=>void;onMaterialMove:(id:string,x:number,y:number)=>void;view:View;dragging:boolean;onDragState:(v:boolean)=>void;onView:(v:View)=>void;cargo:Cargo[];lang:'zh'|'en';freePlacement:boolean}){
  return <div className="scene-host"><Canvas shadows camera={{position:[7,7,5],fov:42}} onPointerMissed={()=>props.onSelect(null)}><Scene {...props} cameraQuaternion={useRef(new THREE.Quaternion())}/></Canvas></div>
 }
