@@ -3,7 +3,7 @@ import { Canvas, useThree, useFrame } from '@react-three/fiber'
 import { OrbitControls, Environment } from '@react-three/drei'
 import { useEffect, useRef, useState } from 'react'
 import * as THREE from 'three'
-import type { Container, PlacedCargo, SecuringItem } from '../types'
+import type { Cargo, Container, PlacedCargo, SecuringItem } from '../types'
 import ContainerStructure from './ContainerStructure'
 import ContainerFloor from './ContainerFloor'
 import CargoModel from './CargoModel'
@@ -24,7 +24,7 @@ function CameraRig({view,container,dragging,cameraQuaternion}:{view:View;contain
  return <><OrbitControls ref={controls} makeDefault enabled={!dragging} enableDamping dampingFactor={.09} rotateSpeed={.55} zoomSpeed={.9} panSpeed={.7} minDistance={1.2} maxDistance={24}/><CameraQuaternionSync target={cameraQuaternion}/></>
 }
 function CameraQuaternionSync({target}:{target:React.MutableRefObject<THREE.Quaternion>}){const {camera}=useThree(); useFrame(()=>target.current.copy(camera.quaternion)); return null}
-function CargoInteraction({p,container,selected,onSelect,onMove,onDragState}:{p:PlacedCargo;container:Container;selected:boolean;onSelect:()=>void;onMove:(id:string,x:number,y:number,z:number)=>void;onDragState:(v:boolean)=>void}){
+function CargoInteraction({p,container,selected,onSelect,onMove,onDragState,showName}:{p:PlacedCargo;container:Container;selected:boolean;onSelect:()=>void;onMove:(id:string,x:number,y:number,z:number)=>void;onDragState:(v:boolean)=>void;showName:boolean}){
  const [draggingLocal,setDraggingLocal]=useState(false)
  const plane=useRef(new THREE.Plane(new THREE.Vector3(0,0,1),0))
  const offset=useRef(new THREE.Vector3())
@@ -68,15 +68,15 @@ function CargoInteraction({p,container,selected,onSelect,onMove,onDragState}:{p:
  }
  return <CargoModel p={p} container={container} selected={selected} onPointerDown={down} onPointerMove={move} onPointerUp={up} onClick={e=>{e.stopPropagation();onSelect()}}/>
 }
-function Scene({container,items,materials,selectedId,onSelect,onMove,onMaterialMove,view,dragging,onDragState,cameraQuaternion}:{container:Container;items:PlacedCargo[];materials:SecuringItem[];selectedId:string|null;onSelect:(id:string|null)=>void;onMove:(id:string,x:number,y:number,z:number)=>void;onMaterialMove:(id:string,x:number,y:number)=>void;view:View;dragging:boolean;onDragState:(v:boolean)=>void;cameraQuaternion:React.MutableRefObject<THREE.Quaternion>}){
+function Scene({container,items,materials,selectedId,onSelect,onMove,onMaterialMove,view,dragging,onDragState,cameraQuaternion,cargo,lang}:{container:Container;items:PlacedCargo[];materials:SecuringItem[];selectedId:string|null;onSelect:(id:string|null)=>void;onMove:(id:string,x:number,y:number,z:number)=>void;onMaterialMove:(id:string,x:number,y:number)=>void;view:View;dragging:boolean;onDragState:(v:boolean)=>void;cameraQuaternion:React.MutableRefObject<THREE.Quaternion>;cargo:Cargo[];lang:'zh'|'en'}){
  return <>
   <color attach="background" args={['#edf0f1']}/><ambientLight intensity={1.7}/><directionalLight position={[6,8,10]} intensity={2.1} castShadow/><Environment preset="city"/>
-  <ContainerStructure container={container}/><ContainerFloor container={container}/>
-  {items.map(p=><CargoInteraction key={p.id} p={p} container={container} selected={p.id===selectedId} onSelect={()=>onSelect(p.id)} onMove={onMove} onDragState={onDragState}/>)}
+  <ContainerStructure container={container} lang={lang}/><ContainerFloor container={container}/>
+  {items.map(p=><CargoInteraction key={p.id} p={p} container={container} selected={p.id===selectedId} onSelect={()=>onSelect(p.id)} onMove={onMove} onDragState={onDragState} showName={!!cargo.find(c=>c.id===p.cargoId)?.showName}/>) }
   {materials.map(m=><SecuringModel key={m.id} item={m} container={container} onMove={onMaterialMove} onDragState={onDragState}/>)}
   <CameraRig view={view} container={container} dragging={dragging} cameraQuaternion={cameraQuaternion}/>
  </>
 }
-export default function ContainerScene(props:{container:Container;items:PlacedCargo[];materials:SecuringItem[];selectedId:string|null;onSelect:(id:string|null)=>void;onMove:(id:string,x:number,y:number,z:number)=>void;onMaterialMove:(id:string,x:number,y:number)=>void;view:View;dragging:boolean;onDragState:(v:boolean)=>void;onView:(v:View)=>void}){
+export default function ContainerScene(props:{container:Container;items:PlacedCargo[];materials:SecuringItem[];selectedId:string|null;onSelect:(id:string|null)=>void;onMove:(id:string,x:number,y:number,z:number)=>void;onMaterialMove:(id:string,x:number,y:number)=>void;view:View;dragging:boolean;onDragState:(v:boolean)=>void;onView:(v:View)=>void;cargo:Cargo[];lang:'zh'|'en'}){
  return <div className="scene-host"><Canvas shadows camera={{position:[7,7,5],fov:42}} onPointerMissed={()=>props.onSelect(null)}><Scene {...props} cameraQuaternion={useRef(new THREE.Quaternion())}/></Canvas></div>
 }

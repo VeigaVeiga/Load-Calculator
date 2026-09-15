@@ -10,6 +10,7 @@ export interface Cargo {
   height: number
   weight: number
   color: string
+  showName: boolean
   stackable: boolean
   rotatable: boolean
   maxStackLayers: number

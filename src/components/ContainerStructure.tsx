@@ -34,7 +34,6 @@ function DoorFrame({container}:{container:Container}){
   <Beam position={[x,0,dh]} size={[post,dw+post,header]}/>
   {upperH>0&&<Beam position={[x,0,dh+upperH/2]} size={[post,W*0.94,upperH]} color="#3b6e93" opacity={1}/>} 
   <Beam position={[x,0,0.045]} size={[post,dw+post,0.09]}/>
-  <Html position={[x+0.05,0,dh+0.18]} center><div className="door-label">DOOR OPENING · {container.doorWidth.toLocaleString()} × {container.doorHeight.toLocaleString()} mm</div></Html>
  </group>
 }
 function DoorLeaf({container,side}:{container:Container;side:-1|1}){
@@ -57,18 +56,17 @@ function LengthRuler({container}:{container:Container}){
  if(container.length%1000){const xx=container.length/2*S;marks.push(<Line key="end" points={[[xx,y,z-0.04],[xx,y,z+0.04]]} color="#465260" lineWidth={0.8}/>,<Html key="endl" position={[xx,y-0.02,z+0.075]} center><div className="cad-tick-label">{container.length.toLocaleString()}</div></Html>)}
  return <group><Line points={[[-L/2,y,z],[L/2,y,z]]} color="#465260" lineWidth={1.1}/>{marks}</group>
 }
-export default function ContainerStructure({container}:{container:Container}){
+export default function ContainerStructure({container,lang='zh'}:{container:Container;lang?:'zh'|'en'}){
  const L=container.outerLength*S,W=container.outerWidth*S,H=container.outerHeight*S,IL=container.length*S,IW=container.width*S,IH=container.height*S,floor=container.floorThickness*S,post=0.075,rail=0.055,rightX=L/2
  return <group>
   <Beam position={[0,0,-floor/2]} size={[L,W,floor]} color="#315f83"/><Roof container={container}/><HeadWall container={container}/><SideWall y={-W/2} container={container}/><SideWall y={W/2} container={container}/>
   {[-L/2,L/2].flatMap(x=>[-W/2,W/2].map(y=><Beam key={`${x}-${y}`} position={[x,y,(H-floor)/2]} size={[post,post,H+floor]} color="#174d78"/>))}
   <Beam position={[0,-W/2,H-rail/2]} size={[L,rail,rail]}/><Beam position={[0,W/2,H-rail/2]} size={[L,rail,rail]}/><DoorFrame container={container}/><DoorLeaf container={container} side={-1}/><DoorLeaf container={container} side={1}/>
   <LengthRuler container={container}/>
-  <DimensionLine axis="y" points={[[rightX+0.28,-IW/2,0.12],[rightX+0.28,IW/2,0.12]]} label={`INTERNAL WIDTH · ${container.width.toLocaleString()} mm`} position={[rightX+0.28,0,0.29]}/>
-  <DimensionLine axis="y" points={[[rightX+0.62,-container.doorWidth*S/2,-0.08],[rightX+0.62,container.doorWidth*S/2,-0.08]]} label={`DOOR WIDTH · ${container.doorWidth.toLocaleString()} mm`} position={[rightX+0.62,0,-0.23]}/>
-  <DimensionLine axis="y" vertical points={[[rightX+0.30,IW/2+0.28,0],[rightX+0.30,IW/2+0.28,IH]]} label={`INTERNAL HEIGHT · ${container.height.toLocaleString()} mm`} position={[rightX+0.30,IW/2+0.28,IH/2]}/>
-  <DimensionLine axis="y" vertical points={[[rightX+0.70,container.doorWidth*S/2+0.48,0],[rightX+0.70,container.doorWidth*S/2+0.48,container.doorHeight*S]]} label={`DOOR HEIGHT · ${container.doorHeight.toLocaleString()} mm`} position={[rightX+0.70,container.doorWidth*S/2+0.48,container.doorHeight*S/2]}/>
-  <Html position={[rightX+0.25,0,container.doorHeight*S+0.18]} center><div className="door-label">DOOR / 柜门 · OUTWARD</div></Html>
-  <Html position={[-L/2-0.16,0,IH*0.60]} center><div className="front-label">FRONT / 柜头</div></Html>
+  <DimensionLine axis="y" points={[[rightX+0.28,-IW/2,0.12],[rightX+0.28,IW/2,0.12]]} label={`${lang==='zh'?'内部宽度':'INTERNAL WIDTH'} · ${container.width.toLocaleString()} mm`} position={[rightX+0.28,0,0.29]}/>
+  <DimensionLine axis="y" points={[[rightX+0.62,-container.doorWidth*S/2,-0.08],[rightX+0.62,container.doorWidth*S/2,-0.08]]} label={`${lang==='zh'?'柜门宽度':'DOOR WIDTH'} · ${container.doorWidth.toLocaleString()} mm`} position={[rightX+0.62,0,-0.23]}/>
+  <DimensionLine axis="y" vertical points={[[rightX+0.30,IW/2+0.28,0],[rightX+0.30,IW/2+0.28,IH]]} label={`${lang==='zh'?'内部高度':'INTERNAL HEIGHT'} · ${container.height.toLocaleString()} mm`} position={[rightX+0.30,IW/2+0.28,IH/2]}/>
+  <DimensionLine axis="y" vertical points={[[rightX+0.70,container.doorWidth*S/2+0.48,0],[rightX+0.70,container.doorWidth*S/2+0.48,container.doorHeight*S]]} label={`${lang==='zh'?'柜门高度':'DOOR HEIGHT'} · ${container.doorHeight.toLocaleString()} mm`} position={[rightX+0.70,container.doorWidth*S/2+0.48,container.doorHeight*S/2]}/>
+  <Html position={[-L/2-0.16,0,IH*0.60]} center><div className="front-label">{lang==='zh'?'柜头':'FRONT'}</div></Html>
  </group>
 }
