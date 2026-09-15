@@ -1,161 +1,82 @@
-import { Canvas } from '@react-three/fiber'
-import { OrbitControls, Grid, Environment } from '@react-three/drei'
+import React from 'react'
+import { Canvas, useThree, useFrame } from '@react-three/fiber'
+import { OrbitControls, Environment } from '@react-three/drei'
+import { useEffect, useRef, useState } from 'react'
 import * as THREE from 'three'
-import type { Cargo, Container, PackedBox } from '../types'
-
-interface Props {
-  container: Container
-  cargo: Cargo[]
-  selectedId: string | null
-  onSelect: (id: string) => void
+import type { Container, PlacedCargo, SecuringItem } from '../types'
+import ContainerStructure from './ContainerStructure'
+import ContainerFloor from './ContainerFloor'
+import CargoModel from './CargoModel'
+import SecuringModel from './SecuringModel'
+import { dims } from '../packing/geometry'
+export type View='iso'|'top'|'front'|'rear'|'left'|'right'
+const S=.001
+function CameraRig({view,container,dragging,cameraQuaternion}:{view:View;container:Container;dragging:boolean;cameraQuaternion:React.MutableRefObject<THREE.Quaternion>}){
+ const {camera}=useThree(); const controls=useRef<any>(null)
+ useEffect(()=>{
+  camera.up.set(0,0,1)
+  const L=container.length*S,W=container.width*S,H=container.height*S
+  const d=Math.max(L,W,H)*1.35
+  const target=new THREE.Vector3(0,0,H*.38)
+  const pos:Record<View,[number,number,number]>={iso:[d*1.08,d*.92,d*.72],top:[0,0,d*1.4],front:[-d*1.55,0,H*.45],rear:[d*1.55,0,H*.45],left:[0,-d*1.65,H*.45],right:[0,d*1.65,H*.45]}
+  camera.position.set(...pos[view]); camera.lookAt(target); if(controls.current){controls.current.target.copy(target);controls.current.update()}
+ },[view,camera,container.length,container.width,container.height])
+ return <><OrbitControls ref={controls} makeDefault enabled={!dragging} enableDamping dampingFactor={.09} rotateSpeed={.55} zoomSpeed={.9} panSpeed={.7} minDistance={1.2} maxDistance={24}/><CameraQuaternionSync target={cameraQuaternion}/></>
 }
-
-function Box3D({
-  box,
-  selected,
-  onClick,
-}: {
-  box: PackedBox
-  selected: boolean
-  onClick: () => void
-}) {
-  const scale = 0.001
-  return (
-    <mesh
-      position={[
-        (box.x + box.length / 2) * scale,
-        (box.z + box.height / 2) * scale,
-        (box.y + box.width / 2) * scale,
-      ]}
-      onClick={(e) => {
-        e.stopPropagation()
-        onClick()
-      }}
-    >
-      <boxGeometry
-        args={[
-          box.length * scale,
-          box.height * scale,
-          box.width * scale,
-        ]}
-      />
-      <meshStandardMaterial
-        color={selected ? '#ffffff' : box.color}
-        transparent
-        opacity={0.9}
-        roughness={0.65}
-      />
-    </mesh>
-  )
+function CameraQuaternionSync({target}:{target:React.MutableRefObject<THREE.Quaternion>}){const {camera}=useThree(); useFrame(()=>target.current.copy(camera.quaternion)); return null}
+function CargoInteraction({p,container,selected,onSelect,onMove,onDragState}:{p:PlacedCargo;container:Container;selected:boolean;onSelect:()=>void;onMove:(id:string,x:number,y:number,z:number)=>void;onDragState:(v:boolean)=>void}){
+ const [draggingLocal,setDraggingLocal]=useState(false)
+ const plane=useRef(new THREE.Plane(new THREE.Vector3(0,0,1),0))
+ const offset=useRef(new THREE.Vector3())
+ const lastMove=useRef({x:Number.NaN,y:Number.NaN})
+ const d=dims(p)
+ const point=(e:any)=>{
+  const out=new THREE.Vector3()
+  plane.current.set(new THREE.Vector3(0,0,1),-(p.z*S))
+  return e.ray.intersectPlane(plane.current,out)?out:null
+ }
+ const down=(e:any)=>{
+  if(p.locked)return
+  e.stopPropagation()
+  onSelect()
+  const pt=point(e)
+  if(!pt)return
+  const cargoCenter=new THREE.Vector3((p.x+d.length/2-container.length/2)*S,(p.y+d.width/2-container.width/2)*S,(p.z+p.height/2)*S)
+  offset.current.copy(cargoCenter).sub(pt)
+  setDraggingLocal(true)
+  onDragState(true)
+  e.target.setPointerCapture?.(e.pointerId)
+ }
+ const move=(e:any)=>{
+  if(!draggingLocal||p.locked)return
+  e.stopPropagation()
+  const pt=point(e)
+  if(!pt)return
+  const world=pt.clone().add(offset.current)
+  const nx=Math.round((world.x+d.length*S/2+container.length*S/2)/(S*10))*10
+  const ny=Math.round((world.y+d.width*S/2+container.width*S/2)/(S*10))*10
+  if(nx===lastMove.current.x&&ny===lastMove.current.y)return
+  lastMove.current={x:nx,y:ny}
+  onMove(p.id,nx,ny,p.z)
+ }
+ const up=(e:any)=>{
+  if(!draggingLocal)return
+  e.stopPropagation()
+  setDraggingLocal(false)
+  onDragState(false)
+  e.target.releasePointerCapture?.(e.pointerId)
+ }
+ return <CargoModel p={p} container={container} selected={selected} onPointerDown={down} onPointerMove={move} onPointerUp={up} onClick={e=>{e.stopPropagation();onSelect()}}/>
 }
-
-function SceneContent({ container, cargo, selectedId, onSelect }: Props) {
-  const scale = 0.001
-  const boxes: PackedBox[] = []
-
-  // V1 intentionally uses a simple shelf layout.
-  // Later this section can be replaced by LAFF / EB-AFIT.
-  let cursorX = 0
-  let cursorY = 0
-  let cursorZ = 0
-  let rowHeight = 0
-
-  for (const item of cargo) {
-    for (let i = 0; i < item.quantity; i++) {
-      if (cursorX + item.length > container.length) {
-        cursorX = 0
-        cursorY += 900
-        rowHeight = 0
-      }
-
-      if (cursorY + item.width > container.width) {
-        cursorX = 0
-        cursorY = 0
-        cursorZ += 900
-        rowHeight = 0
-      }
-
-      if (cursorZ + item.height > container.height) continue
-
-      boxes.push({
-        id: `${item.id}-${i + 1}`,
-        cargoId: item.id,
-        x: cursorX,
-        y: cursorY,
-        z: cursorZ,
-        length: item.length,
-        width: item.width,
-        height: item.height,
-        color: item.color,
-      })
-
-      cursorX += item.length
-      rowHeight = Math.max(rowHeight, item.height)
-    }
-  }
-
-  const centerX = container.length * scale / 2
-  const centerZ = container.width * scale / 2
-
-  return (
-    <>
-      <color attach="background" args={['#f5f6f8']} />
-
-      <ambientLight intensity={1.5} />
-      <directionalLight position={[8, 10, 8]} intensity={2.5} />
-      <Environment preset="city" />
-
-      <group position={[-centerX, 0, -centerZ]}>
-        {/* Container floor */}
-        <mesh position={[centerX, -0.04, centerZ]}>
-          <boxGeometry args={[container.length * scale, 0.08, container.width * scale]} />
-          <meshStandardMaterial color="#c9cdd3" />
-        </mesh>
-
-        {/* Container outline */}
-        <lineSegments>
-          <edgesGeometry
-            args={[
-              new THREE.BoxGeometry(
-                container.length * scale,
-                container.height * scale,
-                container.width * scale,
-              ),
-            ]}
-          />
-          <lineBasicMaterial color="#8c929b" />
-        </lineSegments>
-
-        {boxes.map((box) => (
-          <Box3D
-            key={box.id}
-            box={box}
-            selected={selectedId === box.id}
-            onClick={() => onSelect(box.id)}
-          />
-        ))}
-
-        <Grid
-          args={[container.length * scale, container.width * scale]}
-          position={[centerX, 0.01, centerZ]}
-          cellSize={0.5}
-          cellThickness={0.5}
-          sectionSize={2}
-          sectionThickness={1}
-          fadeDistance={25}
-          infiniteGrid={false}
-        />
-      </group>
-
-      <OrbitControls makeDefault />
-    </>
-  )
+function Scene({container,items,materials,selectedId,onSelect,onMove,onMaterialMove,view,dragging,onDragState,cameraQuaternion}:{container:Container;items:PlacedCargo[];materials:SecuringItem[];selectedId:string|null;onSelect:(id:string|null)=>void;onMove:(id:string,x:number,y:number,z:number)=>void;onMaterialMove:(id:string,x:number,y:number)=>void;view:View;dragging:boolean;onDragState:(v:boolean)=>void;cameraQuaternion:React.MutableRefObject<THREE.Quaternion>}){
+ return <>
+  <color attach="background" args={['#edf0f1']}/><ambientLight intensity={1.7}/><directionalLight position={[6,8,10]} intensity={2.1} castShadow/><Environment preset="city"/>
+  <ContainerStructure container={container}/><ContainerFloor container={container}/>
+  {items.map(p=><CargoInteraction key={p.id} p={p} container={container} selected={p.id===selectedId} onSelect={()=>onSelect(p.id)} onMove={onMove} onDragState={onDragState}/>)}
+  {materials.map(m=><SecuringModel key={m.id} item={m} container={container} onMove={onMaterialMove} onDragState={onDragState}/>)}
+  <CameraRig view={view} container={container} dragging={dragging} cameraQuaternion={cameraQuaternion}/>
+ </>
 }
-
-export default function ContainerScene(props: Props) {
-  return (
-    <Canvas camera={{ position: [14, 9, 15], fov: 42 }}>
-      <SceneContent {...props} />
-    </Canvas>
-  )
+export default function ContainerScene(props:{container:Container;items:PlacedCargo[];materials:SecuringItem[];selectedId:string|null;onSelect:(id:string|null)=>void;onMove:(id:string,x:number,y:number,z:number)=>void;onMaterialMove:(id:string,x:number,y:number)=>void;view:View;dragging:boolean;onDragState:(v:boolean)=>void;onView:(v:View)=>void}){
+ return <div className="scene-host"><Canvas shadows camera={{position:[7,7,5],fov:42}} onPointerMissed={()=>props.onSelect(null)}><Scene {...props} cameraQuaternion={useRef(new THREE.Quaternion())}/></Canvas></div>
 }
