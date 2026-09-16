@@ -1,10 +1,10 @@
 import type { Container, LashingPoint } from '../types'
 
 function points(length:number,width:number,height:number):LashingPoint[]{
-  const out:LashingPoint[]=[]; let n=1
-  for(const x of [300,length/2,length-300]) for(const y of [80,width-80]) out.push({id:`F${n++}`,x,y,z:0,type:'floor',maxLoad:1000})
-  for(const x of [250,length-250]) for(const z of [500,1200]) for(const y of [0,width]) out.push({id:`S${n++}`,x,y,z,type:'side',maxLoad:500})
-  return out
+ const out:LashingPoint[]=[]; const count=Math.max(5,Math.round(length/1200))
+ for(let i=0;i<count;i++){const x=Math.round((i+0.5)*length/count);out.push({id:`LB${i+1}`,x,y:55,z:45,type:'side',maxLoad:1000});out.push({id:`RB${i+1}`,x,y:width-55,z:45,type:'side',maxLoad:1000});out.push({id:`LT${i+1}`,x,y:55,z:Math.max(45,height-45),type:'side',maxLoad:1000});out.push({id:`RT${i+1}`,x,y:width-55,z:Math.max(45,height-45),type:'side',maxLoad:1000})}
+ for(const x of [120,Math.max(120,length-120)]) for(const y of [90,width-90]) out.push({id:`F${out.length+1}`,x,y,z:25,type:'floor',maxLoad:1000})
+ return out
 }
 
 export const containerTemplates:Container[]=[

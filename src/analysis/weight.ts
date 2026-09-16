@@ -9,7 +9,10 @@ export interface WeightAnalysis {
   left: number
   right: number
   corners: { fl: number; fr: number; rl: number; rr: number }
-  balanceScore: number
+  longitudinalOffset: number
+  transverseOffset: number
+  dominantOffset: number
+  dominantDirection: 'front'|'rear'|'left'|'right'|'balanced'
 }
 
 export function analyzeWeight(items: PlacedCargo[], c: Container): WeightAnalysis {
@@ -54,9 +57,10 @@ export function analyzeWeight(items: PlacedCargo[], c: Container): WeightAnalysi
     else corners.rr += p.weight
   }
 
-  const xImbalance = total ? Math.abs(front - rear) / total : 0
-  const yImbalance = total ? Math.abs(left - right) / total : 0
-  const balanceScore = Math.max(0, 100 - (xImbalance + yImbalance) * 100)
+  const longitudinalOffset = Math.abs(front - rear)
+  const transverseOffset = Math.abs(left - right)
+  const dominantOffset = Math.max(longitudinalOffset, transverseOffset)
+  const dominantDirection = dominantOffset < 0.5 ? 'balanced' : longitudinalOffset >= transverseOffset ? (front > rear ? 'front' : 'rear') : (left > right ? 'left' : 'right')
 
   return {
     total,
@@ -66,6 +70,9 @@ export function analyzeWeight(items: PlacedCargo[], c: Container): WeightAnalysi
     left,
     right,
     corners,
-    balanceScore,
+    longitudinalOffset,
+    transverseOffset,
+    dominantOffset,
+    dominantDirection,
   }
 }

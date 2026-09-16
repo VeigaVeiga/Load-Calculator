@@ -80,6 +80,9 @@ export interface SecuringItem {
   width: number
   height: number
   rotation: number
+  path?: Array<{x:number;y:number;z:number}>
+  stretchable?: boolean
+  selectedNode?: number
 }
 
 export interface DunnageAirBag { id: string; cargoId: string; x: number; y: number; z: number; length: number; width: number; height: number; ratedCapacity?: number }

@@ -5,11 +5,11 @@ const S=.001
 export default function ContainerFloor({container}:{container:Container}){
  const L=container.length*S,W=container.width*S
  const lines:ReactElement[]=[]
- // Grid is symmetric about the container centerline. 100 mm minor grid, 1 m major grid.
+ // Grid is symmetric about the container centerline. 200 mm minor grid, 1 m major grid.
  const addAxisLines=(axis:'x'|'y')=>{
    const total=axis==='x'?container.length:container.width
    const half=total/2
-   for(let offset=-Math.floor(half/100)*100;offset<=Math.floor(half/100)*100;offset+=100){
+   for(let offset=-Math.floor(half/200)*200;offset<=Math.floor(half/200)*200;offset+=200){
      const major=Math.abs(offset)%1000===0
      if(axis==='x'){
        const X=offset*S

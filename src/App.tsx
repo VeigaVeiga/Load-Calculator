@@ -13,7 +13,7 @@ import type {
   SecuringItem,
   SecuringMaterialType,
 } from './types'
-import { autoPack } from './packing/packer'
+import { autoPack, autoPackAsync } from './packing/packer'
 import { validatePlacement } from './packing/geometry'
 import { analyzeWeight } from './analysis/weight'
 import { cbm, mm } from './utils'
@@ -24,8 +24,7 @@ const MAX_CARGO_VOLUME_CBM = 120
 
 const T = {
   zh: {
-    title: '铁路集装箱装载规划器',
-    subtitle: '3D 可视化 · 装箱 · 重量分析 · 加固规划',
+    title: '集装箱装载规划器',
     cargo: '货物列表',
     add: '添加货物',
     carton: '纸箱',
@@ -105,8 +104,7 @@ const T = {
   },
 
   en: {
-    title: 'Railway Container Loading Planner',
-    subtitle: '3D Visualization · Packing · Weight Analysis · Securing',
+    title: 'Container Loading Planner',
     cargo: 'Cargo List',
     add: 'Add Cargo',
     carton: 'Carton',
@@ -278,6 +276,17 @@ function App() {
 
   const [message, setMessage] = useState('')
 
+  const [lowPower, setLowPower] = useState(false)
+  const [showDimensions, setShowDimensions] = useState(true)
+  const [airBagStretch, setAirBagStretch] = useState(true)
+  const [packingProgress, setPackingProgress] = useState<number | null>(null)
+
+  useEffect(() => {
+    const mobile = window.matchMedia('(max-width: 780px)').matches || /Android|iPhone|iPad|Mobile/i.test(navigator.userAgent)
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    setLowPower(mobile || reduced)
+  }, [])
+
   const [materials, setMaterials] = useState<SecuringItem[]>([])
 
   useEffect(() => {
@@ -310,6 +319,58 @@ function App() {
     () => analyzeWeight(placed, container),
     [placed, container],
   )
+
+  const placedByCargo = useMemo(() => {
+    const map: Record<string, number> = {}
+    for (const p of placed) map[p.cargoId] = (map[p.cargoId] || 0) + 1
+    return map
+  }, [placed])
+
+  const overflowCount = useMemo(() =>
+    cargo.reduce((sum, c) => sum + Math.max(0, Math.floor(c.quantity) - (placedByCargo[c.id] || 0)), 0),
+    [cargo, placedByCargo],
+  )
+
+  const overflowItems = useMemo<PlacedCargo[]>(() => {
+    const result: PlacedCargo[] = []
+    const gap = 180
+    const zoneXMax = Math.max(1000, container.length - 700)
+    let cursorX = 250
+    let cursorY = -11550
+    let rowDepth = 0
+    for (const c of cargo) {
+      const missing = Math.max(0, Math.floor(c.quantity) - (placedByCargo[c.id] || 0))
+      for (let i = 0; i < missing && result.length < 48; i += 1) {
+        const rotation = c.rotatable && (result.length % 2 === 1) ? 90 : 0
+        const L = rotation % 180 === 0 ? c.length : c.width
+        const W = rotation % 180 === 0 ? c.width : c.length
+        if (cursorX + L > zoneXMax && cursorX > 250) {
+          cursorX = 250
+          cursorY -= rowDepth + gap
+          rowDepth = 0
+        }
+        result.push({
+          id: `overflow-${c.id}-${i + 1}`,
+          cargoId: c.id,
+          cargoType: c.type,
+          x: cursorX,
+          y: cursorY,
+          z: 0,
+          length: c.length,
+          width: c.width,
+          height: c.height,
+          rotation,
+          weight: c.weight,
+          color: c.color,
+          placementMode: 'manual',
+          locked: false,
+        })
+        cursorX += L + gap
+        rowDepth = Math.max(rowDepth, W)
+      }
+    }
+    return result
+  }, [cargo, placedByCargo, container.length])
 
   const selected = placed.find((p) => p.id === selectedId)
 
@@ -390,6 +451,10 @@ function App() {
       y,
       z,
     })
+  }
+
+  const rotateCargo = (id: string, rotation: number) => {
+    setP(id, { rotation: ((Math.round(rotation / 90) * 90) % 360 + 360) % 360 })
   }
 
   const add = () => {
@@ -543,23 +608,29 @@ function App() {
     update(id, 'type', type)
   }
 
-  const repack = () => {
-    setPlaced(
-      autoPack(
-        cargo,
-        container,
-        placed.filter((p) => p.locked),
-      ),
-    )
-
-    setSelectedId(null)
-
-    setMessage(
-      lang === 'zh'
-        ? '自动装柜完成'
-        : 'Auto packing complete',
-    )
+  const runPacking = async (nextContainer = container) => {
+    if (packingProgress !== null) return
+    const locked = placed.filter((p) => p.locked)
+    setPackingProgress(0)
+    setMessage('')
+    let lastProgress = -1
+    try {
+      const result = await autoPackAsync(cargo, nextContainer, locked, (done, total) => {
+        const percent = total ? Math.round((done / total) * 100) : 100
+        if (percent !== lastProgress) {
+          lastProgress = percent
+          setPackingProgress(percent)
+        }
+      })
+      setPlaced(result)
+      setSelectedId(null)
+      setMessage(lang === 'zh' ? '自动装柜完成' : 'Auto packing complete')
+    } finally {
+      setPackingProgress(null)
+    }
   }
+
+  const repack = () => { void runPacking(container) }
 
   const addMaterial = (
     type: SecuringMaterialType,
@@ -569,35 +640,36 @@ function App() {
     const material: SecuringItem = {
       id: `${type}-${n}`,
       type,
-      x: container.length / 2 - 400,
-      y: container.width / 2 - 150,
+      x: 350 + ((n - 1) % 8) * 1450,
+      y: 11550 + container.width / 2 - 50 - Math.floor((n - 1) / 8) * 950,
       z: 0,
       length:
         type === 'triangleWood'
-          ? 250
+          ? 200
           : type === 'lashingBelt'
-            ? 1000
+            ? 3000
             : type === 'doorNet'
               ? 40
-              : 700,
+              : 1000,
       width:
         type === 'triangleWood'
-          ? 120
+          ? 150
           : type === 'lashingBelt'
-            ? 40
+            ? 4
             : type === 'doorNet'
               ? container.doorWidth
-              : 150,
+              : 1000,
       height:
         type === 'triangleWood'
-          ? 180
+          ? 150
           : type === 'lashingBelt'
-            ? 35
+            ? 4
             : type === 'doorNet'
               ? container.doorHeight
-              : 100,
+              : 1800,
       rotation: 0,
     }
+    material.y = Math.round(11550 + container.width / 2 - material.width / 2 - Math.floor((n - 1) / 8) * 950)
 
     setMaterials((items) => [
       ...items,
@@ -758,8 +830,8 @@ function App() {
 
     const title =
       lang === 'zh'
-        ? `铁路集装箱装载规划器 · ${container.name}`
-        : `Railway Container Loading Planner · ${container.name}`
+        ? `集装箱装载规划器 · ${container.name}`
+        : `Container Loading Planner · ${container.name}`
 
     const svg = `
       <svg
@@ -997,16 +1069,10 @@ function App() {
   return (
     <div className="app">
       <header className="topbar">
-        <div>
-          <div className="eyebrow">
-            RAILWAY CONTAINER PLANNER
-          </div>
-
+        <div className="hero-title">
+          <div className="hero-orbit" aria-hidden="true" />
+          <div className="hero-rule" aria-hidden="true" />
           <h1>{tr.title}</h1>
-
-          <div className="app-subtitle">
-            {tr.subtitle}
-          </div>
         </div>
 
         <div className="top-actions">
@@ -1056,15 +1122,7 @@ function App() {
                         (x) => x.id === id,
                       )!
 
-                setPlaced(
-                  autoPack(
-                    cargo,
-                    nextContainer,
-                    [],
-                  ),
-                )
-
-                setSelectedId(null)
+                void runPacking(nextContainer)
               }}
             >
               {containerTemplates.map(
@@ -1164,15 +1222,7 @@ function App() {
           </label>
 
           <button
-            onClick={() =>
-              setPlaced(
-                autoPack(
-                  cargo,
-                  container,
-                  [],
-                ),
-              )
-            }
+            onClick={() => void runPacking(container)}
           >
             {tr.customApply}
           </button>
@@ -1258,6 +1308,19 @@ function App() {
             >
               {tr.clear}
             </button>
+          </div>
+
+          <div className="securing-palette">
+            <div className="palette-title">
+              <span>{tr.materials}</span>
+              <small>{lang === 'zh' ? '点击添加到 3D 场景' : 'Click to add to 3D scene'}</small>
+            </div>
+            <div className="material-toolbar">
+              <button onClick={() => addMaterial('triangleWood')}>▰ {tr.triangle}</button>
+              <button onClick={() => addMaterial('lashingBelt')}>━ {tr.belt}</button>
+              <button onClick={() => addMaterial('airBag')}>□ {tr.airbag}</button>
+              <button onClick={() => addMaterial('doorNet')}>▦ {tr.net}</button>
+            </div>
           </div>
 
           <div className="cargo-list">
@@ -1630,6 +1693,7 @@ function App() {
 
           <div className="view-toolbar">
             <span>{tr.view}</span>
+            <button className={showDimensions ? 'active' : ''} onClick={() => setShowDimensions(v => !v)}>{lang === 'zh' ? '尺寸标注' : 'Dimensions'}</button>
 
             <button
               className={
@@ -1692,6 +1756,16 @@ function App() {
           </div>
 
           <div className="canvas-wrap">
+            {packingProgress !== null && (
+              <div className="packing-overlay">
+                <div className="packing-panel">
+                  <div className="packing-kicker">{lang === 'zh' ? '装载计算中' : 'PACKING IN PROGRESS'}</div>
+                  <strong>{packingProgress}%</strong>
+                  <div className="packing-track"><i style={{ width: `${packingProgress}%` }} /></div>
+                  <span>{lang === 'zh' ? '正在搜索摆放位置与旋转组合，请稍候…' : 'Searching placement and rotation combinations…'}</span>
+                </div>
+              </div>
+            )}
             <ContainerScene
               container={container}
               items={placed}
@@ -1699,8 +1773,18 @@ function App() {
               selectedId={selectedId}
               onSelect={setSelectedId}
               onMove={move}
+              onRotate={rotateCargo}
               onMaterialMove={
                 moveMaterial
+              }
+              onRotateMaterial={(id, rotation) =>
+                setMaterials((items) =>
+                  items.map((m) =>
+                    m.id === id
+                      ? { ...m, rotation: ((Math.round(rotation / 90) * 90) % 360 + 360) % 360 }
+                      : m,
+                  ),
+                )
               }
               view={view}
               dragging={dragging}
@@ -1713,6 +1797,11 @@ function App() {
               freePlacement={
                 freePlacement
               }
+              overflowCount={overflowCount}
+              overflowItems={overflowItems}
+              lowPower={lowPower}
+              showDimensions={showDimensions}
+              airBagStretch={airBagStretch}
             />
           </div>
 
@@ -1722,12 +1811,13 @@ function App() {
             <span>{tr.axis}</span>
 
             <span>
-              {tr.balance}{' '}
-              {analysis.balanceScore.toFixed(
-                0,
-              )}
-              %
+              {lang === 'zh' ? '偏载' : 'IMBALANCE'} {analysis.dominantOffset.toFixed(0)} kg
             </span>
+            {overflowCount > 0 && (
+              <span className="overflow-badge">
+                {lang === 'zh' ? `未装载 ${overflowCount} 件` : `${overflowCount} unplaced`}
+              </span>
+            )}
           </div>
         </section>
 
@@ -1811,130 +1901,13 @@ function App() {
           {tab === 'analysis' && (
             <div className="analysis">
               <h3>{tr.weight}</h3>
-
-              <div className="balance-grid">
-                <span>
-                  {tr.frontWeight}
-
-                  <b>
-                    {analysis.front.toFixed(
-                      0,
-                    )}{' '}
-                    kg
-                  </b>
-                </span>
-
-                <span>
-                  {tr.doorWeight}
-
-                  <b>
-                    {analysis.rear.toFixed(
-                      0,
-                    )}{' '}
-                    kg
-                  </b>
-                </span>
-
-                <span>
-                  {tr.leftWeight}
-
-                  <b>
-                    {analysis.left.toFixed(
-                      0,
-                    )}{' '}
-                    kg
-                  </b>
-                </span>
-
-                <span>
-                  {tr.rightWeight}
-
-                  <b>
-                    {analysis.right.toFixed(
-                      0,
-                    )}{' '}
-                    kg
-                  </b>
-                </span>
+              <div className="bias-primary">
+                <span>{lang === 'zh' ? '当前偏载' : 'CURRENT IMBALANCE'}</span>
+                <b>{analysis.dominantOffset.toFixed(0)} kg</b>
+                <strong>{analysis.dominantDirection === 'balanced' ? (lang === 'zh' ? '基本平衡' : 'BALANCED') : analysis.dominantDirection === 'front' ? (lang === 'zh' ? '偏柜头' : 'TOWARD FRONT') : analysis.dominantDirection === 'rear' ? (lang === 'zh' ? '偏柜门' : 'TOWARD DOOR') : analysis.dominantDirection === 'left' ? (lang === 'zh' ? '偏左侧' : 'TOWARD LEFT') : (lang === 'zh' ? '偏右侧' : 'TOWARD RIGHT')}</strong>
               </div>
-
-              <h4>
-                {tr.fourCorners}
-              </h4>
-
-              <div className="balance-grid">
-                <span>
-                  {lang === 'zh'
-                    ? '柜头左'
-                    : 'FRONT-LEFT'}{' '}
-                  / FL
-
-                  <b>
-                    {analysis.corners.fl.toFixed(
-                      0,
-                    )}{' '}
-                    kg
-                  </b>
-                </span>
-
-                <span>
-                  {lang === 'zh'
-                    ? '柜头右'
-                    : 'FRONT-RIGHT'}{' '}
-                  / FR
-
-                  <b>
-                    {analysis.corners.fr.toFixed(
-                      0,
-                    )}{' '}
-                    kg
-                  </b>
-                </span>
-
-                <span>
-                  {lang === 'zh'
-                    ? '柜门左'
-                    : 'DOOR-LEFT'}{' '}
-                  / RL
-
-                  <b>
-                    {analysis.corners.rl.toFixed(
-                      0,
-                    )}{' '}
-                    kg
-                  </b>
-                </span>
-
-                <span>
-                  {lang === 'zh'
-                    ? '柜门右'
-                    : 'DOOR-RIGHT'}{' '}
-                  / RR
-
-                  <b>
-                    {analysis.corners.rr.toFixed(
-                      0,
-                    )}{' '}
-                    kg
-                  </b>
-                </span>
-              </div>
-
-              <p>
-                {tr.balance}{' '}
-                <b>
-                  {analysis.balanceScore.toFixed(
-                    0,
-                  )}
-                  %
-                </b>
-              </p>
-
-              <CenterOfGravity
-                analysis={analysis}
-                container={container}
-                lang={lang}
-              />
+              <p className="analysis-note">{lang === 'zh' ? '偏载 = 相对两侧的实际重量差。' : 'Imbalance is the actual weight difference between opposite sides.'}</p>
+              <CenterOfGravity analysis={analysis} container={container} lang={lang}/>
             </div>
           )}
 
@@ -1942,55 +1915,10 @@ function App() {
             <div className="analysis">
               <h3>{tr.secure}</h3>
 
-              <div className="material-toolbar">
-                <button
-                  onClick={() =>
-                    addMaterial(
-                      'triangleWood',
-                    )
-                  }
-                >
-                  ▰ {tr.triangle}
-                </button>
+              <p className="hint">{tr.securingHint}<br/>{lang === 'zh' ? '选中模型后：G 移动 · R 旋转' : 'Select a model: G = move · R = rotate'}</p>
 
-                <button
-                  onClick={() =>
-                    addMaterial(
-                      'lashingBelt',
-                    )
-                  }
-                >
-                  ━ {tr.belt}
-                </button>
-
-                <button
-                  onClick={() =>
-                    addMaterial(
-                      'airBag',
-                    )
-                  }
-                >
-                  □ {tr.airbag}
-                </button>
-
-                <button
-                  onClick={() =>
-                    addMaterial(
-                      'doorNet',
-                    )
-                  }
-                >
-                  ▦ {tr.net}
-                </button>
-              </div>
-
-              <p className="hint">
-                {tr.securingHint}
-              </p>
-
-              <h4>
-                {tr.materialCount}
-              </h4>
+              <h4>{tr.materialCount}</h4>
+              <label className="stretch-toggle"><input type="checkbox" checked={airBagStretch} onChange={e => setAirBagStretch(e.target.checked)} /> {lang === 'zh' ? '充气袋允许拉伸适配间隙' : 'Allow air bags to stretch to fit gaps'}</label>
 
               <div className="material-stats">
                 {(
