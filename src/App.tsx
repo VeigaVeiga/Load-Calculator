@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
 import ContainerScene, { type View } from './components/ContainerScene'
 import CargoProperties from './components/CargoProperties'
@@ -17,6 +17,7 @@ import { autoPack, autoPackAsync } from './packing/packer'
 import { validatePlacement } from './packing/geometry'
 import { analyzeWeight } from './analysis/weight'
 import { cbm, mm } from './utils'
+import { createDocxWithPlanImages, extractZipEntry } from './utils/docxTemplate'
 
 type Lang = 'zh' | 'en'
 
@@ -31,7 +32,6 @@ const T = {
     pallet: '托盘',
     crate: '木箱',
     auto: '自动装柜',
-    opt: '优化装载',
     clear: '清除未锁定',
     properties: '货物属性',
     weight: '重量分析',
@@ -46,8 +46,15 @@ const T = {
     reset: '重置视图',
     lang: '语言',
     custom: '自定义集装箱',
-    import: '导入模板',
+    import: '',
     export: '导出三视图',
+    exportPlan: '导出装箱方案',
+    autoQuality: '自动',
+    lowQuality: '性能',
+    standardQuality: '标准',
+    ultraQuality: '极致',
+    securingMode: '加固模式',
+    exitSecuringMode: '退出加固',
     materials: '加固材料',
     triangle: '三角木',
     belt: '紧固带',
@@ -66,6 +73,7 @@ const T = {
     width: '宽度',
     height: '高度',
     stack: '可堆叠',
+    loadBearing: '可承重',
     rotate: '允许旋转',
     color: '颜色',
     showName: '3D 显示货物名称',
@@ -94,8 +102,10 @@ const T = {
     support: '支撑面积不足',
     floating: '货物处于悬空位置，请检查支撑',
     freePlacement: '自由摆放',
+    singleSelect: '单选',
+    boxSelect: '框选',
     stopPlacement: '结束摆放',
-    securingHint: '添加后可在 3D 视图中拖动 · 统计只记录当前方案材料。',
+    securingHint: '从 3D 左侧工具栏选择加固材料。',
     planningAid: '仅作为装载规划辅助，不代表加固认证。',
     cargoType: '货物类型',
     name: '名称',
@@ -126,8 +136,15 @@ const T = {
     reset: 'RESET VIEW',
     lang: 'Language',
     custom: 'Custom Container',
-    import: 'Import Template',
+    import: '',
     export: 'Export 3 Views',
+    exportPlan: 'Export Loading Plan',
+    autoQuality: 'Auto',
+    lowQuality: 'Performance',
+    standardQuality: 'Standard',
+    ultraQuality: 'Ultra',
+    securingMode: 'Securing Mode',
+    exitSecuringMode: 'Exit Securing',
     materials: 'Securing Materials',
     triangle: 'Triangle Wood',
     belt: 'Lashing Belt',
@@ -146,6 +163,7 @@ const T = {
     width: 'Width',
     height: 'Height',
     stack: 'Stackable',
+    loadBearing: 'Load-bearing',
     rotate: 'Rotatable',
     color: 'Color',
     showName: 'Show cargo name in 3D',
@@ -174,9 +192,10 @@ const T = {
     support: 'Insufficient support area',
     floating: 'Cargo is floating; check support',
     freePlacement: 'Free Placement',
+    singleSelect: 'Single Select',
+    boxSelect: 'Box Select',
     stopPlacement: 'Stop Placement',
-    securingHint:
-      'Drag added materials in the 3D view · counts reflect the current plan.',
+    securingHint: 'Choose securing materials from the 3D toolbar.',
     planningAid: 'Planning aid only; not a securing certification.',
     cargoType: 'Cargo Type',
     name: 'Name',
@@ -265,6 +284,8 @@ function App() {
   )
 
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [selectionMode, setSelectionMode] = useState<'single'|'box'>('single')
 
   const [tab, setTab] = useState<'cargo' | 'analysis' | 'secure'>('cargo')
 
@@ -276,16 +297,12 @@ function App() {
 
   const [message, setMessage] = useState('')
 
-  const [lowPower, setLowPower] = useState(false)
+  const [securingMode, setSecuringMode] = useState(false)
   const [showDimensions, setShowDimensions] = useState(true)
-  const [airBagStretch, setAirBagStretch] = useState(true)
+  const [airBagStretch] = useState(false)
+  const cargoSignatureRef = useRef('')
   const [packingProgress, setPackingProgress] = useState<number | null>(null)
 
-  useEffect(() => {
-    const mobile = window.matchMedia('(max-width: 780px)').matches || /Android|iPhone|iPad|Mobile/i.test(navigator.userAgent)
-    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    setLowPower(mobile || reduced)
-  }, [])
 
   const [materials, setMaterials] = useState<SecuringItem[]>([])
 
@@ -298,6 +315,15 @@ function App() {
 
     return () => window.clearTimeout(timer)
   }, [message])
+
+  const cargoSignature = useMemo(() => cargo.map(c => `${c.id}:${c.quantity}:${c.length}:${c.width}:${c.height}:${c.weight}:${c.type}:${c.stackable}:${c.loadBearing}:${c.rotatable}:${c.maxStackLayers}:${c.maxLoadOnTop}`).join('|'), [cargo])
+  useEffect(() => {
+    if (!cargoSignatureRef.current) { cargoSignatureRef.current = cargoSignature; return }
+    if (cargoSignatureRef.current === cargoSignature) return
+    cargoSignatureRef.current = cargoSignature
+    const timer = window.setTimeout(() => { void runPacking(container) }, 550)
+    return () => window.clearTimeout(timer)
+  }, [cargoSignature])
 
   const totals = useMemo(
     () => ({
@@ -334,9 +360,9 @@ function App() {
   const overflowItems = useMemo<PlacedCargo[]>(() => {
     const result: PlacedCargo[] = []
     const gap = 180
-    const zoneXMax = Math.max(1000, container.length - 700)
+    const zoneXMax = Math.max(1000, container.length - 500)
     let cursorX = 250
-    let cursorY = -11550
+    let cursorY = -3000
     let rowDepth = 0
     for (const c of cargo) {
       const missing = Math.max(0, Math.floor(c.quantity) - (placedByCargo[c.id] || 0))
@@ -377,6 +403,16 @@ function App() {
   const selectedCargo = cargo.find(
     (c) => c.id === selected?.cargoId,
   )
+
+  const selectOne = (id: string | null) => {
+    setSelectedId(id)
+    setSelectedIds(id ? [id] : [])
+  }
+
+  const selectMany = (ids: string[]) => {
+    setSelectedIds(ids)
+    setSelectedId(ids[0] ?? null)
+  }
 
   const setP = (
     id: string,
@@ -473,6 +509,7 @@ function App() {
       showName: false,
       locked: false,
       stackable: true,
+      loadBearing: true,
       rotatable: true,
       maxStackLayers: 4,
       maxLoadOnTop: 100,
@@ -540,52 +577,17 @@ function App() {
 
   const updateNumber = (
     id: string,
-    key:
-      | 'quantity'
-      | 'length'
-      | 'width'
-      | 'height'
-      | 'weight',
+    key: 'quantity'|'length'|'width'|'height'|'weight',
     raw: number,
   ) => {
-    const value = Math.max(
-      key === 'quantity' ||
-        key === 'length' ||
-        key === 'width' ||
-        key === 'height'
-        ? 1
-        : 0,
-      Number.isFinite(raw) ? raw : 0,
-    )
+    const value = Math.max(key === 'quantity' || key === 'length' || key === 'width' || key === 'height' ? 1 : 0, Number.isFinite(raw) ? raw : 0)
+    setCargo(items => items.map(c => c.id === id ? { ...c, [key]: value } : c))
+  }
 
-    setCargo((items) =>
-      items.map((c) => {
-        if (c.id !== id) {
-          return c
-        }
-
-        const next = {
-          ...c,
-          [key]: value,
-        }
-
-        const volume = cbm(
-          next.length,
-          next.width,
-          next.height,
-          next.quantity,
-        )
-
-        if (volume > MAX_CARGO_VOLUME_CBM) {
-          setMessage(tr.volumeLimit)
-          return c
-        }
-
-        setMessage('')
-
-        return next
-      }),
-    )
+  const limitsFor=(c:Cargo)=>({maxQuantity:c.type==='pallet'?50:600,maxVolume:MAX_CARGO_VOLUME_CBM})
+  const inputInvalid=(c:Cargo,key:'quantity'|'length'|'width'|'height')=>{
+    const lim=limitsFor(c); const vol=cbm(c.length,c.width,c.height,c.quantity)
+    return key==='quantity' ? c.quantity>lim.maxQuantity || vol>lim.maxVolume : vol>lim.maxVolume
   }
 
   const remove = (id: string) => {
@@ -598,6 +600,7 @@ function App() {
     )
 
     setSelectedId(null)
+    setSelectedIds([])
     setMessage('')
   }
 
@@ -615,22 +618,22 @@ function App() {
     setMessage('')
     let lastProgress = -1
     try {
-      const result = await autoPackAsync(cargo, nextContainer, locked, (done, total) => {
-        const percent = total ? Math.round((done / total) * 100) : 100
-        if (percent !== lastProgress) {
-          lastProgress = percent
-          setPackingProgress(percent)
+      const result = await autoPackAsync(cargo, nextContainer, locked, (percent) => {
+        const safePercent = Math.min(100, Math.max(0, Math.round(percent)))
+        if (safePercent !== lastProgress) {
+          lastProgress = safePercent
+          setPackingProgress(safePercent)
         }
       })
       setPlaced(result)
       setSelectedId(null)
+      setSelectedIds([])
       setMessage(lang === 'zh' ? '自动装柜完成' : 'Auto packing complete')
     } finally {
       setPackingProgress(null)
     }
   }
 
-  const repack = () => { void runPacking(container) }
 
   const addMaterial = (
     type: SecuringMaterialType,
@@ -641,7 +644,7 @@ function App() {
       id: `${type}-${n}`,
       type,
       x: 350 + ((n - 1) % 8) * 1450,
-      y: 11550 + container.width / 2 - 50 - Math.floor((n - 1) / 8) * 950,
+      y: 3000 - 50 - Math.floor((n - 1) / 8) * 950,
       z: 0,
       length:
         type === 'triangleWood'
@@ -657,7 +660,7 @@ function App() {
           : type === 'lashingBelt'
             ? 4
             : type === 'doorNet'
-              ? container.doorWidth
+              ? container.width
               : 1000,
       height:
         type === 'triangleWood'
@@ -665,11 +668,11 @@ function App() {
           : type === 'lashingBelt'
             ? 4
             : type === 'doorNet'
-              ? container.doorHeight
+              ? container.height
               : 1800,
       rotation: 0,
     }
-    material.y = Math.round(11550 + container.width / 2 - material.width / 2 - Math.floor((n - 1) / 8) * 950)
+    material.y = Math.round(container.width / 2 + 3000 + material.width / 2 + Math.floor((n - 1) / 8) * 950)
 
     setMaterials((items) => [
       ...items,
@@ -695,6 +698,11 @@ function App() {
     )
   }
 
+  const scaleMaterial = (id:string, factor:number) => {
+    const f=Math.max(.25,Math.min(4,factor))
+    setMaterials(items=>items.map(m=>m.id===id?{...m,length:Math.round(m.length*f/10)*10,width:Math.round(m.width*f/10)*10,height:Math.round(m.height*f/10)*10}:m))
+  }
+
   const materialCounts = useMemo(
     () =>
       materials.reduce(
@@ -708,366 +716,53 @@ function App() {
     [materials],
   )
 
-  const exportThree = () => {
-    const W = 1400
-    const H = 820
+  const makeTopViewSvg=(W:number,H:number)=>{
+    const ratio=container.length/container.width
+    const boxH=Math.min(H-70,(W-80)/ratio),boxW=boxH*ratio,bx=(W-boxW)/2,by=50
+    const rect=(x:number,y:number,w:number,h:number,c:string)=>`<rect x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${w.toFixed(2)}" height="${h.toFixed(2)}" fill="${c}" fill-opacity=".82" stroke="#243b4b" stroke-width="1.2"/>`
+    let shapes=''
+    for(const p of placed){const d=p.rotation%180===0?{l:p.length,w:p.width}:{l:p.width,w:p.length};shapes+=rect(bx+p.x/container.length*boxW,by+p.y/container.width*boxH,d.l/container.length*boxW,d.w/container.width*boxH,p.color)}
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"><rect width="100%" height="100%" fill="#fff"/><text x="${W/2}" y="25" text-anchor="middle" font-size="17" font-weight="700" fill="#17354d">${container.name} · ${lang==='zh'?'俯视示意图':'TOP VIEW'}</text><rect x="${bx}" y="${by}" width="${boxW}" height="${boxH}" fill="#eef4f7" stroke="#17354d" stroke-width="2"/>${shapes}</svg>`
+  }
 
-    const esc = (value: string) =>
-      value
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
+  const makeSideFrontSvg=(W:number,H:number)=>{
+    const fit=(x:number,y:number,maxW:number,maxH:number,ratio:number)=>{const w=Math.min(maxW,maxH*ratio),h=w/ratio;return{x:x+(maxW-w)/2,y:y+(maxH-h)/2,w,h}}
+    const gap=34,side=fit(25,48,W*.63-gap/2,H-80,container.length/container.height),front=fit(W*.63+gap/2,48,W*.37-25-gap/2,H-80,container.width/container.height)
+    const rect=(x:number,y:number,w:number,h:number,c:string)=>`<rect x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${w.toFixed(2)}" height="${h.toFixed(2)}" fill="${c}" fill-opacity=".82" stroke="#243b4b" stroke-width="1.1"/>`
+    let left='',frontShapes=''
+    for(const p of placed){const d=p.rotation%180===0?{l:p.length,w:p.width}:{l:p.width,w:p.length};left+=rect(side.x+p.x/container.length*side.w,side.y+(1-(p.z+p.height)/container.height)*side.h,d.l/container.length*side.w,p.height/container.height*side.h,p.color);frontShapes+=rect(front.x+p.y/container.width*front.w,front.y+(1-(p.z+p.height)/container.height)*front.h,d.w/container.width*front.w,p.height/container.height*front.h,p.color)}
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"><rect width="100%" height="100%" fill="#fff"/><text x="${side.x+side.w/2}" y="30" text-anchor="middle" font-size="15" font-weight="700" fill="#17354d">${lang==='zh'?'侧视示意图':'SIDE VIEW'}</text><text x="${front.x+front.w/2}" y="30" text-anchor="middle" font-size="15" font-weight="700" fill="#17354d">${lang==='zh'?'正视示意图':'FRONT VIEW'}</text><rect x="${side.x}" y="${side.y}" width="${side.w}" height="${side.h}" fill="#eef4f7" stroke="#17354d" stroke-width="2"/>${left}<rect x="${front.x}" y="${front.y}" width="${front.w}" height="${front.h}" fill="#eef4f7" stroke="#17354d" stroke-width="2"/>${frontShapes}</svg>`
+  }
 
-    const box = (
-      x: number,
-      y: number,
-      w: number,
-      h: number,
-      color: string,
-      name: string,
-      show: boolean,
-    ) =>
-      `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${color}" fill-opacity=".72" stroke="#56615e"/>${
-        show
-          ? `<text x="${x + w / 2}" y="${y + h / 2}" text-anchor="middle" dominant-baseline="middle" font-size="11" fill="#263238">${esc(name)}</text>`
-          : ''
-      }`
+  const svgToPng=async(svg:string,W:number,H:number)=>{
+    const url=URL.createObjectURL(new Blob([svg],{type:'image/svg+xml;charset=utf-8'}))
+    try{const img=await new Promise<HTMLImageElement>((resolve,reject)=>{const i=new Image();i.onload=()=>resolve(i);i.onerror=reject;i.src=url});const canvas=document.createElement('canvas');canvas.width=W;canvas.height=H;const ctx=canvas.getContext('2d');if(!ctx)throw new Error('Canvas unavailable');ctx.drawImage(img,0,0,W,H);const blob=await new Promise<Blob|null>(r=>canvas.toBlob(r,'image/png'));if(!blob)throw new Error('PNG export failed');return new Uint8Array(await blob.arrayBuffer())}finally{URL.revokeObjectURL(url)}
+  }
 
-    let top = ''
-    let front = ''
-    let side = ''
+  const exportThree=async()=>{
+    const top=await svgToPng(makeTopViewSvg(1000,420),1000,420),sf=await svgToPng(makeSideFrontSvg(1000,430),1000,430)
+    const canvas=document.createElement('canvas');canvas.width=1600;canvas.height=950;const ctx=canvas.getContext('2d');if(!ctx)throw new Error('Canvas unavailable');ctx.fillStyle='#fff';ctx.fillRect(0,0,1600,950)
+    const a1=await createImageBitmap(new Blob([top],{type:'image/png'})),a2=await createImageBitmap(new Blob([sf],{type:'image/png'}));ctx.drawImage(a1,40,30,1520,420);ctx.drawImage(a2,40,480,1520,440);a1.close();a2.close()
+    const blob=await new Promise<Blob|null>(r=>canvas.toBlob(r,'image/png'));if(!blob)throw new Error('PNG export failed');const u=URL.createObjectURL(blob);const a=document.createElement('a');a.href=u;a.download=`${container.name}-three-views.png`;a.click();setTimeout(()=>URL.revokeObjectURL(u),1000)
+  }
 
-    for (const p of placed) {
-      const dimensions =
-        p.rotation % 180 === 0
-          ? {
-              l: p.length,
-              w: p.width,
-            }
-          : {
-              l: p.width,
-              w: p.length,
-            }
+  const setCellText=(cell:Element,text:string)=>{
+    const ns='http://schemas.openxmlformats.org/wordprocessingml/2006/main';const texts=Array.from(cell.getElementsByTagNameNS(ns,'t'));if(texts.length){texts[0].textContent=text;for(let i=1;i<texts.length;i++)texts[i].textContent=''}
+  }
 
-      const cargoDef = cargo.find(
-        (c) => c.id === p.cargoId,
-      )
-
-      const show = !!cargoDef?.showName
-
-      const name =
-        cargoDef?.name || p.cargoId
-
-      top += box(
-        80 +
-          (p.x / container.length) *
-            600,
-        85 +
-          (p.y / container.width) *
-            180,
-        (dimensions.l / container.length) *
-          600,
-        (dimensions.w / container.width) *
-          180,
-        p.color,
-        name,
-        show,
-      )
-
-      front += box(
-        80 +
-          (p.y / container.width) *
-            600,
-        335 +
-          (1 -
-            (p.z + p.height) /
-              container.height) *
-            200,
-        (dimensions.w / container.width) *
-          600,
-        (p.height / container.height) *
-          200,
-        p.color,
-        name,
-        show,
-      )
-
-      side += box(
-        780 +
-          (p.x / container.length) *
-            420,
-        335 +
-          (1 -
-            (p.z + p.height) /
-              container.height) *
-            200,
-        (dimensions.l / container.length) *
-          420,
-        (p.height / container.height) *
-          200,
-        p.color,
-        name,
-        show,
-      )
-    }
-
-    const matRows = Object.entries(
-      materialCounts,
-    )
-      .map(
-        ([key, value], index) =>
-          `<text x="80" y="${
-            620 + index * 24
-          }" font-size="14">${
-            esc(
-              materialNames[
-                key as SecuringMaterialType
-              ][lang],
-            )
-          } × ${value}</text>`,
-      )
-      .join('')
-
-    const title =
-      lang === 'zh'
-        ? `集装箱装载规划器 · ${container.name}`
-        : `Container Loading Planner · ${container.name}`
-
-    const svg = `
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        width="${W}"
-        height="${H}"
-        viewBox="0 0 ${W} ${H}"
-      >
-        <rect
-          width="100%"
-          height="100%"
-          fill="#f7f8f5"
-        />
-
-        <text
-          x="50"
-          y="42"
-          font-size="24"
-          font-weight="700"
-          fill="#334047"
-        >
-          ${esc(title)}
-        </text>
-
-        <text
-          x="50"
-          y="66"
-          font-size="13"
-          fill="#66716c"
-        >
-          ${esc(
-            `${
-              lang === 'zh'
-                ? '内部'
-                : 'Internal'
-            } ${container.length.toLocaleString()} × ${container.width.toLocaleString()} × ${container.height.toLocaleString()} mm`,
-          )}
-        </text>
-
-        <text
-          x="80"
-          y="75"
-          font-size="15"
-          font-weight="700"
-        >
-          ${lang === 'zh' ? '顶视图' : 'TOP VIEW'}
-        </text>
-
-        <rect
-          x="80"
-          y="85"
-          width="600"
-          height="180"
-          fill="none"
-          stroke="#45504c"
-        />
-
-        ${top}
-
-        <text
-          x="80"
-          y="325"
-          font-size="15"
-          font-weight="700"
-        >
-          ${
-            lang === 'zh'
-              ? '正视图（柜门）'
-              : 'FRONT VIEW (DOOR)'
-          }
-        </text>
-
-        <rect
-          x="80"
-          y="335"
-          width="600"
-          height="200"
-          fill="none"
-          stroke="#45504c"
-        />
-
-        ${front}
-
-        <text
-          x="780"
-          y="325"
-          font-size="15"
-          font-weight="700"
-        >
-          ${lang === 'zh' ? '侧视图' : 'SIDE VIEW'}
-        </text>
-
-        <rect
-          x="780"
-          y="335"
-          width="420"
-          height="200"
-          fill="none"
-          stroke="#45504c"
-        />
-
-        ${side}
-
-        <text
-          x="50"
-          y="585"
-          font-size="17"
-          font-weight="700"
-        >
-          ${
-            lang === 'zh'
-              ? '加固材料'
-              : 'SECURING MATERIALS'
-          }
-        </text>
-
-        ${
-          matRows ||
-          `<text x="80" y="620" font-size="14">${
-            lang === 'zh'
-              ? '无'
-              : 'None'
-          }</text>`
-        }
-
-        <text
-          x="780"
-          y="585"
-          font-size="17"
-          font-weight="700"
-        >
-          ${
-            lang === 'zh'
-              ? '装载摘要'
-              : 'LOAD SUMMARY'
-          }
-        </text>
-
-        <text
-          x="780"
-          y="615"
-          font-size="14"
-        >
-          ${
-            lang === 'zh'
-              ? '货物数量'
-              : 'Cargo units'
-          }: ${totals.q}
-        </text>
-
-        <text
-          x="780"
-          y="640"
-          font-size="14"
-        >
-          ${
-            lang === 'zh'
-              ? '总重量'
-              : 'Gross weight'
-          }: ${totals.w.toFixed(1)} kg
-        </text>
-
-        <text
-          x="780"
-          y="665"
-          font-size="14"
-        >
-          ${
-            lang === 'zh'
-              ? '总体积'
-              : 'Volume'
-          }: ${totals.v.toFixed(2)} m³
-        </text>
-      </svg>
-    `
-
-    const blob = new Blob(
-      [svg],
-      {
-        type: 'image/svg+xml;charset=utf-8',
-      },
-    )
-
-    const url =
-      URL.createObjectURL(blob)
-
-    const img = new Image()
-
-    img.onload = () => {
-      const canvas =
-        document.createElement('canvas')
-
-      canvas.width = W * 2
-      canvas.height = H * 2
-
-      const ctx =
-        canvas.getContext('2d')
-
-      if (!ctx) {
-        URL.revokeObjectURL(url)
-        return
-      }
-
-      ctx.scale(2, 2)
-      ctx.drawImage(img, 0, 0, W, H)
-
-      URL.revokeObjectURL(url)
-
-      canvas.toBlob((png) => {
-        if (!png) return
-
-        const downloadUrl =
-          URL.createObjectURL(png)
-
-        const a =
-          document.createElement('a')
-
-        a.href = downloadUrl
-        a.download = `${container.name}-three-views.png`
-        a.click()
-
-        window.setTimeout(
-          () =>
-            URL.revokeObjectURL(
-              downloadUrl,
-            ),
-          1000,
-        )
-      }, 'image/png')
-    }
-
-    img.src = url
+  const exportPlan=async()=>{
+    try{
+      const response=await fetch('/装箱方案模板.docx');if(!response.ok)throw new Error('Template not found');const template=await response.arrayBuffer();const templateBytes=new Uint8Array(template);const xmlBytes=await extractZipEntry(templateBytes,'word/document.xml');const xmlText=new TextDecoder().decode(xmlBytes)
+      const parser=new DOMParser();const doc=parser.parseFromString(xmlText,'application/xml');const w='http://schemas.openxmlformats.org/wordprocessingml/2006/main';const tables=Array.from(doc.getElementsByTagNameNS(w,'tbl'));const cargoTable=tables[0],infoTable=tables[1];if(!cargoTable||!infoTable)throw new Error('Template tables not found')
+      const rows=Array.from(cargoTable.getElementsByTagNameNS(w,'tr'));const containerCells=Array.from(rows[0].getElementsByTagNameNS(w,'tc'));if(containerCells[1])setCellText(containerCells[1],`${container.name}（${container.length.toLocaleString()}×${container.width.toLocaleString()}×${container.height.toLocaleString()} mm）`);if(containerCells[3])setCellText(containerCells[3],lang==='zh'?'均匀、紧凑、对称布满箱底':'Uniform, compact and symmetrical loading')
+      const totalWeight=cargo.reduce((sum,c)=>sum+c.weight*c.quantity,0);const cargoLines=cargo.map(c=>`${c.name} × ${Math.floor(c.quantity)}`).join('；');const dimsLines=cargo.map(c=>`${c.length}×${c.width}×${c.height}`).join('；');const typeLines=cargo.map(c=>c.type==='pallet'?tr.pallet:c.type==='woodCrate'?tr.crate:tr.carton).join('；');const first=Array.from(rows[2]?.getElementsByTagNameNS(w,'tc')||[]);if(first.length>=7){setCellText(first[1],cargoLines||'-');setCellText(first[2],String(cargo.reduce((s,c)=>s+Math.floor(c.quantity),0)));setCellText(first[3],cargo.length===1?cargo[0].weight.toFixed(1):'-');setCellText(first[4],totalWeight.toFixed(1));setCellText(first[5],dimsLines||'-');setCellText(first[6],typeLines||'-')}
+      const infoRows=Array.from(infoTable.getElementsByTagNameNS(w,'tr'));if(infoRows[2]){const c=Array.from(infoRows[2].getElementsByTagNameNS(w,'tc'));if(c[1])setCellText(c[1],lang==='zh'?`根据当前3D视图内货物的实际位置、尺寸、旋转及堆叠状态生成装箱方案，共装载 ${placed.length} 件货物。`:`The loading plan is generated from the current 3D cargo arrangement; ${placed.length} units are loaded.`)}if(infoRows[3]){const c=Array.from(infoRows[3].getElementsByTagNameNS(w,'tc'));if(c[1])setCellText(c[1],lang==='zh'?`1、箱内货物紧密码靠，装载均匀、稳定、对称、配载合理。\n2、货物装箱后不影响箱门关闭。`:`1. Cargo is compact and stable.\n2. Cargo must not obstruct the doors.`)}if(infoRows[4]){const c=Array.from(infoRows[4].getElementsByTagNameNS(w,'tc'));if(c[1])setCellText(c[1],lang==='zh'?'按当前装载结果配置三角木、紧固带、气袋及其他需要的加固材料，防止运输过程中位移。':'Place securing materials at gaps and required positions to prevent movement.')}if(infoRows[5]){const c=Array.from(infoRows[5].getElementsByTagNameNS(w,'tc'));const materialText=Object.entries(materialCounts).map(([k,v])=>`${materialNames[k as SecuringMaterialType][lang]} × ${v}`).join('、')|| (lang==='zh'?'暂无加固材料':'No securing materials');if(c[1])setCellText(c[1],materialText)}
+      const updatedXml=new XMLSerializer().serializeToString(doc);const top=await svgToPng(makeTopViewSvg(1000,420),1000,420);const sf=await svgToPng(makeSideFrontSvg(1000,430),1000,430);const output=await createDocxWithPlanImages(template,updatedXml,top,sf);const blob=new Blob([output],{type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'});const u=URL.createObjectURL(blob);const a=document.createElement('a');a.href=u;a.download=`${container.name}-装箱方案.docx`;a.click();setTimeout(()=>URL.revokeObjectURL(u),1500);setMessage(lang==='zh'?'已按 Word 模板导出装箱方案':'Loading plan exported from Word template')
+    }catch(error){console.error(error);setMessage(lang==='zh'?'装箱方案模板导出失败，请检查模板文件':'Loading plan template export failed')}
   }
 
   return (
-    <div className="app">
+    <div className={`app theme-portal ${securingMode ? 'securing-mode' : ''}`}>
       <header className="topbar">
         <div className="hero-title">
           <div className="hero-orbit" aria-hidden="true" />
@@ -1142,18 +837,8 @@ function App() {
             </select>
           </label>
 
-          <button
-            disabled
-            className="disabled-btn"
-          >
-            {tr.import}
-          </button>
-
-          <button
-            onClick={exportThree}
-          >
-            {tr.export}
-          </button>
+          <button onClick={exportPlan}>{tr.exportPlan}</button>
+          <button onClick={exportThree}>{tr.export}</button>
         </div>
       </header>
 
@@ -1289,12 +974,8 @@ function App() {
           </div>
 
           <div className="tool-row">
-            <button onClick={repack}>
+            <button onClick={() => void runPacking(container)}>
               {tr.auto}
-            </button>
-
-            <button onClick={repack}>
-              {tr.opt}
             </button>
 
             <button
@@ -1308,19 +989,6 @@ function App() {
             >
               {tr.clear}
             </button>
-          </div>
-
-          <div className="securing-palette">
-            <div className="palette-title">
-              <span>{tr.materials}</span>
-              <small>{lang === 'zh' ? '点击添加到 3D 场景' : 'Click to add to 3D scene'}</small>
-            </div>
-            <div className="material-toolbar">
-              <button onClick={() => addMaterial('triangleWood')}>▰ {tr.triangle}</button>
-              <button onClick={() => addMaterial('lashingBelt')}>━ {tr.belt}</button>
-              <button onClick={() => addMaterial('airBag')}>□ {tr.airbag}</button>
-              <button onClick={() => addMaterial('doorNet')}>▦ {tr.net}</button>
-            </div>
           </div>
 
           <div className="cargo-list">
@@ -1479,6 +1147,7 @@ function App() {
                       {tr.quantity}
 
                       <input
+                        className={inputInvalid(c,'quantity')?'input-limit-error':''}
                         type="number"
                         min="1"
                         value={c.quantity}
@@ -1519,6 +1188,7 @@ function App() {
                       {tr.length}
 
                       <input
+                        className={inputInvalid(c,'length')?'input-limit-error':''}
                         type="number"
                         min="1"
                         value={c.length}
@@ -1538,6 +1208,7 @@ function App() {
                       {tr.width}
 
                       <input
+                        className={inputInvalid(c,'width')?'input-limit-error':''}
                         type="number"
                         min="1"
                         value={c.width}
@@ -1557,6 +1228,7 @@ function App() {
                       {tr.height}
 
                       <input
+                        className={inputInvalid(c,'height')?'input-limit-error':''}
                         type="number"
                         min="1"
                         value={c.height}
@@ -1590,6 +1262,11 @@ function App() {
                       />
 
                       {tr.stack}
+                    </label>
+
+                    <label>
+                      <input type="checkbox" checked={c.loadBearing} onChange={e=>update(c.id,'loadBearing',e.target.checked)} />
+                      {tr.loadBearing}
                     </label>
 
                     <label>
@@ -1659,10 +1336,9 @@ function App() {
                     {volume.toFixed(2)} CBM
                   </div>
 
-                  {volume >
-                    MAX_CARGO_VOLUME_CBM && (
+                  {(volume > MAX_CARGO_VOLUME_CBM || c.quantity > limitsFor(c).maxQuantity) && (
                     <div className="volume-error">
-                      {tr.volumeLimit}
+                      {c.quantity > limitsFor(c).maxQuantity ? (lang==='zh'?`件数超过 ${limitsFor(c).maxQuantity} 件限制`:`Quantity exceeds ${limitsFor(c).maxQuantity}`) : tr.volumeLimit}
                     </div>
                   )}
                 </div>
@@ -1692,67 +1368,16 @@ function App() {
           </div>
 
           <div className="view-toolbar">
-            <span>{tr.view}</span>
-            <button className={showDimensions ? 'active' : ''} onClick={() => setShowDimensions(v => !v)}>{lang === 'zh' ? '尺寸标注' : 'Dimensions'}</button>
-
-            <button
-              className={
-                freePlacement
-                  ? 'active placement-toggle'
-                  : ''
-              }
-              onClick={() =>
-                setFreePlacement(
-                  (value) => {
-                    const next =
-                      !value
-
-                    if (!next) {
-                      setDragging(false)
-                    }
-
-                    return next
-                  },
-                )
-              }
-            >
-              {freePlacement
-                ? tr.stopPlacement
-                : tr.freePlacement}
-            </button>
-
-            {(
-              [
-                ['iso', tr.iso],
-                ['top', tr.top],
-                ['front', tr.front],
-                ['rear', tr.rear],
-                ['left', tr.left],
-                ['right', tr.right],
-              ] as [View, string][]
-            ).map(([value, label]) => (
-              <button
-                key={value}
-                className={
-                  view === value
-                    ? 'active'
-                    : ''
-                }
-                onClick={() =>
-                  setView(value)
-                }
-              >
-                {label}
-              </button>
-            ))}
-
-            <button
-              onClick={() =>
-                setView('iso')
-              }
-            >
-              {tr.reset}
-            </button>
+            <div className="toolbar-group"><b>{tr.view}</b>
+              {([['iso',tr.iso],['top',tr.top],['front',tr.front],['left',tr.left],['right',tr.right]] as [View,string][]).map(([value,label])=><button key={value} className={view===value?'active':''} onClick={()=>setView(value)}>{label}</button>)}
+              <button className={securingMode?'active':''} onClick={()=>setSecuringMode(v=>!v)}>{tr.securingMode}</button>
+              <label className="dimension-toggle"><input type="checkbox" checked={showDimensions} onChange={e=>setShowDimensions(e.target.checked)}/>{lang==='zh'?'容器尺寸标注':'Container Dimensions'}</label>
+            </div>
+            <div className="toolbar-group"><b>{lang==='zh'?'模式':'MODE'}</b>
+              <button className={selectionMode==='single'?'active':''} onClick={()=>setSelectionMode('single')}>{tr.singleSelect}</button>
+              <button className={selectionMode==='box'?'active':''} onClick={()=>setSelectionMode('box')}>{tr.boxSelect}</button>
+              <button className={freePlacement?'active':''} onClick={()=>setFreePlacement(v=>!v)}>{tr.freePlacement}</button>
+            </div>
           </div>
 
           <div className="canvas-wrap">
@@ -1771,7 +1396,10 @@ function App() {
               items={placed}
               materials={materials}
               selectedId={selectedId}
-              onSelect={setSelectedId}
+              selectedIds={selectedIds}
+              selectionMode={selectionMode}
+              onSelect={selectOne}
+              onSelectMany={selectMany}
               onMove={move}
               onRotate={rotateCargo}
               onMaterialMove={
@@ -1799,9 +1427,11 @@ function App() {
               }
               overflowCount={overflowCount}
               overflowItems={overflowItems}
-              lowPower={lowPower}
+              securingMode={securingMode}
               showDimensions={showDimensions}
               airBagStretch={airBagStretch}
+              onAddMaterial={addMaterial}
+              onMaterialScale={scaleMaterial}
             />
           </div>
 
@@ -1835,9 +1465,10 @@ function App() {
                   ? 'active'
                   : ''
               }
-              onClick={() =>
+              onClick={() => {
                 setTab('cargo')
-              }
+                setSecuringMode(false)
+              }}
             >
               {tr.properties}
             </button>
@@ -1861,9 +1492,10 @@ function App() {
                   ? 'active'
                   : ''
               }
-              onClick={() =>
+              onClick={() => {
                 setTab('secure')
-              }
+                setSecuringMode(true)
+              }}
             >
               {tr.secure}
             </button>
@@ -1892,6 +1524,7 @@ function App() {
                   )
 
                   setSelectedId(null)
+                  setSelectedIds([])
                 }
               }}
               lang={lang}
@@ -1915,11 +1548,9 @@ function App() {
             <div className="analysis">
               <h3>{tr.secure}</h3>
 
-              <p className="hint">{tr.securingHint}<br/>{lang === 'zh' ? '选中模型后：G 移动 · R 旋转' : 'Select a model: G = move · R = rotate'}</p>
+              <p className="hint">{tr.securingHint}</p>
 
               <h4>{tr.materialCount}</h4>
-              <label className="stretch-toggle"><input type="checkbox" checked={airBagStretch} onChange={e => setAirBagStretch(e.target.checked)} /> {lang === 'zh' ? '充气袋允许拉伸适配间隙' : 'Allow air bags to stretch to fit gaps'}</label>
-
               <div className="material-stats">
                 {(
                   [

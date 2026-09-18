@@ -2,3 +2,16 @@
 
 /* V14 interaction/layout refinements */
 .name-field{display:flex;flex-direction:column;gap:2px;flex:1;min-width:0}.name-field span{font-size:7px;color:#8a9490;font-weight:500}.name-field input{width:100%!important;padding:0!important}.cargo-title .delete{width:24px;height:24px;display:flex;align-items:center;justify-content:center;font-size:19px;line-height:1;border:1px solid #e4d5d1;border-radius:5px;background:#fff7f5}.cargo-title .delete:hover{background:#fff0ec}.checks label{display:inline-flex;align-items:center;gap:3px}.placement-toggle{font-weight:700}.placement-toggle.active{background:#465558!important;color:#fff!important;border-color:#465558!important}.volume-error{margin-top:4px;padding:4px 6px;border-radius:5px;background:#fff1ed;color:#a14437;font-size:8px;line-height:1.35}.cg-vertical-box{display:flex;justify-content:center}.cg-vertical-box svg{width:120px;height:220px}.cg-box .cg-axis{stroke:#87918d!important;stroke-dasharray:4 3!important}.cg-box .cg-vector{stroke:#a33f36!important;stroke-width:1.8}.cg-box circle{fill:#c33e32}.cg-box text{font-size:8px!important;fill:#66716c}.axis-label{white-space:nowrap}.viewer .view-toolbar{flex-wrap:wrap}.viewer .view-toolbar button{white-space:nowrap}
+
+/* 21.0 NASA Punk game UI */
+html,body,#root{font-size:15px}
+button,input,select{font-size:15px}
+.app{font-size:15px}
+.top-actions label{font-size:12px}
+.top-actions select,.custom-bar input{padding:8px 10px}
+.topbar h1{font-size:24px}
+.summary span,.summary small{font-size:10px}
+.summary strong{font-size:16px}
+.sidebar h2,.viewer h2{font-size:15px}
+.sidebar-head span,.viewer-head span{font-size:10px}
+

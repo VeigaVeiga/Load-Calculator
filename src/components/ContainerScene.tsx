@@ -1,9 +1,9 @@
 import React from 'react'
 import { Canvas, useThree, useFrame } from '@react-three/fiber'
-import { OrbitControls, Line, Html, Sky, Stars, TransformControls } from '@react-three/drei'
-import { useEffect, useRef, useState } from 'react'
+import { OrbitControls, Line, Html, Sky } from '@react-three/drei'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
-import type { Cargo, Container, PlacedCargo, SecuringItem } from '../types'
+import type { Cargo, Container, PlacedCargo, SecuringItem, SecuringMaterialType } from '../types'
 import ContainerStructure from './ContainerStructure'
 import ContainerFloor from './ContainerFloor'
 import CargoModel from './CargoModel'
@@ -11,148 +11,47 @@ import SecuringModel from './SecuringModel'
 import LashingPoints from './LashingPoints'
 import { dims } from '../packing/geometry'
 
-export type View='iso'|'top'|'front'|'rear'|'left'|'right'
+export type View='iso'|'top'|'front'|'left'|'right'
+export type SceneTool='move'|'rotate'|'scale'
 const S=.001
 
-function CameraRig({view,container,dragging,cameraQuaternion}:{view:View;container:Container;dragging:boolean;cameraQuaternion:React.MutableRefObject<THREE.Quaternion>}){
+function CameraRig({view,container,dragging,cameraQuaternion,securingMode}:{view:View;container:Container;dragging:boolean;cameraQuaternion:React.MutableRefObject<THREE.Quaternion>;securingMode:boolean}){
  const {camera}=useThree(); const controls=useRef<any>(null)
- useEffect(()=>{
-  camera.up.set(0,0,1)
-  const L=container.length*S,W=container.width*S,H=container.height*S
-  const d=Math.max(L,W,H)*1.35
-  const target=new THREE.Vector3(0,0,H*.34)
-  const pos:Record<View,[number,number,number]>={
-   iso:[d*1.04,d*.92,d*.68],
-   top:[0,0,d*1.38],
-   front:[-d*1.55,0,H*.45],
-   rear:[d*1.55,0,H*.45],
-   left:[0,-d*1.62,H*.45],
-   right:[0,d*1.62,H*.45]
-  }
-  camera.position.set(...pos[view]); camera.lookAt(target)
-  if(controls.current){controls.current.target.copy(target);controls.current.update()}
- },[view,camera,container.length,container.width,container.height])
- return <><OrbitControls ref={controls} makeDefault enabled={!dragging} enableDamping dampingFactor={.08} rotateSpeed={.5} zoomSpeed={.85} panSpeed={.65} minDistance={1.2} maxDistance={28}/><CameraQuaternionSync target={cameraQuaternion}/></>
+ useEffect(()=>{camera.up.set(0,0,1);const L=container.length*S,W=container.width*S,H=container.height*S;const d=Math.max(L,W,H)*(securingMode?.92:1.35);const target=new THREE.Vector3(0,0,securingMode?H*.42:H*.34);const pos:Record<View,[number,number,number]>={iso:[d*1.04,d*.92,d*.68],top:[0,0,d*1.38],front:[-d*1.55,0,H*.45],left:[0,-d*1.62,H*.45],right:[0,d*1.62,H*.45]};camera.position.set(...pos[view]);camera.lookAt(target);if(controls.current){controls.current.target.copy(target);controls.current.update()}},[view,camera,container.length,container.width,container.height,securingMode])
+ return <><OrbitControls ref={controls} makeDefault enabled={!dragging} enableDamping dampingFactor={.08} rotateSpeed={.5} zoomSpeed={.85} panSpeed={.65} minDistance={.65} maxDistance={28}/><CameraQuaternionSync target={cameraQuaternion}/></>
 }
-function CameraQuaternionSync({target}:{target:React.MutableRefObject<THREE.Quaternion>}){const {camera}=useThree(); useFrame(()=>target.current.copy(camera.quaternion)); return null}
+function CameraQuaternionSync({target}:{target:React.MutableRefObject<THREE.Quaternion>}){const {camera}=useThree();useFrame(()=>target.current.copy(camera.quaternion));return null}
+function Arrow({axis,color}:{axis:'x'|'y'|'z';color:string}){const r:Record<string,[number,number,number]>={x:[0,0,-Math.PI/2],y:[0,0,0],z:[0,0,0]};const pos=axis==='x'?[.88,0,0]:axis==='y'?[0,.88,0]:[0,0,.88];return <mesh rotation={r[axis]} position={pos as [number,number,number]} raycast={()=>null}><coneGeometry args={[.045,.13,12]}/><meshBasicMaterial color={color}/></mesh>}
+function CoordinateAxes({container,lang}:{container:Container;lang:'zh'|'en'}){const L=container.length*S,W=container.width*S,p:[number,number,number]=[-L/2-3,-W/2-3,.02],len=Math.min(.9,Math.max(.45,Math.min(L,W)*.7));return <group position={p}><Line points={[[0,0,0],[len,0,0]]} color="#b4473d" lineWidth={2}/><Arrow axis="x" color="#b4473d"/><Line points={[[0,0,0],[0,len,0]]} color="#4d8052" lineWidth={2}/><Arrow axis="y" color="#4d8052"/><Line points={[[0,0,0],[0,0,len]]} color="#3f6f9e" lineWidth={2}/><Arrow axis="z" color="#3f6f9e"/><Html position={[len+.06,0,0]} center><div className="axis-label axis-x">X {lang==='zh'?'长度':'Length'}</div></Html><Html position={[0,len+.06,0]} center><div className="axis-label axis-y">Y {lang==='zh'?'宽度':'Width'}</div></Html><Html position={[0,0,len+.06]} center><div className="axis-label axis-z">Z {lang==='zh'?'高度':'Height'}</div></Html></group>}
+function CargoGizmo({position,tool}:{position:[number,number,number];tool:SceneTool}){const a=.38;return <group position={position} raycast={()=>null}>{tool==='rotate'?<><mesh rotation={[0,0,0]} raycast={()=>null}><torusGeometry args={[.24,.012,8,32]}/><meshBasicMaterial color="#d94b43"/></mesh><mesh rotation={[Math.PI/2,0,0]} raycast={()=>null}><torusGeometry args={[.24,.012,8,32]}/><meshBasicMaterial color="#4c8a56"/></mesh><mesh rotation={[0,Math.PI/2,0]} raycast={()=>null}><torusGeometry args={[.24,.012,8,32]}/><meshBasicMaterial color="#3f76b0"/></mesh></>:<><Line points={[[0,0,0],[a,0,0]]} color="#d94b43" lineWidth={2}/><Arrow axis="x" color="#d94b43"/><Line points={[[0,0,0],[0,a,0]]} color="#4c8a56" lineWidth={2}/><Arrow axis="y" color="#4c8a56"/><Line points={[[0,0,0],[0,0,a]]} color="#3f76b0" lineWidth={2}/><Arrow axis="z" color="#3f76b0"/></>}</group>}
 
-function CoordinateAxes({container,lang}:{container:Container;lang:'zh'|'en'}){
- const L=container.length*S,W=container.width*S
- const p:[number,number,number]=[-L/2-3,-W/2-3,0.02]
- const len=Math.min(.9,Math.max(.45,Math.min(L,W)*.7))
- return <group position={p}>
-  <Line points={[[0,0,0],[len,0,0]]} color="#b4473d" lineWidth={2}/>
-  <Line points={[[0,0,0],[0,len,0]]} color="#4d8052" lineWidth={2}/>
-  <Line points={[[0,0,0],[0,0,len]]} color="#3f6f9e" lineWidth={2}/>
-  <Html position={[len,0,0]} center><div className="axis-label axis-x">X {lang==='zh'?'长度':'Length'} →</div></Html>
-  <Html position={[0,len,0]} center><div className="axis-label axis-y">Y {lang==='zh'?'宽度':'Width'} →</div></Html>
-  <Html position={[0,0,len]} center><div className="axis-label axis-z">Z {lang==='zh'?'高度':'Height'} ↑</div></Html>
- </group>
+function CargoInteraction({p,container,selected,onSelect,onMove,onRotate,onDragState,showName,freePlacement,items,tool}:{p:PlacedCargo;container:Container;selected:boolean;onSelect:()=>void;onMove:(id:string,x:number,y:number,z:number)=>void;onRotate:(id:string,rotation:number)=>void;onDragState:(v:boolean)=>void;showName:boolean;freePlacement:boolean;items:PlacedCargo[];tool:SceneTool}){
+ const groupRef=useRef<THREE.Group>(null);const dragRef=useRef(false);const lastRef=useRef({x:p.x,y:p.y,z:p.z});const offsetRef=useRef({x:0,y:0});const plane=useRef(new THREE.Plane());const [hovered,setHovered]=useState(false)
+ const d=dims(p);const pivot:[number,number,number]=[(p.x+d.length/2-container.length/2)*S,(p.y+d.width/2-container.width/2)*S,(p.z+p.height/2)*S]
+ const valid=(x:number,y:number,z:number,r:number)=>{const rd=dims({...p,rotation:r});if(x<0||y<0||z<0||x+rd.length>container.length||y+rd.width>container.width||z+p.height>container.height)return false;const t={...p,x,y,z,rotation:r};return !items.some(q=>q.id!==p.id&&overlap3(t,q))}
+ const begin=(e:any)=>{e.stopPropagation();onSelect();if(!freePlacement||p.locked)return;if(tool==='rotate'){onRotate(p.id,(p.rotation+90)%360);return}if(tool!=='move')return;const z=(p.z+p.height/2)*S;plane.current.set(new THREE.Vector3(0,0,1),-z);const pt=e.ray.intersectPlane(plane.current,new THREE.Vector3());if(!pt)return;dragRef.current=true;onDragState(true);offsetRef.current.x=pivot[0]-pt.x;offsetRef.current.y=pivot[1]-pt.y;lastRef.current={x:p.x,y:p.y,z:p.z};(e.target as any)?.setPointerCapture?.(e.pointerId)}
+ const moveDrag=(e:any)=>{if(!dragRef.current||tool!=='move')return;e.stopPropagation();const pt=e.ray.intersectPlane(plane.current,new THREE.Vector3());if(!pt)return;const cx=(pt.x+offsetRef.current.x)/S,cy=(pt.y+offsetRef.current.y)/S;const rd=dims(p);const x=Math.round((cx-rd.length/2+container.length/2)/10)*10,y=Math.round((cy-rd.width/2+container.width/2)/10)*10;if(valid(x,y,p.z,p.rotation)){lastRef.current={x,y,z:p.z};if(groupRef.current){groupRef.current.position.x=(x+rd.length/2-container.length/2)*S;groupRef.current.position.y=(y+rd.width/2-container.width/2)*S}}}
+ const end=(e:any)=>{if(!dragRef.current)return;e.stopPropagation();dragRef.current=false;onDragState(false);onMove(p.id,lastRef.current.x,lastRef.current.y,lastRef.current.z);(e.target as any)?.releasePointerCapture?.(e.pointerId)}
+ return <group ref={groupRef} position={pivot} rotation={[0,0,p.rotation*Math.PI/180]} onPointerOver={e=>{e.stopPropagation();setHovered(true)}} onPointerOut={e=>{e.stopPropagation();setHovered(false)}} onPointerDown={begin} onPointerMove={moveDrag} onPointerUp={end} onClick={e=>{e.stopPropagation();onSelect()}}><CargoModel p={{...p,x:0,y:0,z:0} as PlacedCargo} container={container} selected={selected} hovered={hovered} onPointerDown={begin} onPointerMove={moveDrag} onPointerUp={end} onClick={e=>{e.stopPropagation();onSelect()}} showName={showName} local/>{selected&&freePlacement&&<CargoGizmo position={[0,0,p.height*S/2+.04]} tool={tool}/>}</group>
 }
+function overlap3(a:PlacedCargo,b:PlacedCargo){const A=dims(a),B=dims(b);return a.x<b.x+B.length-EPS&&a.x+A.length>b.x+EPS&&a.y<b.y+B.width-EPS&&a.y+A.width>b.y+EPS&&a.z<b.z+b.height-EPS&&a.z+a.height>b.z+EPS}
+const EPS=1
 
-function CargoInteraction({p,container,selected,onSelect,onMove,onRotate,onDragState,showName,freePlacement}:{p:PlacedCargo;container:Container;selected:boolean;onSelect:()=>void;onMove:(id:string,x:number,y:number,z:number)=>void;onRotate:(id:string,rotation:number)=>void;onDragState:(v:boolean)=>void;showName:boolean;freePlacement:boolean}){
- const groupRef=useRef<THREE.Group>(null)
- const [mode,setMode]=useState<'translate'|'rotate'>('translate')
- const [transformObject,setTransformObject]=useState<THREE.Group|null>(null)
- const d=dims(p)
- const pivot=[(p.x+d.length/2-container.length/2)*S,(p.y+d.width/2-container.width/2)*S,p.z*S] as [number,number,number]
- const syncTransform=()=>{
-  const g=groupRef.current
-  if(!g)return
-  const deg=((Math.round((g.rotation.z*180/Math.PI)/90)*90)%360+360)%360
-  const rd=dims({...p,rotation:deg})
-  const x=Math.round((g.position.x/S-rd.length/2+container.length/2)/10)*10
-  const y=Math.round((g.position.y/S-rd.width/2+container.width/2)/10)*10
-  const z=Math.max(0,Math.round((g.position.z/S)/10)*10)
-  onMove(p.id,x,y,z)
-  onRotate(p.id,deg)
- }
- useEffect(()=>{
-  if(!selected||!freePlacement)return
-  const onKey=(e:KeyboardEvent)=>{
-   if(e.ctrlKey||e.altKey||e.metaKey)return
-   const tag=(e.target as HTMLElement | null)?.tagName
-   if(tag==='INPUT'||tag==='TEXTAREA'||tag==='SELECT')return
-   if(e.key.toLowerCase()==='g'){e.preventDefault();setMode('translate')}
-   if(e.key.toLowerCase()==='r'){e.preventDefault();setMode('rotate')}
-   if(e.key==='Escape'){onSelect()}
-  }
-  window.addEventListener('keydown',onKey)
-  return()=>window.removeEventListener('keydown',onKey)
- },[selected,freePlacement,onSelect])
- useEffect(()=>{ if(groupRef.current) setTransformObject(groupRef.current) },[])
- const handleControlDown=()=>onDragState(true)
- const handleControlUp=()=>{onDragState(false);syncTransform()}
- const highlight=selected
- return <group ref={groupRef} position={pivot} rotation={[0,0,p.rotation*Math.PI/180]}
-   onPointerOver={e=>e.stopPropagation()} onPointerOut={e=>e.stopPropagation()}
-   onClick={e=>{e.stopPropagation();onSelect()}}>
-   <CargoModel p={{...p,x:0,y:0,z:0} as PlacedCargo} container={container} selected={highlight} onPointerDown={e=>{e.stopPropagation();onSelect()}} onPointerMove={e=>e.stopPropagation()} onPointerUp={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();onSelect()}} showName={showName} local/>
-   {selected&&freePlacement&&transformObject&&<TransformControls
-     object={transformObject}
-     mode={mode}
-     size={.82}
-     showX showY showZ showRX showRY showRZ
-     translationSnap={S*10}
-     rotationSnap={Math.PI/2}
-     onMouseDown={handleControlDown}
-     onMouseUp={handleControlUp}
-   />}
-   {selected&&freePlacement&&<Html position={[0,0,p.height*S+.16]} center><div className="transform-mode-hint">{mode==='translate'?'G 移动  ·  R 旋转':'R 旋转  ·  G 移动'} · 90°</div></Html>}
- </group>
-}
-function ZonePlate({container,side,label,detail}:{container:Container;side:-1|1;label:string;detail:string}){
- const L=container.length*S
- const y=side*(container.width*S/2+11.55)
- return <group position={[0,y,0.018]}>
-  <mesh rotation={[-0.0,0,0]}><boxGeometry args={[L,2.55,.035]}/><meshStandardMaterial color="#b8b1a3" roughness={.94}/></mesh>
-  <Line points={[[-L/2,-1.2,0.022],[L/2,-1.2,0.022],[L/2,1.2,0.022],[-L/2,1.2,0.022],[-L/2,-1.2,0.022]]} color="#7f776b" lineWidth={1}/>
-  <Html position={[-L/2+.35,-1.05,.08]} center><div className="scene-zone-label"><b>{label}</b><span>{detail}</span></div></Html>
- </group>
-}
+function ZonePlate({container,side,label,detail}:{container:Container;side:-1|1;label:string;detail:string}){const L=container.length*S,y=side*(container.width*S/2+3);return <group position={[0,y,-.18]}><mesh><boxGeometry args={[L,2.55,.035]}/><meshStandardMaterial color="#b8b1a3" roughness={.94}/></mesh><Line points={[[-L/2,-1.2,.022],[L/2,-1.2,.022],[L/2,1.2,.022],[-L/2,1.2,.022],[-L/2,-1.2,.022]]} color="#7f776b" lineWidth={1}/><Html position={[-L/2+.35,-1.05,.08]} center><div className="scene-zone-label"><b>{label}</b><span>{detail}</span></div></Html></group>}
+function OverflowZone({container,count,items,lang}:{container:Container;count:number;items:PlacedCargo[];lang:'zh'|'en'}){if(count<=0)return null;const zoneY=-(container.width*S/2+3);return <group><ZonePlate container={container} side={-1} label={lang==='zh'?'溢出货物区':'OVERFLOW CARGO'} detail={lang==='zh'?`${count} 件未装载`:`${count} unplaced`}/>{items.map(p=><group key={p.id} position={[(p.x+p.length/2-container.length/2)*S,(p.y+p.width/2-container.width/2)*S,p.z*S]}><CargoModel p={{...p,x:0,y:0,z:0} as PlacedCargo} container={container} selected={false} hovered={false} onPointerDown={e=>e.stopPropagation()} onPointerMove={e=>e.stopPropagation()} onPointerUp={e=>e.stopPropagation()} onClick={e=>e.stopPropagation()} showName={false} local/></group>)}{count>items.length&&<Html position={[0,zoneY,.14]} center><div className="overflow-more">+{count-items.length}</div></Html>}</group>}
+function SecuringZone({container,lang}:{container:Container;lang:'zh'|'en'}){return <ZonePlate container={container} side={1} label={lang==='zh'?'加固材料区':'SECURING MATERIALS'} detail={lang==='zh'?'从左侧工具栏选择材料':'Choose material from toolbar'}/>}
+function IndustrialEnvironment(){return <Sky distance={450000} sunPosition={[25,30,55]} inclination={.48} azimuth={.25} turbidity={3.2} rayleigh={2.1} mieCoefficient={.003} mieDirectionalG={.75}/>}
 
-function OverflowZone({container,count,items,lang}:{container:Container;count:number;items:PlacedCargo[];lang:'zh'|'en'}){
- if(count<=0)return null
- const zoneY=-(container.width*S/2+11.55)
- return <group>
-  <ZonePlate container={container} side={-1} label={lang==='zh'?'溢出货物区':'OVERFLOW CARGO'} detail={lang==='zh'?`${count} 件未装载`:`${count} unplaced`}/>
-  {items.map(p=><group key={p.id} position={[(p.x+p.length/2-container.length/2)*S,(p.y+p.width/2-container.width/2)*S,p.z*S]} rotation={[0,0,p.rotation*Math.PI/180]}><CargoModel p={{...p,x:0,y:0,z:0} as PlacedCargo} container={container} selected={false} onPointerDown={e=>e.stopPropagation()} onPointerMove={e=>e.stopPropagation()} onPointerUp={e=>e.stopPropagation()} onClick={e=>e.stopPropagation()} showName={false} local/></group>)}
-  {count>items.length&&<Html position={[0,zoneY,.14]} center><div className="overflow-more">+{count-items.length}</div></Html>}
- </group>
-}
-function SecuringZone({container,lang}:{container:Container;lang:'zh'|'en'}){
- return <ZonePlate container={container} side={1} label={lang==='zh'?'加固材料区':'SECURING MATERIALS'} detail={lang==='zh'?'从这里拖入柜内':'Drag into container'}/>
-}
+function SelectionOverlay({enabled,items,container,onSelectMany}:{enabled:boolean;items:PlacedCargo[];container:Container;onSelectMany:(ids:string[])=>void}){const {camera,gl}=useThree();const [start,setStart]=useState<[number,number]|null>(null);const [current,setCurrent]=useState<[number,number]|null>(null);if(!enabled)return null;const finish=(cx:number,cy:number)=>{if(!start)return;const rect=gl.domElement.getBoundingClientRect(),x=cx-rect.left,y=cy-rect.top,minX=Math.min(start[0],x),maxX=Math.max(start[0],x),minY=Math.min(start[1],y),maxY=Math.max(start[1],y),v=new THREE.Vector3(),ids:string[]=[];for(const p of items){const d=dims(p);v.set((p.x+d.length/2-container.length/2)*S,(p.y+d.width/2-container.width/2)*S,(p.z+p.height/2)*S).project(camera);const sx=(v.x*.5+.5)*rect.width,sy=(-v.y*.5+.5)*rect.height;if(sx>=minX&&sx<=maxX&&sy>=minY&&sy<=maxY)ids.push(p.id)}onSelectMany(ids);setStart(null);setCurrent(null)};return <Html fullscreen style={{pointerEvents:'auto'}}><div className="selection-overlay" onPointerDown={e=>{e.stopPropagation();const r=gl.domElement.getBoundingClientRect();setStart([e.clientX-r.left,e.clientY-r.top]);setCurrent([e.clientX-r.left,e.clientY-r.top])}} onPointerMove={e=>{if(!start)return;e.stopPropagation();const r=gl.domElement.getBoundingClientRect();setCurrent([e.clientX-r.left,e.clientY-r.top])}} onPointerUp={e=>{e.stopPropagation();finish(e.clientX,e.clientY)}}>{start&&current&&<div className="selection-rect" style={{left:Math.min(start[0],current[0]),top:Math.min(start[1],current[1]),width:Math.abs(current[0]-start[0]),height:Math.abs(current[1]-start[1])}}/>}</div></Html>}
 
-function Scene(props:{container:Container;items:PlacedCargo[];materials:SecuringItem[];selectedId:string|null;onSelect:(id:string|null)=>void;onMove:(id:string,x:number,y:number,z:number)=>void;onRotate:(id:string,rotation:number)=>void;onRotateMaterial:(id:string,rotation:number)=>void;onMaterialMove:(id:string,x:number,y:number)=>void;view:View;dragging:boolean;onDragState:(v:boolean)=>void;cameraQuaternion:React.MutableRefObject<THREE.Quaternion>;cargo:Cargo[];lang:'zh'|'en';freePlacement:boolean;overflowCount:number;overflowItems:PlacedCargo[];lowPower:boolean;showDimensions:boolean;airBagStretch:boolean}){
- const {container,items,materials,selectedId,onSelect,selectedMaterialId,onSelectMaterial,onMove,onRotate,onRotateMaterial,onMaterialMove,view,dragging,onDragState,cameraQuaternion,cargo,lang,freePlacement,overflowCount,overflowItems,showDimensions,airBagStretch}=props
- const isLowPower = props.lowPower
- return <>
-  <Sky distance={450} sunPosition={[5,2,10]} turbidity={3.2} rayleigh={0.65} mieCoefficient={0.0018} mieDirectionalG={0.72}/>
-  {!isLowPower&&<Stars radius={120} depth={70} count={isLowPower?260:1300} factor={isLowPower?.7:1.25} saturation={0} fade speed={.08}/>} 
-  <fog attach="fog" args={['#252b2c',24,60]}/>
-  <ambientLight intensity={isLowPower?1.35:1.65}/><directionalLight position={[6,8,12]} intensity={isLowPower?1.1:1.55} castShadow={!isLowPower}/>
-  <ContainerStructure container={container} lang={lang} showDimensions={showDimensions}/><ContainerFloor container={container}/><LashingPoints container={container}/><CoordinateAxes container={container} lang={lang}/>
-  <OverflowZone container={container} count={overflowCount} items={overflowItems} lang={lang}/><SecuringZone container={container} lang={lang}/>
-  {items.map(p=><CargoInteraction key={p.id} p={p} container={container} selected={p.id===selectedId} onSelect={()=>onSelect(p.id)} onMove={onMove} onRotate={onRotate} onDragState={onDragState} showName={!!cargo.find(c=>c.id===p.cargoId)?.showName} freePlacement={freePlacement}/>)}
-  {materials.map(m=><SecuringModel key={m.id} item={m} container={container} selected={m.id===selectedMaterialId} onSelect={()=>onSelectMaterial(m.id)} onMove={onMaterialMove} onRotate={onRotateMaterial} onDragState={onDragState} airBagStretch={airBagStretch}/>) }
-  <CameraRig view={view} container={container} dragging={dragging} cameraQuaternion={cameraQuaternion}/>
- </>
+function Scene(props:{container:Container;items:PlacedCargo[];materials:SecuringItem[];selectedId:string|null;selectedIds:string[];selectionMode:'single'|'box';onSelect:(id:string|null)=>void;onSelectMany:(ids:string[])=>void;onMove:(id:string,x:number,y:number,z:number)=>void;onRotate:(id:string,rotation:number)=>void;onRotateMaterial:(id:string,rotation:number)=>void;onMaterialMove:(id:string,x:number,y:number)=>void;onMaterialScale:(id:string,factor:number)=>void;onAddMaterial:(type:SecuringMaterialType)=>void;view:View;dragging:boolean;onDragState:(v:boolean)=>void;cameraQuaternion:React.MutableRefObject<THREE.Quaternion>;cargo:Cargo[];lang:'zh'|'en';freePlacement:boolean;overflowCount:number;overflowItems:PlacedCargo[];showDimensions:boolean;airBagStretch:boolean;tool:SceneTool;selectedMaterialId:string|null;onSelectMaterial:(id:string|null)=>void;securingMode:boolean}){
+ const {container,items,materials,selectedId,selectedIds,selectionMode,onSelect,onSelectMany,selectedMaterialId,onSelectMaterial,onMove,onRotate,onRotateMaterial,onMaterialMove,onMaterialScale,onAddMaterial,view,dragging,onDragState,cameraQuaternion,cargo,lang,freePlacement,overflowCount,overflowItems,showDimensions,airBagStretch,tool}=props
+ return <><IndustrialEnvironment/><fog attach="fog" args={['#b9d8ef',28,85]}/><ambientLight intensity={1.25}/><directionalLight position={[6,8,16]} intensity={1.35} castShadow={false}/><hemisphereLight intensity={.35} groundColor="#cfd5d8" color="#f4f8fb"/><ContainerStructure container={container} lang={lang} showDimensions={showDimensions}/><ContainerFloor container={container}/><LashingPoints container={container}/><CoordinateAxes container={container} lang={lang}/><OverflowZone container={container} count={overflowCount} items={overflowItems} lang={lang}/><SecuringZone container={container} lang={lang}/>{items.map(p=><CargoInteraction key={p.id} p={p} container={container} selected={selectedIds.includes(p.id)} onSelect={()=>{onSelectMaterial(null);onSelect(p.id)}} onMove={onMove} onRotate={onRotate} onDragState={onDragState} showName={!!cargo.find(c=>c.id===p.cargoId)?.showName} freePlacement={freePlacement} items={items} tool={tool}/>)}{materials.map(m=><SecuringModel key={m.id} item={m} container={container} selected={m.id===selectedMaterialId} onSelect={()=>{onSelect(null);onSelectMaterial(m.id)}} onMove={onMaterialMove} onRotate={onRotateMaterial} onScale={onMaterialScale} onDragState={onDragState} airBagStretch={airBagStretch} focusMode={props.securingMode} tool={tool}/>) }<SelectionOverlay enabled={selectionMode==='box'} items={items} container={container} onSelectMany={onSelectMany}/><CameraRig view={view} container={container} dragging={dragging} cameraQuaternion={cameraQuaternion} securingMode={props.securingMode}/></>
 }
+function WebGLGate({children}:{children:React.ReactNode}){const [ok,setOk]=useState<boolean|null>(null);useEffect(()=>{try{const canvas=document.createElement('canvas');const gl=canvas.getContext('webgl2')||canvas.getContext('webgl')||canvas.getContext('experimental-webgl');setOk(!!gl)}catch{setOk(false)}},[]);if(ok===null)return <div className="webgl-fallback"><b>INITIALIZING 3D SYSTEM</b><span>正在检测图形设备…</span></div>;if(!ok)return <div className="webgl-fallback"><b>3D SYSTEM UNAVAILABLE</b><span>当前设备或浏览器无法提供 WebGL。装载数据仍可继续查看。</span></div>;return <>{children}</>}
 
-function WebGLGate({children}:{children:React.ReactNode}) {
- const [ok,setOk]=useState<boolean | null>(null)
- useEffect(()=>{
-  try { const canvas=document.createElement('canvas'); const gl=canvas.getContext('webgl2') || canvas.getContext('webgl') || canvas.getContext('experimental-webgl'); setOk(!!gl) } catch { setOk(false) }
- },[])
- if(ok===null)return <div className="webgl-fallback"><b>INITIALIZING 3D SYSTEM</b><span>正在检测图形设备…</span></div>
- if(!ok)return <div className="webgl-fallback"><b>3D SYSTEM UNAVAILABLE</b><span>当前设备或浏览器无法提供 WebGL。装载数据仍可继续查看。</span></div>
- return <>{children}</>
-}
-
-export default function ContainerScene(props:{container:Container;items:PlacedCargo[];materials:SecuringItem[];selectedId:string|null;onSelect:(id:string|null)=>void;onMove:(id:string,x:number,y:number,z:number)=>void;onRotate:(id:string,rotation:number)=>void;onRotateMaterial:(id:string,rotation:number)=>void;onMaterialMove:(id:string,x:number,y:number)=>void;view:View;dragging:boolean;onDragState:(v:boolean)=>void;onView:(v:View)=>void;cargo:Cargo[];lang:'zh'|'en';freePlacement:boolean;overflowCount:number;overflowItems:PlacedCargo[];lowPower?:boolean;showDimensions:boolean;airBagStretch:boolean}){
- const lowPower=props.lowPower??false
- const cameraQuaternion=useRef(new THREE.Quaternion())
- const [selectedMaterialId,setSelectedMaterialId]=useState<string|null>(null)
- return <div className="scene-host"><WebGLGate><Canvas dpr={lowPower?1:[1,1.35]} shadows={!lowPower} frameloop="always" gl={{antialias:!lowPower,powerPreference:lowPower?'low-power':'high-performance',failIfMajorPerformanceCaveat:false}} camera={{position:[7,7,5],fov:42}} onPointerMissed={()=>{props.onSelect(null);setSelectedMaterialId(null)}}><Scene {...props} selectedMaterialId={selectedMaterialId} onSelectMaterial={setSelectedMaterialId} lowPower={lowPower} cameraQuaternion={cameraQuaternion}/></Canvas></WebGLGate></div>
+export default function ContainerScene(props:{container:Container;items:PlacedCargo[];materials:SecuringItem[];selectedId:string|null;selectedIds:string[];selectionMode:'single'|'box';onSelect:(id:string|null)=>void;onSelectMany:(ids:string[])=>void;onMove:(id:string,x:number,y:number,z:number)=>void;onRotate:(id:string,rotation:number)=>void;onRotateMaterial:(id:string,rotation:number)=>void;onMaterialMove:(id:string,x:number,y:number)=>void;onMaterialScale:(id:string,factor:number)=>void;onAddMaterial:(type:SecuringMaterialType)=>void;view:View;dragging:boolean;onDragState:(v:boolean)=>void;onView:(v:View)=>void;cargo:Cargo[];lang:'zh'|'en';freePlacement:boolean;overflowCount:number;overflowItems:PlacedCargo[];showDimensions:boolean;airBagStretch:boolean;securingMode?:boolean}){
+ const cameraQuaternion=useRef(new THREE.Quaternion());const [selectedMaterialId,setSelectedMaterialId]=useState<string|null>(null);const [tool,setTool]=useState<SceneTool>('move')
+ const materialButtons:[SecuringMaterialType,string][]=[['triangleWood','三角木'],['lashingBelt','紧固带'],['airBag','充气袋'],['doorNet','柜门网']]
+ return <div className="scene-host"><WebGLGate><Canvas dpr={1} shadows={false} frameloop="always" gl={{antialias:true,powerPreference:'high-performance',failIfMajorPerformanceCaveat:false}} camera={{position:[7,7,5],fov:42}} onPointerMissed={()=>{props.onSelect(null);setSelectedMaterialId(null)}}><Scene {...props} selectedMaterialId={selectedMaterialId} onSelectMaterial={setSelectedMaterialId} onMaterialScale={props.onMaterialScale} onAddMaterial={props.onAddMaterial} tool={tool} cameraQuaternion={cameraQuaternion} securingMode={props.securingMode??false}/></Canvas><div className="scene-toolbox"><div className="scene-tool-row"><button className={tool==='move'?'active':''} onClick={()=>setTool('move')}>↔ 移动</button><button className={tool==='rotate'?'active':''} onClick={()=>setTool('rotate')}>⟳ 旋转</button><button className={tool==='scale'?'active':''} onClick={()=>setTool('scale')}>↔ 缩放</button></div><div className="scene-tool-title">加固材料</div><div className="scene-material-grid">{materialButtons.map(([type,label])=><button key={type} onClick={()=>props.onAddMaterial(type)}>{label}</button>)}</div><div className="scene-tool-tip">{tool==='scale'?'仅加固材料可缩放':'旋转固定 90°'}</div></div></WebGLGate></div>
 }

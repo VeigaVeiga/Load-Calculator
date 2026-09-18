@@ -1,0 +1,18 @@
+Load-Calculator V28 — Packing Engine 2.0 functional pass
+
+1. Replaced Cartesian-product packing candidates with O(n) extreme points plus spatial-hash collision lookup for responsive 90–600 unit loads.
+2. Stackability semantics: stackable controls whether a cargo may be placed above floor; loadBearing controls whether another cargo may be placed on it; support coverage and maxLoadOnTop are checked.
+3. Auto repack is triggered after quantity/dimension/weight/type/stacking property changes with a short debounce.
+4. Three.js antialiasing is enabled by default; shadows remain disabled for performance.
+5. Packing calculation is isolated from all scene decorations, lashing points, dunnage and visual meshes.
+6. Added 3D left toolbar: move / rotate / scale; scale is available only for securing materials; material buttons are centralized there.
+7. Cargo click targets use dedicated exact-size hit boxes; visual meshes do not intercept raycasts. Selected cargo becomes more transparent and shows its local transform gizmo.
+8. Cargo no longer displays an in-scene information popup; information remains in the right panel. Cargo XYZ editors were removed from the right panel.
+9. Rotation is locked to 90-degree increments.
+10. Door net receives a thick interactive hit volume and visible rope thickness. Air bag is thinner. Triangle wood uses a right-angle profile.
+11. Added Cargo.loadBearing and corresponding Add/Edit checkbox.
+12. Carton/wood crate quantity limit: 600. Pallet quantity limit: 50. Total volume limit: 120 CBM. Quantity and dimension fields turn red according to the requested limit rules.
+13. Weight imbalance is now continuous moment-based, so a centered CG reports approximately 0 kg rather than a false multi-ton side difference.
+14. Removed obsolete quality selector CSS and retained a single default rendering mode with antialiasing enabled.
+15. Removed right-panel air-bag stretch control and shortcut hint. Removed top-right securing-mode button; securing mode is controlled from the 3D View toolbar.
+16. Corrected world-axis arrow orientation.

@@ -1,6 +1,25 @@
 import type { Cargo } from '../types'
-export const cargoTemplates:Cargo[]=[
- {id:'CARTON-001',name:'Standard Carton',type:'carton',quantity:20,length:600,width:400,height:400,weight:18,color:'#b88b5a',showName:false,locked:false,stackable:true,rotatable:true,maxStackLayers:5,maxLoadOnTop:200,breakablePallet:false},
- {id:'PALLET-001',name:'Euro Pallet',type:'pallet',quantity:4,length:1200,width:800,height:1450,weight:520,color:'#c9954e',showName:false,locked:false,stackable:false,rotatable:true,maxStackLayers:1,maxLoadOnTop:0,breakablePallet:false},
- {id:'CRATE-001',name:'Wooden Crate',type:'woodCrate',quantity:3,length:1000,width:800,height:900,weight:260,color:'#a87845',showName:false,locked:false,stackable:true,rotatable:true,maxStackLayers:3,maxLoadOnTop:250,breakablePallet:false},
+
+// Default regression-test load: 15 pallets, 1100 × 1200 × 1600 mm.
+// A 40HQ can tile these in two 1100 mm lanes along the 12032 mm length.
+export const cargoTemplates: Cargo[] = [
+  {
+    id: 'TEST-PALLET-001',
+    name: '测试托盘 1100×1200×1600',
+    type: 'pallet',
+    quantity: 15,
+    length: 1100,
+    width: 1200,
+    height: 1600,
+    weight: 500,
+    color: '#c9954e',
+    showName: false,
+    locked: false,
+    stackable: false,
+    loadBearing: true,
+    rotatable: true,
+    maxStackLayers: 1,
+    maxLoadOnTop: 0,
+    breakablePallet: false,
+  },
 ]

@@ -3,14 +3,14 @@ import type { ReactNode } from 'react'
 import type { Container } from '../types'
 
 const S=0.001
-const BEAM='#275d86'
-const EDGE='#6b87a0'
+const BEAM='#2f6f9f'
+const EDGE='#5e8db3'
 
 function Beam({position,size,color=BEAM,opacity=0.96}:{position:[number,number,number];size:[number,number,number];color?:string;opacity?:number}){
  return <mesh position={position} castShadow><boxGeometry args={size}/><meshStandardMaterial color={color} transparent={opacity<1} opacity={opacity} metalness={0.15} roughness={0.58}/></mesh>
 }
 function Panel({position,size,opacity=0.08}:{position:[number,number,number];size:[number,number,number];opacity?:number}){
- return <mesh position={position}><boxGeometry args={size}/><meshStandardMaterial color="#527b9b" transparent opacity={opacity} depthWrite={false}/></mesh>
+ return <mesh position={position}><boxGeometry args={size}/><meshStandardMaterial color="#7da8c6" transparent opacity={opacity} depthWrite={false}/></mesh>
 }
 function SideWall({y,container}:{y:number;container:Container}){
  const L=container.outerLength*S,H=container.outerHeight*S; const ribs:ReactNode[]=[]
@@ -19,7 +19,7 @@ function SideWall({y,container}:{y:number;container:Container}){
 }
 function HeadWall({container}:{container:Container}){
  const W=container.outerWidth*S,H=container.outerHeight*S,x=-container.outerLength*S/2
- return <group><mesh position={[x,0,H/2]}><boxGeometry args={[container.wallThickness*S,W,H]}/><meshStandardMaterial color="#40515b" transparent opacity={0.24} roughness={0.78} metalness={0.08}/></mesh><Beam position={[x+0.012,0,H/2]} size={[0.05,W,H]} color="#53656e" opacity={0.42}/></group>
+ return <group><mesh position={[x,0,H/2]}><boxGeometry args={[container.wallThickness*S,W,H]}/><meshStandardMaterial color="#315f83" transparent opacity={0.24} roughness={0.78} metalness={0.08}/></mesh><Beam position={[x+0.012,0,H/2]} size={[0.05,W,H]} color="#3d78a5" opacity={0.42}/></group>
 }
 function Roof({container}:{container:Container}){
  const L=container.outerLength*S,W=container.outerWidth*S,H=container.outerHeight*S,t=container.roofThickness*S; const ribs:ReactNode[]=[]
@@ -32,7 +32,7 @@ function DoorFrame({container}:{container:Container}){
   <Beam position={[x,-W/2+post/2,H/2]} size={[post,post,H]}/><Beam position={[x,W/2-post/2,H/2]} size={[post,post,H]}/>
   <mesh position={[x,0,dh+(upperH>0?upperH/2:0)]} castShadow>
     <boxGeometry args={[post,W*0.94,Math.max(0.08,upperH)]}/>
-    <meshStandardMaterial color="#3b6e93" metalness={0.12} roughness={0.58}/>
+    <meshStandardMaterial color="#2f6f9f" metalness={0.12} roughness={0.58}/>
   </mesh>
   <Beam position={[x,0,0.045]} size={[post,dw+post,0.09]}/>
  </group>
@@ -40,11 +40,11 @@ function DoorFrame({container}:{container:Container}){
 function DoorLeaf({container,side}:{container:Container;side:-1|1}){
  const L=container.outerLength*S,dw=container.doorWidth*S,dh=container.doorHeight*S,t=0.035,leafW=dw/2,x=L/2+0.055,hingeY=side*dw/2,openAngle=side*Math.PI/2
  return <group position={[x,hingeY,dh/2]} rotation={[0,0,openAngle]}><group position={[0,-side*leafW/2,0]}>
-  <mesh castShadow><boxGeometry args={[t,leafW,dh]}/><meshStandardMaterial color="#2e6798" metalness={0.2} roughness={0.55}/></mesh>
-  {[0.18,0.38,0.58,0.78].map((f,i)=><Beam key={i} position={[-0.012,0,dh*(f-0.5)]} size={[0.055,leafW-0.04,0.045]} color="#173f65"/>)}
-  <Beam position={[-0.018,0,0]} size={[0.065,0.045,dh-0.08]} color="#153b60"/>
-  {[-0.33,0.33].map((f,i)=><Beam key={`v${i}`} position={[-0.012,f*leafW,0]} size={[0.06,0.045,dh-0.06]} color="#153b60"/>)}
-  <mesh position={[-0.032,0,0]}><boxGeometry args={[0.025,leafW-0.10,dh-0.14]}/><meshStandardMaterial color="#447ba8" transparent opacity={0.7}/></mesh>
+  <mesh castShadow><boxGeometry args={[t,leafW,dh]}/><meshStandardMaterial color="#3d7ea9" metalness={0.2} roughness={0.55}/></mesh>
+  {[0.18,0.38,0.58,0.78].map((f,i)=><Beam key={i} position={[-0.012,0,dh*(f-0.5)]} size={[0.055,leafW-0.04,0.045]} color="#285d82"/>)}
+  <Beam position={[-0.018,0,0]} size={[0.065,0.045,dh-0.08]} color="#234f70"/>
+  {[-0.33,0.33].map((f,i)=><Beam key={`v${i}`} position={[-0.012,f*leafW,0]} size={[0.06,0.045,dh-0.06]} color="#234f70"/>)}
+  <mesh position={[-0.032,0,0]}><boxGeometry args={[0.025,leafW-0.10,dh-0.14]}/><meshStandardMaterial color="#6e9fbe" transparent opacity={0.7}/></mesh>
  </group></group>
 }
 function EndTick({p,axis}:{p:[number,number,number];axis:'x'|'y'}){const d=0.025; return axis==='y'?<Line points={[[p[0]-d,p[1],p[2]],[p[0]+d,p[1],p[2]]]} color="#465260" lineWidth={0.8}/>:<Line points={[[p[0],p[1]-d,p[2]],[p[0],p[1]+d,p[2]]]} color="#465260" lineWidth={0.8}/>} 
@@ -61,7 +61,7 @@ export default function ContainerStructure({container,lang='zh',showDimensions=t
  const L=container.outerLength*S,W=container.outerWidth*S,H=container.outerHeight*S,IL=container.length*S,IW=container.width*S,IH=container.height*S,floor=container.floorThickness*S,post=0.075,rail=0.055,rightX=L/2
  return <group>
   <Beam position={[0,0,-floor/2]} size={[L,W,floor]} color="#315f83"/><Roof container={container}/><HeadWall container={container}/><SideWall y={-W/2} container={container}/><SideWall y={W/2} container={container}/>
-  {[-L/2,L/2].flatMap(x=>[-W/2,W/2].map(y=><Beam key={`${x}-${y}`} position={[x,y,(H-floor)/2]} size={[post,post,H+floor]} color="#174d78"/>))}
+  {[-L/2,L/2].flatMap(x=>[-W/2,W/2].map(y=><Beam key={`${x}-${y}`} position={[x,y,(H-floor)/2]} size={[post,post,H+floor]} color="#454945"/>))}
   <Beam position={[0,-W/2,H-rail/2]} size={[L,rail,rail]}/><Beam position={[0,W/2,H-rail/2]} size={[L,rail,rail]}/><DoorFrame container={container}/><DoorLeaf container={container} side={-1}/><DoorLeaf container={container} side={1}/>
   {showDimensions && <>  <LengthRuler container={container}/>
   <DimensionLine axis="y" points={[[rightX+0.28,-IW/2,0.12],[rightX+0.28,IW/2,0.12]]} label={`${lang==='zh'?'内部宽度':'INTERNAL WIDTH'} · ${container.width.toLocaleString()} mm`} position={[rightX+0.28,0,0.29]}/>
@@ -69,6 +69,5 @@ export default function ContainerStructure({container,lang='zh',showDimensions=t
   <DimensionLine axis="y" vertical points={[[rightX+0.30,IW/2+0.28,0],[rightX+0.30,IW/2+0.28,IH]]} label={`${lang==='zh'?'内部高度':'INTERNAL HEIGHT'} · ${container.height.toLocaleString()} mm`} position={[rightX+0.30,IW/2+0.28,IH/2]}/>
   <DimensionLine axis="y" vertical points={[[rightX+0.70,container.doorWidth*S/2+0.48,0],[rightX+0.70,container.doorWidth*S/2+0.48,container.doorHeight*S]]} label={`${lang==='zh'?'柜门高度':'DOOR HEIGHT'} · ${container.doorHeight.toLocaleString()} mm`} position={[rightX+0.70,container.doorWidth*S/2+0.48,container.doorHeight*S/2]}/>
   </>}
-  <Html position={[-L/2-0.16,0,IH*0.60]} center><div className="front-label">{lang==='zh'?'柜头':'FRONT'}</div></Html>
  </group>
 }

@@ -15,7 +15,6 @@ export default function CenterOfGravity({analysis,container,lang='zh'}:{analysis
         <line x1="18" y1="110" x2="102" y2="110" className="cg-axis"/>
         <line x1="60" y1="110" x2={x} y2={y} className="cg-vector"/>
         <circle cx={x} cy={y} r="5"/>
-        <text x="60" y="7" textAnchor="middle">{lang==='zh'?'柜头':'FRONT'}</text>
         <text x="60" y="219" textAnchor="middle">{lang==='zh'?'柜门':'DOOR'}</text>
       </svg>
     </div>

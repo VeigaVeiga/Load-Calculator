@@ -1,7 +1,7 @@
 {
   "name": "load-calculator",
   "private": true,
-  "version": "20.0.0",
+  "version": "28.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",

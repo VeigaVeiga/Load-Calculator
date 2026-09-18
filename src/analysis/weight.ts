@@ -32,35 +32,24 @@ export function analyzeWeight(items: PlacedCargo[], c: Container): WeightAnalysi
     z: total ? moment.z / total : 0,
   }
 
-  let front = 0
-  let rear = 0
-  let left = 0
-  let right = 0
+  const front = items.reduce((sum,p)=>sum + (p.x + dims(p).length/2 < c.length/2 ? p.weight : 0),0)
+  const rear = total-front
+  const left = items.reduce((sum,p)=>sum + (p.y + dims(p).width/2 < c.width/2 ? p.weight : 0),0)
+  const right = total-left
   const corners = { fl: 0, fr: 0, rl: 0, rr: 0 }
-
   for (const p of items) {
-    const d=dims(p)
-    const x = p.x + d.length / 2
-    const y = p.y + d.width / 2
-    const isFront = x < c.length / 2
-    const isLeft = y < c.width / 2
-
-    if (isFront) front += p.weight
-    else rear += p.weight
-
-    if (isLeft) left += p.weight
-    else right += p.weight
-
-    if (isFront && isLeft) corners.fl += p.weight
-    else if (isFront && !isLeft) corners.fr += p.weight
-    else if (!isFront && isLeft) corners.rl += p.weight
-    else corners.rr += p.weight
+    const d=dims(p); const x=p.x+d.length/2; const y=p.y+d.width/2
+    if(x<c.length/2 && y<c.width/2) corners.fl+=p.weight
+    else if(x<c.length/2) corners.fr+=p.weight
+    else if(y<c.width/2) corners.rl+=p.weight
+    else corners.rr+=p.weight
   }
-
-  const longitudinalOffset = Math.abs(front - rear)
-  const transverseOffset = Math.abs(left - right)
+  // Continuous moment-based imbalance: zero when CG is on the container centreline,
+  // independent of which side a box centre happens to fall on.
+  const longitudinalOffset = total ? Math.abs(cg.x-c.length/2) * 2 * total / c.length : 0
+  const transverseOffset = total ? Math.abs(cg.y-c.width/2) * 2 * total / c.width : 0
   const dominantOffset = Math.max(longitudinalOffset, transverseOffset)
-  const dominantDirection = dominantOffset < 0.5 ? 'balanced' : longitudinalOffset >= transverseOffset ? (front > rear ? 'front' : 'rear') : (left > right ? 'left' : 'right')
+  const dominantDirection = dominantOffset < 0.5 ? 'balanced' : longitudinalOffset >= transverseOffset ? (cg.x < c.length/2 ? 'front' : 'rear') : (cg.y < c.width/2 ? 'left' : 'right')
 
   return {
     total,

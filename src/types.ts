@@ -16,6 +16,7 @@ export interface Cargo {
   locked: boolean
 
   stackable: boolean
+  loadBearing: boolean
   rotatable: boolean
   maxStackLayers: number
   maxLoadOnTop: number
@@ -91,3 +92,4 @@ export interface LashingBelt { id: string; cargoId: string; startPoint: string; 
 export interface DoorNet { id: string; width: number; height: number; ratedCapacity?: number }
 export interface SecuringPlan { cargoId: string; triangleWood: TriangleWood[]; lashingBelts: LashingBelt[]; airBags: DunnageAirBag[]; doorNet?: DoorNet; status: 'none' | 'partial' | 'secured' }
 export interface ValidationResult { ok: boolean; errors: string[]; warnings: string[] }
+
