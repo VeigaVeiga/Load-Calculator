@@ -1,28 +1,19 @@
 import type { Cargo, Container, PlacedCargo } from '../types'
-import { dims, overlap } from './geometry'
+import { dims, overlap, inBounds } from './geometry'
 
-const SNAP = 10
-const EPS = 1
+const EPS = 0.5
+const YIELD_EVERY = 18
 
 type Orientation = { length:number; width:number; rotation:0|90 }
 type Unit = { cargo:Cargo; index:number }
-
 type Point = { x:number; y:number; z:number }
 
-class SpatialIndex {
-  private cells=new Map<string,PlacedCargo[]>()
-  private readonly size=500
-  private key(ix:number,iy:number,iz:number){return `${ix}|${iy}|${iz}`}
-  private range(min:number,max:number){const a=Math.floor(min/this.size),b=Math.floor(Math.max(min,max-EPS)/this.size);const out:number[]=[];for(let i=a;i<=b;i++)out.push(i);return out}
-  add(p:PlacedCargo){const d=dims(p);for(const ix of this.range(p.x,p.x+d.length))for(const iy of this.range(p.y,p.y+d.width))for(const iz of this.range(p.z,p.z+p.height)){const k=this.key(ix,iy,iz);const a=this.cells.get(k);if(a)a.push(p);else this.cells.set(k,[p])}}
-  query(p:PlacedCargo){const d=dims(p),seen=new Set<string>(),out:PlacedCargo[]=[];for(const ix of this.range(p.x,p.x+d.length))for(const iy of this.range(p.y,p.y+d.width))for(const iz of this.range(p.z,p.z+p.height)){const a=this.cells.get(this.key(ix,iy,iz));if(!a)continue;for(const q of a)if(!seen.has(q.id)){seen.add(q.id);out.push(q)}}return out}
-}
-
-const snap=(n:number)=>Math.max(0,Math.round(n/SNAP)*SNAP)
+const key=(x:number,y:number,z:number)=>`${x}|${y}|${z}`
+const clean=(n:number)=>Math.max(0,Math.round(n*10)/10)
 
 function orientations(c:Cargo):Orientation[]{
   const a:Orientation={length:c.length,width:c.width,rotation:0}
-  if(!c.rotatable||Math.abs(c.length-c.width)<EPS)return [a]
+  if(!c.rotatable || Math.abs(c.length-c.width)<EPS)return [a]
   return [a,{length:c.width,width:c.length,rotation:90}]
 }
 
@@ -36,187 +27,213 @@ export function expandCargo(cargo:Cargo[]):Unit[]{
 }
 
 function makePlaced(u:Unit,o:Orientation,x:number,y:number,z:number):PlacedCargo{
-  return {id:`${u.cargo.id}-${u.index+1}`,cargoId:u.cargo.id,cargoType:u.cargo.type,x,y,z,length:u.cargo.length,width:u.cargo.width,height:u.cargo.height,rotation:o.rotation,weight:u.cargo.weight,color:u.cargo.color,placementMode:'automatic',locked:false}
+  return {id:`${u.cargo.id}-${u.index+1}`,cargoId:u.cargo.id,cargoType:u.cargo.type,x:clean(x),y:clean(y),z:clean(z),length:u.cargo.length,width:u.cargo.width,height:u.cargo.height,rotation:o.rotation,weight:u.cargo.weight,color:u.cargo.color,placementMode:'automatic',locked:false}
 }
 
-function rectIntersectionArea(a:PlacedCargo,b:PlacedCargo){
+function rectArea(a:PlacedCargo,b:PlacedCargo){
   const A=dims(a),B=dims(b)
   return Math.max(0,Math.min(a.x+A.length,b.x+B.length)-Math.max(a.x,b.x))*Math.max(0,Math.min(a.y+A.width,b.y+B.width)-Math.max(a.y,b.y))
 }
 
-function fullSupport(p:PlacedCargo,items:PlacedCargo[]){
-  if(p.z<=EPS)return true
-  const area=dims(p).length*dims(p).width
-  let covered=0
-  const supports=items.filter(q=>Math.abs(q.z+q.height-p.z)<=EPS&&rectIntersectionArea(p,q)>EPS)
-  if(!supports.length)return false
-  const xs=new Set<number>([p.x,p.x+dims(p).length])
-  for(const q of supports){const d=dims(q);xs.add(Math.max(p.x,q.x));xs.add(Math.min(p.x+dims(p).length,q.x+d.length))}
-  const xvals=[...xs].sort((a,b)=>a-b)
-  for(let i=0;i<xvals.length-1;i++){
-    const xa=xvals[i],xb=xvals[i+1]
-    if(xb-xa<=EPS)continue
-    const intervals:sliceInterval[]=[]
-    for(const q of supports){const d=dims(q);if(q.x<xb-EPS&&q.x+d.length>xa+EPS)intervals.push({a:Math.max(p.y,q.y),b:Math.min(p.y+dims(p).width,q.y+d.width)})}
-    intervals.sort((a,b)=>a.a-b.a)
-    let end=-Infinity
-    let union=0
-    for(const r of intervals){if(r.b<=r.a+EPS)continue;if(r.a>end+EPS){union+=r.b-r.a;end=r.b}else if(r.b>end){union+=r.b-end;end=r.b}}
-    covered+=(xb-xa)*union
+function supportCoverage(p:PlacedCargo,items:PlacedCargo[]){
+  if(p.z<=EPS)return 1
+  const d=dims(p), area=d.length*d.width
+  const supports=items.filter(q=>Math.abs(q.z+q.height-p.z)<=EPS&&rectArea(p,q)>EPS)
+  if(!supports.length)return 0
+  const xs=new Set<number>([p.x,p.x+d.length])
+  const ys=new Set<number>([p.y,p.y+d.width])
+  for(const q of supports){
+    const qd=dims(q)
+    xs.add(Math.max(p.x,q.x)); xs.add(Math.min(p.x+d.length,q.x+qd.length))
+    ys.add(Math.max(p.y,q.y)); ys.add(Math.min(p.y+d.width,q.y+qd.width))
   }
-  return covered>=area*.995
+  const xv=[...xs].sort((a,b)=>a-b), yv=[...ys].sort((a,b)=>a-b)
+  let covered=0
+  for(let xi=0;xi<xv.length-1;xi++)for(let yi=0;yi<yv.length-1;yi++){
+    const cx=(xv[xi]+xv[xi+1])/2, cy=(yv[yi]+yv[yi+1])/2
+    if(cx<p.x-EPS||cx>p.x+d.length+EPS||cy<p.y-EPS||cy>p.y+d.width+EPS)continue
+    if(supports.some(q=>{const qd=dims(q);return cx>=q.x-EPS&&cx<=q.x+qd.length+EPS&&cy>=q.y-EPS&&cy<=q.y+qd.width+EPS}))covered+=(xv[xi+1]-xv[xi])*(yv[yi+1]-yv[yi])
+  }
+  return Math.min(1,covered/area)
 }
 
-type sliceInterval={a:number;b:number}
-
-function stackAllowed(p:PlacedCargo, c:Cargo, items:PlacedCargo[], defs:Map<string,Cargo>){
+function canStack(p:PlacedCargo,c:Cargo,items:PlacedCargo[],defs:Map<string,Cargo>){
   if(p.z<=EPS)return true
   if(!c.stackable)return false
-  if(!fullSupport(p,items))return false
-  const supports=items.filter(q=>Math.abs(q.z+q.height-p.z)<=EPS&&rectIntersectionArea(p,q)>EPS)
-  if(!supports.length)return false
+  const supports=items.filter(q=>Math.abs(q.z+q.height-p.z)<=EPS&&rectArea(p,q)>EPS)
+  if(supportCoverage(p,items)<0.995)return false
   for(const q of supports){
     const d=defs.get(q.cargoId)
     if(!d||!d.loadBearing||d.breakablePallet)return false
     if(d.maxLoadOnTop>0&&c.weight>d.maxLoadOnTop+EPS)return false
+    if(d.maxStackLayers>0){
+      let layers=1
+      for(const below of items)if(Math.abs(below.z+below.height-q.z)<=EPS&&rectArea(q,below)>EPS)layers++
+      if(layers>=d.maxStackLayers)return false
+    }
   }
   return true
 }
 
-function extremePoints(items:PlacedCargo[],c:Container):Point[]{
-  const pts:Point[]=[{x:0,y:0,z:0}]
+function collision(p:PlacedCargo,items:PlacedCargo[]){
+  return items.some(q=>overlap(p,q))
+}
+
+/**
+ * Generate compact candidate points from actual occupied edges.  Unlike a grid,
+ * this scales with cargo count and never depends on the visual Three.js scene.
+ */
+function candidatePoints(items:PlacedCargo[],c:Container):Point[]{
+  const out:Point[]=[]
+  const seen=new Set<string>()
+  const add=(x:number,y:number,z:number)=>{
+    x=clean(x);y=clean(y);z=clean(z)
+    if(x<-EPS||y<-EPS||z<-EPS||x>c.length+EPS||y>c.width+EPS||z>c.height+EPS)return
+    const k=key(x,y,z);if(!seen.has(k)){seen.add(k);out.push({x,y,z})}
+  }
+  add(0,0,0)
+  // Standard extreme points: floor corners, side edges and tops.
   for(const q of items){
     const d=dims(q)
-    pts.push({x:q.x+d.length,y:q.y,z:q.z})
-    pts.push({x:q.x,y:q.y+d.width,z:q.z})
-    pts.push({x:q.x,y:q.y,z:q.z+q.height})
-    pts.push({x:q.x+d.length,y:q.y+d.width,z:q.z})
+    add(q.x+d.length,q.y,q.z)
+    add(q.x,q.y+d.width,q.z)
+    add(q.x+d.length,q.y+d.width,q.z)
+    add(q.x,q.y,q.z+q.height)
   }
-  const seen=new Set<string>(),out:Point[]=[]
-  for(const p of pts){
-    const x=snap(p.x),y=snap(p.y),z=snap(p.z)
-    if(x<0||y<0||z<0||x>c.length+EPS||y>c.width+EPS||z>c.height+EPS)continue
-    const k=`${x}|${y}|${z}`
-    if(!seen.has(k)){seen.add(k);out.push({x,y,z})}
+  // Cross-edge points are essential when two rows meet or a rotated box fills a gap.
+  const xs=new Set<number>([0,c.length]), ys=new Set<number>([0,c.width]), zs=new Set<number>([0])
+  for(const q of items){const d=dims(q);xs.add(q.x);xs.add(q.x+d.length);ys.add(q.y);ys.add(q.y+d.width);zs.add(q.z);zs.add(q.z+q.height)}
+  const xu=[...xs].sort((a,b)=>a-b), yu=[...ys].sort((a,b)=>a-b), zu=[...zs].sort((a,b)=>a-b)
+  // Only test cross sections that are created by an existing top surface.
+  for(const z of zu){
+    if(z>c.height+EPS)continue
+    for(const x of xu)for(const y of yu){
+      if(x<=c.length+EPS&&y<=c.width+EPS)add(x,y,z)
+    }
   }
   out.sort((a,b)=>a.z-b.z||a.y-b.y||a.x-b.x)
   return out
 }
 
-function localScore(p:PlacedCargo,items:PlacedCargo[],c:Container){
+function contactScore(p:PlacedCargo,items:PlacedCargo[],c:Container){
   const d=dims(p)
-  let contact=0,wall=0,nearby=0
+  let side=0, top=0
   for(const q of items){
-    const qd=dims(q)
-    const xTouch=Math.abs((p.x+d.length)-q.x)<=EPS||Math.abs(p.x-(q.x+qd.length))<=EPS
-    const yTouch=Math.abs((p.y+d.width)-q.y)<=EPS||Math.abs(p.y-(q.y+qd.width))<=EPS
-    const zTouch=Math.abs((p.z+p.height)-q.z)<=EPS||Math.abs(p.z-(q.z+q.height))<=EPS
-    if(xTouch&&rectIntersectionArea(p,q)>EPS)contact+=1
-    if(yTouch&&rectIntersectionArea(p,q)>EPS)contact+=1
-    if(zTouch&&rectIntersectionArea(p,q)>EPS)contact+=4
-    if((xTouch||yTouch)&&rectIntersectionArea(p,q)>EPS)nearby+=1
+    const qd=dims(q), area=rectArea(p,q)
+    if(area<=EPS)continue
+    if(Math.abs(p.z-(q.z+q.height))<=EPS)top+=area/(d.length*d.width)
+    if(Math.abs(p.x-(q.x+qd.length))<=EPS||Math.abs(p.x+d.length-q.x)<=EPS)side+=Math.min(d.width,qd.width)/Math.max(d.width,qd.width)
+    if(Math.abs(p.y-(q.y+qd.width))<=EPS||Math.abs(p.y+d.width-q.y)<=EPS)side+=Math.min(d.length,qd.length)/Math.max(d.length,qd.length)
   }
-  if(p.x<=EPS||Math.abs(p.x+d.length-c.length)<=EPS)wall+=2
-  if(p.y<=EPS||Math.abs(p.y+d.width-c.width)<=EPS)wall+=2
-  if(p.z<=EPS)wall+=3
-  const centerY=Math.abs((p.y+d.width/2)-c.width/2)
-  return p.z*10000 + centerY*.015 - contact*260 - nearby*20 - wall*40
+  const wall=(p.x<=EPS?1:0)+(Math.abs(p.x+d.length-c.length)<=EPS?1:0)+(p.y<=EPS?1:0)+(Math.abs(p.y+d.width-c.width)<=EPS?1:0)
+  const volume=d.length*d.width*d.height
+  // Lower score is better: first minimize height, then reward contact and compact fill.
+  return p.z*100000 + (1-top)*1200 + (1-Math.min(1,side/4))*300 + (c.length-(p.x+d.length))*0.02 + (c.width-(p.y+d.width))*0.02 - wall*80 - volume*0.000001
 }
 
-function orderUnits(cargo:Cargo[], strategy:'footprint'|'height'|'weight'='footprint'){
+function orderUnits(cargo:Cargo[],strategy:'footprint'|'height'|'volume'|'weight'='footprint'){
   return expandCargo(cargo).filter(u=>u.cargo.length>0&&u.cargo.width>0&&u.cargo.height>0).sort((a,b)=>{
     const av=a.cargo.length*a.cargo.width*a.cargo.height,bv=b.cargo.length*b.cargo.width*b.cargo.height
     const af=a.cargo.length*a.cargo.width,bf=b.cargo.length*b.cargo.width
-    if(strategy==='height') return b.cargo.height-a.cargo.height||bf-af||b.cargo.weight-a.cargo.weight
-    if(strategy==='weight') return b.cargo.weight-a.cargo.weight||bf-af||bv-av
-    return bf-af||bv-av||b.cargo.weight-a.cargo.weight
+    if(strategy==='height')return b.cargo.height-a.cargo.height||bf-af||bv-av
+    if(strategy==='volume')return bv-av||bf-af||b.cargo.height-a.cargo.height
+    if(strategy==='weight')return b.cargo.weight-a.cargo.weight||bf-af||bv-av
+    return bf-af||b.cargo.height-a.cargo.height||bv-av
   })
 }
 
-function packCore(cargo:Cargo[],c:Container,locked:PlacedCargo[],orderStrategy:'footprint'|'height'|'weight'='footprint',onStep?:(i:number,total:number)=>void){
+function validLocked(locked:PlacedCargo[],c:Container,quantities:Map<string,number>){
+  const out:PlacedCargo[]=[]
+  for(const p of locked){
+    if((quantities.get(p.cargoId)||0)<=0||!inBounds(p,c))continue
+    if(out.some(q=>overlap(p,q)))continue
+    out.push(p)
+  }
+  return out
+}
+
+function packCore(cargo:Cargo[],c:Container,locked:PlacedCargo[],strategy:'footprint'|'height'|'volume'|'weight',onStep?:(i:number,total:number)=>void){
   const defs=new Map(cargo.map(x=>[x.id,x]))
   const quantities=new Map(cargo.map(x=>[x.id,Math.floor(x.quantity)]))
-  const safeLocked=locked.filter(p=>{
-    const q=quantities.get(p.cargoId)||0
-    return p.x>=0&&p.y>=0&&p.z>=0&&p.x+dims(p).length<=c.length+EPS&&p.y+dims(p).width<=c.width+EPS&&p.z+p.height<=c.height+EPS&&q>0
-  })
+  const items=validLocked(locked,c,quantities)
   const lockedCount=new Map<string,number>()
-  for(const p of safeLocked)lockedCount.set(p.cargoId,(lockedCount.get(p.cargoId)||0)+1)
-  const units=orderUnits(cargo,orderStrategy).filter(u=>u.index>=(lockedCount.get(u.cargo.id)||0))
-  const items=[...safeLocked]
-  const index=new SpatialIndex()
-  for(const p of items)index.add(p)
+  for(const p of items)lockedCount.set(p.cargoId,(lockedCount.get(p.cargoId)||0)+1)
+  const units=orderUnits(cargo,strategy).filter(u=>u.index>=(lockedCount.get(u.cargo.id)||0))
   let totalWeight=items.reduce((s,p)=>s+p.weight,0)
   for(let i=0;i<units.length;i++){
     const u=units[i]
-    let best:PlacedCargo|undefined
-    let bestScore=Infinity
+    let best:PlacedCargo|undefined,bestScore=Infinity
+    const points=candidatePoints(items,c)
     for(const o of orientations(u.cargo)){
       if(o.length>c.length+EPS||o.width>c.width+EPS||u.cargo.height>c.height+EPS)continue
-      for(const pt of extremePoints(items,c)){
+      for(const pt of points){
         if(pt.x+o.length>c.length+EPS||pt.y+o.width>c.width+EPS||pt.z+u.cargo.height>c.height+EPS)continue
         const p=makePlaced(u,o,pt.x,pt.y,pt.z)
         if(totalWeight+p.weight>c.maxPayload+EPS)continue
-        if(index.query(p).some(q=>overlap(p,q)))continue
-        if(!stackAllowed(p,u.cargo,index.query(p),defs))continue
-        const score=localScore(p,items,c)
+        if(collision(p,items))continue
+        if(!canStack(p,u.cargo,items,defs))continue
+        const score=contactScore(p,items,c)
         if(score<bestScore){bestScore=score;best=p}
       }
     }
-    if(best){items.push(best);index.add(best);totalWeight+=best.weight}
+    if(best){items.push(best);totalWeight+=best.weight}
     onStep?.(i+1,units.length)
   }
   return items
 }
 
+function scoreSolution(items:PlacedCargo,c:Container,total:number){return 0}
 function solutionScore(items:PlacedCargo[],c:Container,total:number){
   const completion=total?items.length/total:1
-  let weight=0,mx=0,my=0,usedL=0,usedW=0,usedV=0
-  for(const p of items){const d=dims(p);weight+=p.weight;mx+=p.weight*(p.x+d.length/2);my+=p.weight*(p.y+d.width/2);usedL=Math.max(usedL,p.x+d.length);usedW=Math.max(usedW,p.y+d.width);usedV=Math.max(usedV,p.z+p.height)}
-  const bx=weight?Math.abs(mx/weight-c.length/2)/c.length:1
-  const by=weight?Math.abs(my/weight-c.width/2)/c.width:1
-  const footprint=(usedL*usedW)/(c.length*c.width)
-  const vertical=usedV/c.height
-  return completion*1e9 - bx*3e6 - by*3e6 - footprint*15000 - vertical*2000
+  let weight=0,mx=0,my=0
+  for(const p of items){const d=dims(p);weight+=p.weight;mx+=p.weight*(p.x+d.length/2);my+=p.weight*(p.y+d.width/2)}
+  const bx=weight?Math.abs(mx/weight-c.length/2):0,by=weight?Math.abs(my/weight-c.width/2):0
+  const volume=items.reduce((s,p)=>s+dims(p).length*dims(p).width*p.height,0)
+  return completion*1e12 - bx*1e5 - by*1e5 + volume
 }
 
 export function autoPack(cargo:Cargo[],c:Container,locked:PlacedCargo[]=[]){
   const total=expandCargo(cargo).length
-  if(!total)return [...locked]
-  const result=packCore(cargo,c,locked,'footprint')
-  const result2=packCore(cargo,c,locked,'height')
-  const s1=solutionScore(result,c,total),s2=solutionScore(result2,c,total)
-  return s2>s1?result2:result
+  if(!total)return validLocked(locked,c,new Map(cargo.map(x=>[x.id,Math.floor(x.quantity)])))
+  const strategies:['footprint','height','volume','weight']=['footprint','height','volume','weight']
+  let best:PlacedCargo[]=[]
+  let bestScore=-Infinity
+  for(const s of strategies){
+    const r=packCore(cargo,c,locked,s)
+    const sc=solutionScore(r,c,total)
+    if(sc>bestScore){bestScore=sc;best=r}
+    if(r.length>=total)return r
+  }
+  return best
 }
 
 export async function autoPackAsync(cargo:Cargo[],c:Container,locked:PlacedCargo[]=[],onProgress?:(percent:number)=>void){
   const total=expandCargo(cargo).length
-  if(!total){onProgress?.(100);return [...locked]}
+  if(!total){onProgress?.(100);return validLocked(locked,c,new Map(cargo.map(x=>[x.id,Math.floor(x.quantity)])))}
+  // Run one deterministic strategy asynchronously. Progress is always clamped to 0..100.
   const defs=new Map(cargo.map(x=>[x.id,x]))
   const quantities=new Map(cargo.map(x=>[x.id,Math.floor(x.quantity)]))
-  const safeLocked=locked.filter(p=>quantities.get(p.cargoId)>0)
+  const items=validLocked(locked,c,quantities)
   const lockedCount=new Map<string,number>()
-  for(const p of safeLocked)lockedCount.set(p.cargoId,(lockedCount.get(p.cargoId)||0)+1)
+  for(const p of items)lockedCount.set(p.cargoId,(lockedCount.get(p.cargoId)||0)+1)
   const units=orderUnits(cargo,'footprint').filter(u=>u.index>=(lockedCount.get(u.cargo.id)||0))
-  const items=[...safeLocked]
-  const index=new SpatialIndex()
-  for(const p of items)index.add(p)
   let totalWeight=items.reduce((s,p)=>s+p.weight,0)
   for(let i=0;i<units.length;i++){
-    const u=units[i];let best:PlacedCargo|undefined;let bestScore=Infinity
+    const u=units[i];let best:PlacedCargo|undefined,bestScore=Infinity
+    const points=candidatePoints(items,c)
     for(const o of orientations(u.cargo)){
       if(o.length>c.length+EPS||o.width>c.width+EPS||u.cargo.height>c.height+EPS)continue
-      for(const pt of extremePoints(items,c)){
+      for(const pt of points){
         if(pt.x+o.length>c.length+EPS||pt.y+o.width>c.width+EPS||pt.z+u.cargo.height>c.height+EPS)continue
         const p=makePlaced(u,o,pt.x,pt.y,pt.z)
-        if(totalWeight+p.weight>c.maxPayload+EPS||index.query(p).some(q=>overlap(p,q))||!stackAllowed(p,u.cargo,index.query(p),defs))continue
-        const score=localScore(p,items,c)
-        if(score<bestScore){bestScore=score;best=p}
+        if(totalWeight+p.weight>c.maxPayload+EPS||collision(p,items)||!canStack(p,u.cargo,items,defs))continue
+        const sc=contactScore(p,items,c)
+        if(sc<bestScore){bestScore=sc;best=p}
       }
     }
-    if(best){items.push(best);index.add(best);totalWeight+=best.weight}
+    if(best){items.push(best);totalWeight+=best.weight}
     onProgress?.(Math.min(100,Math.round(((i+1)/units.length)*100)))
-    if(i%12===11)await new Promise<void>(resolve=>setTimeout(resolve,0))
+    if(i%YIELD_EVERY===YIELD_EVERY-1)await new Promise<void>(r=>setTimeout(r,0))
   }
   return items
 }
