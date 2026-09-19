@@ -5,7 +5,9 @@ const S=.001
 export default function ContainerFloor({container}:{container:Container}){
  const L=container.length*S,W=container.width*S
  const lines:ReactElement[]=[]
- // Grid is symmetric about the container centerline. 200 mm minor grid, 1 m major grid.
+ // The packing coordinate system uses z=0 as the top surface of the floor.
+ // Keep the rendered floor top exactly at z=0 so automatically packed cargo
+ // does not appear to float above the floor.
  const addAxisLines=(axis:'x'|'y')=>{
    const total=axis==='x'?container.length:container.width
    const half=total/2
@@ -22,7 +24,7 @@ export default function ContainerFloor({container}:{container:Container}){
  }
  addAxisLines('x'); addAxisLines('y')
  return <group>
-  <mesh position={[0,0,-container.floorThickness*S/2-0.022]} receiveShadow><boxGeometry args={[L,W,container.floorThickness*S]}/><meshStandardMaterial color="#9b8b78" roughness={.9}/></mesh>
+  <mesh position={[0,0,-container.floorThickness*S/2]} receiveShadow><boxGeometry args={[L,W,container.floorThickness*S]}/><meshStandardMaterial color="#9b8b78" roughness={.9}/></mesh>
   {lines}
  </group>
 }
