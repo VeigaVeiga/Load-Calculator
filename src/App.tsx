@@ -637,14 +637,14 @@ function App() {
 
   const addMaterial = (
     type: SecuringMaterialType,
-  ) => {
+  ): string => {
     const n = materials.length + 1
 
     const material: SecuringItem = {
       id: `${type}-${n}`,
       type,
-      x: Math.max(0, Math.round(container.length / 2 - 500)),
-      y: Math.max(0, Math.round(container.width / 2 - 500)),
+      x: type === 'doorNet' ? Math.max(0, container.length - 40) : Math.max(0, Math.round(container.length / 2 - 500)),
+      y: 0,
       z: 0,
       length:
         type === 'triangleWood'
@@ -673,10 +673,8 @@ function App() {
       rotation: 0,
     }
 
-    setMaterials((items) => [
-      ...items,
-      material,
-    ])
+    setMaterials((items) => [...items, material])
+    return material.id
   }
 
   const moveMaterial = (
@@ -727,6 +725,7 @@ function App() {
     const rect=(x:number,y:number,w:number,h:number,c:string)=>`<rect x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${w.toFixed(2)}" height="${h.toFixed(2)}" fill="${c}" fill-opacity=".82" stroke="#243b4b" stroke-width="1.2"/>`
     let shapes=''
     for(const p of placed){const d=p.rotation%180===0?{l:p.length,w:p.width}:{l:p.width,w:p.length};shapes+=rect(bx+p.x/container.length*boxW,by+p.y/container.width*boxH,d.l/container.length*boxW,d.w/container.width*boxH,p.color)}
+    for(const m of materials){const mx=bx+m.x/container.length*boxW,my=by+m.y/container.width*boxH,mw=Math.max(2,m.length/container.length*boxW),mh=Math.max(2,m.width/container.width*boxH);if(m.type==='triangleWood')shapes+=`<polygon points="${mx},${my+mh} ${mx+mw},${my+mh} ${mx},${my}" fill="#3979b8"/>`;else if(m.type==='airBag')shapes+=`<rect x="${mx}" y="${my}" width="${mw}" height="${mh}" rx="3" fill="#3fa36b"/>`;else if(m.type==='lashingBelt')shapes+=`<line x1="${mx}" y1="${my+mh/2}" x2="${mx+mw}" y2="${my+mh/2}" stroke="#e86d43" stroke-width="3"/>`;else shapes+=`<rect x="${mx}" y="${my}" width="${mw}" height="${mh}" fill="none" stroke="#737b82" stroke-width="2" stroke-dasharray="6 5"/>`}
     return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"><rect width="100%" height="100%" fill="#fff"/><text x="${W/2}" y="25" text-anchor="middle" font-size="17" font-weight="700" fill="#17354d">${container.name} · ${lang==='zh'?'俯视示意图':'TOP VIEW'}</text><rect x="${bx}" y="${by}" width="${boxW}" height="${boxH}" fill="#eef4f7" stroke="#17354d" stroke-width="2"/>${shapes}</svg>`
   }
 
@@ -736,6 +735,7 @@ function App() {
     const rect=(x:number,y:number,w:number,h:number,c:string)=>`<rect x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${w.toFixed(2)}" height="${h.toFixed(2)}" fill="${c}" fill-opacity=".82" stroke="#243b4b" stroke-width="1.1"/>`
     let left='',frontShapes=''
     for(const p of placed){const d=p.rotation%180===0?{l:p.length,w:p.width}:{l:p.width,w:p.length};left+=rect(side.x+p.x/container.length*side.w,side.y+(1-(p.z+p.height)/container.height)*side.h,d.l/container.length*side.w,p.height/container.height*side.h,p.color);frontShapes+=rect(front.x+p.y/container.width*front.w,front.y+(1-(p.z+p.height)/container.height)*front.h,d.w/container.width*front.w,p.height/container.height*front.h,p.color)}
+    for(const m of materials){const sx=side.x+m.x/container.length*side.w,sy=side.y+(1-(m.z+m.height)/container.height)*side.h,sw=Math.max(2,m.length/container.length*side.w),sh=Math.max(2,m.height/container.height*side.h);const fx=front.x+m.y/container.width*front.w,fy=front.y+(1-(m.z+m.height)/container.height)*front.h,fw=Math.max(2,m.width/container.width*front.w);if(m.type==='triangleWood'){left+=`<polygon points="${sx},${sy+sh} ${sx+sw},${sy+sh} ${sx},${sy}" fill="#3979b8"/>`;frontShapes+=`<polygon points="${fx},${fy+sh} ${fx+fw},${fy+sh} ${fx},${fy}" fill="#3979b8"/>`}else if(m.type==='airBag'){left+=`<rect x="${sx}" y="${sy}" width="${sw}" height="${sh}" fill="#3fa36b"/>`;frontShapes+=`<rect x="${fx}" y="${fy}" width="${fw}" height="${sh}" fill="#3fa36b"/>`}else if(m.type==='lashingBelt'){left+=`<line x1="${sx}" y1="${sy+sh/2}" x2="${sx+sw}" y2="${sy+sh/2}" stroke="#e86d43" stroke-width="3"/>`;frontShapes+=`<line x1="${fx}" y1="${fy+sh/2}" x2="${fx+fw}" y2="${fy+sh/2}" stroke="#e86d43" stroke-width="3"/>`}else{left+=`<rect x="${sx}" y="${sy}" width="${sw}" height="${sh}" fill="none" stroke="#737b82" stroke-width="2" stroke-dasharray="6 5"/>`;frontShapes+=`<rect x="${fx}" y="${fy}" width="${fw}" height="${sh}" fill="none" stroke="#737b82" stroke-width="2" stroke-dasharray="6 5"/>`}}
     return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"><rect width="100%" height="100%" fill="#fff"/><text x="${side.x+side.w/2}" y="30" text-anchor="middle" font-size="15" font-weight="700" fill="#17354d">${lang==='zh'?'侧视示意图':'SIDE VIEW'}</text><text x="${front.x+front.w/2}" y="30" text-anchor="middle" font-size="15" font-weight="700" fill="#17354d">${lang==='zh'?'正视示意图':'FRONT VIEW'}</text><rect x="${side.x}" y="${side.y}" width="${side.w}" height="${side.h}" fill="#eef4f7" stroke="#17354d" stroke-width="2"/>${left}<rect x="${front.x}" y="${front.y}" width="${front.w}" height="${front.h}" fill="#eef4f7" stroke="#17354d" stroke-width="2"/>${frontShapes}</svg>`
   }
 
@@ -760,7 +760,7 @@ function App() {
       const response=await fetch('/装箱方案模板.docx');if(!response.ok)throw new Error('Template not found');const template=await response.arrayBuffer();const templateBytes=new Uint8Array(template);const xmlBytes=await extractZipEntry(templateBytes,'word/document.xml');const xmlText=new TextDecoder().decode(xmlBytes)
       const parser=new DOMParser();const doc=parser.parseFromString(xmlText,'application/xml');const w='http://schemas.openxmlformats.org/wordprocessingml/2006/main';const tables=Array.from(doc.getElementsByTagNameNS(w,'tbl'));const cargoTable=tables[0],infoTable=tables[1];if(!cargoTable||!infoTable)throw new Error('Template tables not found')
       const rows=Array.from(cargoTable.getElementsByTagNameNS(w,'tr'));const containerCells=Array.from(rows[0].getElementsByTagNameNS(w,'tc'));if(containerCells[1])setCellText(containerCells[1],`${container.name}（${container.length.toLocaleString()}×${container.width.toLocaleString()}×${container.height.toLocaleString()} mm）`);if(containerCells[3])setCellText(containerCells[3],lang==='zh'?'均匀、紧凑、对称布满箱底':'Uniform, compact and symmetrical loading')
-      const loadedById=new Map<string,PlacedCargo[]>();for(const p of placed){const a=loadedById.get(p.cargoId)||[];a.push(p);loadedById.set(p.cargoId,a)};const loaded=cargo.filter(c=>(loadedById.get(c.id)?.length||0)>0);const totalWeight=placed.reduce((sum,p)=>sum+p.weight,0);const cargoLines=loaded.map(c=>`${c.name} × ${(loadedById.get(c.id)||[]).length}`).join('；');const dimsLines=loaded.map(c=>{const p=(loadedById.get(c.id)||[])[0];const d=p.rotation%180===0?{l:p.length,w:p.width}:{l:p.width,w:p.length};return `${d.l}×${d.w}×${p.height}`}).join('；');const typeLines=loaded.map(c=>c.type==='pallet'?tr.pallet:c.type==='woodCrate'?tr.crate:tr.carton).join('；');const first=Array.from(rows[2]?.getElementsByTagNameNS(w,'tc')||[]);for(const r0 of rows.slice(3)){for(const cell of Array.from(r0.getElementsByTagNameNS(w,'tc')))setCellText(cell,'')};if(first.length>=7){setCellText(first[1],cargoLines||'-');setCellText(first[2],String(placed.length));setCellText(first[3],loaded.length===1?(loaded[0].weight||0).toFixed(1):'-');setCellText(first[4],totalWeight.toFixed(1));setCellText(first[5],dimsLines||'-');setCellText(first[6],typeLines||'-')}
+      const loadedById=new Map<string,PlacedCargo[]>();for(const p of placed){const a=loadedById.get(p.cargoId)||[];a.push(p);loadedById.set(p.cargoId,a)};const loaded=cargo.filter(c=>(loadedById.get(c.id)?.length||0)>0);const totalWeight=placed.reduce((sum,p)=>sum+p.weight,0);const cargoLines=loaded.map(c=>`${c.name} × ${(loadedById.get(c.id)||[]).length}`).join('；');const dimsLines=loaded.map(c=>{const p=(loadedById.get(c.id)||[])[0];const d=p.rotation%180===0?{l:p.length,w:p.width}:{l:p.width,w:p.length};return `${d.l}×${d.w}×${p.height}`}).join('；');const typeLines=loaded.map(c=>c.type==='pallet'?tr.pallet:c.type==='woodCrate'?tr.crate:tr.carton).join('；');const first=Array.from(rows[2]?.getElementsByTagNameNS(w,'tc')||[]);for(const r0 of rows.slice(3)){for(const cell of Array.from(r0.getElementsByTagNameNS(w,'tc')))setCellText(cell,'')};if(first.length>=7){setCellText(first[1],cargoLines||'-');setCellText(first[2],String(placed.length));setCellText(first[3],loaded.map(c=>(c.weight||0).toFixed(1)).join('；')||'-');setCellText(first[4],totalWeight.toFixed(1));setCellText(first[5],dimsLines||'-');setCellText(first[6],typeLines||'-')}
       const infoRows=Array.from(infoTable.getElementsByTagNameNS(w,'tr'));if(infoRows[2]){const c=Array.from(infoRows[2].getElementsByTagNameNS(w,'tc'));if(c[1])setCellText(c[1],lang==='zh'?`根据当前3D视图内货物的实际位置、尺寸、旋转及堆叠状态生成装箱方案，共装载 ${placed.length} 件货物。`:`The loading plan is generated from the current 3D cargo arrangement; ${placed.length} units are loaded.`)}if(infoRows[3]){const c=Array.from(infoRows[3].getElementsByTagNameNS(w,'tc'));if(c[1])setCellText(c[1],lang==='zh'?`1、箱内货物紧密码靠，装载均匀、稳定、对称、配载合理。\n2、货物装箱后不影响箱门关闭。`:`1. Cargo is compact and stable.\n2. Cargo must not obstruct the doors.`)}if(infoRows[4]){const c=Array.from(infoRows[4].getElementsByTagNameNS(w,'tc'));if(c[1])setCellText(c[1],lang==='zh'?'按当前装载结果配置三角木、紧固带、气袋及其他需要的加固材料，防止运输过程中位移。':'Place securing materials at gaps and required positions to prevent movement.')}if(infoRows[5]){const c=Array.from(infoRows[5].getElementsByTagNameNS(w,'tc'));const materialText=Object.entries(materialCounts).map(([k,v])=>`${materialNames[k as SecuringMaterialType][lang]} × ${v}`).join('、')|| (lang==='zh'?'暂无加固材料':'No securing materials');if(c[1])setCellText(c[1],materialText)}
       const updatedXml=new XMLSerializer().serializeToString(doc);const top=await svgToPng(makeTopViewSvg(1000,420),1000,420);const sf=await svgToPng(makeSideFrontSvg(1000,430),1000,430);const output=await createDocxWithPlanImages(template,updatedXml,top,sf);const blob=new Blob([output],{type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'});const u=URL.createObjectURL(blob);const a=document.createElement('a');a.href=u;a.download=`${container.name}-装箱方案.docx`;a.click();setTimeout(()=>URL.revokeObjectURL(u),1500);setMessage(lang==='zh'?'已按 Word 模板导出装箱方案':'Loading plan exported from Word template')
     }catch(error){console.error(error);setMessage(lang==='zh'?'装箱方案模板导出失败，请检查模板文件':'Loading plan template export failed')}
