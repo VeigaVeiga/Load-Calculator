@@ -21,13 +21,13 @@ type Props = {
   local?: boolean
 }
 
-function Rope({a,b,radius=.016,color='#8b8f91'}:{a:THREE.Vector3;b:THREE.Vector3;radius?:number;color?:string}){
+function Rope({a,b,radius=.022,color='#8b8f91'}:{a:THREE.Vector3;b:THREE.Vector3;radius?:number;color?:string}){
   const direction=b.clone().sub(a),mid=a.clone().add(b).multiplyScalar(.5),len=direction.length()
   const quaternion=new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0),direction.normalize())
   return <mesh position={mid} quaternion={quaternion} raycast={()=>null}><cylinderGeometry args={[radius,radius,len,8]}/><meshStandardMaterial color={color} roughness={.72}/></mesh>
 }
 
-export default function SecuringModel({item,container,selected,onSelect,registerRef,local=false}:Props){
+export default function SecuringModel({item,container,selected,registerRef,local=false}:Props){
   const center: [number,number,number]=local?[0,0,0]:[(item.x+item.length/2-container.length/2)*S,(item.y+item.width/2-container.width/2)*S,(item.z+item.height/2)*S]
   const material=(color:string)=><meshStandardMaterial color={selected?'#f4a23b':color} roughness={.58} metalness={.06}/>
   let body:ReactNode
@@ -42,15 +42,21 @@ export default function SecuringModel({item,container,selected,onSelect,register
   }else if(item.type==='airBag'){
     const L=item.length*S,W=Math.max(100,item.width)*S,H=Math.min(220,item.height)*S
     body=<group>
-      <mesh scale={[L*.46,W*.34,H*.30]}><sphereGeometry args={[1,18,10]}/>{material('#3fa36b')}</mesh>
-      <mesh position={[L*.27,0,0]} scale={[L*.25,W*.30,H*.27]}><sphereGeometry args={[1,16,10]}/>{material('#3fa36b')}</mesh>
-      <mesh position={[-L*.27,0,0]} scale={[L*.25,W*.30,H*.27]}><sphereGeometry args={[1,16,10]}/>{material('#3fa36b')}</mesh>
+      <mesh scale={[L*.46,W*.34,H*.30]}><sphereGeometry args={[1,16,8]}/>{material('#3fa36b')}</mesh>
+      <mesh position={[L*.27,0,0]} scale={[L*.25,W*.30,H*.27]}><sphereGeometry args={[1,14,8]}/>{material('#3fa36b')}</mesh>
+      <mesh position={[-L*.27,0,0]} scale={[L*.25,W*.30,H*.27]}><sphereGeometry args={[1,14,8]}/>{material('#3fa36b')}</mesh>
     </group>
   }else if(item.type==='doorNet'){
     const w=Math.max(30,item.width)*S,h=Math.max(30,item.height)*S,cols=18,rows=14,ropes:ReactNode[]=[]
-    for(let i=0;i<=cols;i+=1){const x=-w/2+i*w/cols;ropes.push(<Rope key={`v${i}`} a={new THREE.Vector3(0,x,-h/2)} b={new THREE.Vector3(0,x,h/2)}/>)}
-    for(let j=0;j<=rows;j+=1){const z=-h/2+j*h/rows;ropes.push(<Rope key={`h${j}`} a={new THREE.Vector3(0,-w/2,z)} b={new THREE.Vector3(0,w/2,z)}/>)}
-    body=<group>{ropes}</group>
+    for(let i=0;i<=cols;i++){const x=-w/2+i*w/cols;ropes.push(<Rope key={`v${i}`} a={new THREE.Vector3(0,x,-h/2)} b={new THREE.Vector3(0,x,h/2)} radius={.026} color={selected?'#f4a23b':'#737b82'}/>)}
+    for(let j=0;j<=rows;j++){const z=-h/2+j*h/rows;ropes.push(<Rope key={`h${j}`} a={new THREE.Vector3(0,-w/2,z)} b={new THREE.Vector3(0,w/2,z)} radius={.026} color={selected?'#f4a23b':'#737b82'}/>)}
+    body=<group>
+      {ropes}
+      <mesh position={[0,-w/2,0]} raycast={()=>null}><boxGeometry args={[.035,.035,h]}/><meshStandardMaterial color="#626970"/></mesh>
+      <mesh position={[0,w/2,0]} raycast={()=>null}><boxGeometry args={[.035,.035,h]}/><meshStandardMaterial color="#626970"/></mesh>
+      <mesh position={[0,0,-h/2]} raycast={()=>null}><boxGeometry args={[.035,w,.035]}/><meshStandardMaterial color="#626970"/></mesh>
+      <mesh position={[0,0,h/2]} raycast={()=>null}><boxGeometry args={[.035,w,.035]}/><meshStandardMaterial color="#626970"/></mesh>
+    </group>
   }else{
     const points=item.path&&item.path.length>1?item.path.map(q=>new THREE.Vector3((q.x-container.length/2)*S,(q.y-container.width/2)*S,q.z*S)):[new THREE.Vector3(-1.5,0,.05),new THREE.Vector3(0,0,.5),new THREE.Vector3(1.5,0,.05)]
     const curve=new THREE.CatmullRomCurve3(points),geometry=new THREE.TubeGeometry(curve,20,.012,8,false)
@@ -58,7 +64,7 @@ export default function SecuringModel({item,container,selected,onSelect,register
   }
 
   const hitL=Math.max(item.length,360),hitW=Math.max(item.width,360),hitH=Math.max(item.height,220)
-  return <group ref={group=>registerRef?.(item.id,group)} position={center} rotation={[0,0,item.rotation*Math.PI/180]} onPointerDown={e=>{e.stopPropagation();onSelect()}} onClick={e=>{e.stopPropagation();onSelect()}} onContextMenu={e=>{e.stopPropagation();onSelect()}}>
+  return <group ref={group=>registerRef?.(item.id,group)} position={center} rotation={[0,0,item.rotation*Math.PI/180]} onPointerDown={e=>{e.stopPropagation()}} onClick={e=>{e.stopPropagation()}} onContextMenu={e=>{e.stopPropagation();e.nativeEvent.preventDefault()}}>
     <mesh userData={{collisionBody:false,securingBody:true}}><boxGeometry args={[hitL*S,hitW*S,hitH*S]}/><meshBasicMaterial transparent opacity={0.001} depthWrite={false}/></mesh>
     {body}
   </group>
