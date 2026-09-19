@@ -1,62 +1,127 @@
-import React from 'react'
-import { Canvas, useThree, useFrame } from '@react-three/fiber'
-import { OrbitControls, Line, Html, Sky, TransformControls } from '@react-three/drei'
-import { useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Canvas, useFrame, useThree } from '@react-three/fiber'
+import { Html, Line, OrbitControls, Sky, TransformControls } from '@react-three/drei'
 import * as THREE from 'three'
 import type { Cargo, Container, PlacedCargo, SecuringItem, SecuringMaterialType } from '../types'
+import { dims, validatePlacement } from '../packing/geometry'
 import ContainerStructure from './ContainerStructure'
 import ContainerFloor from './ContainerFloor'
 import CargoModel from './CargoModel'
 import SecuringModel from './SecuringModel'
 import LashingPoints from './LashingPoints'
-import { dims } from '../packing/geometry'
 
-export type View='iso'|'top'|'front'|'left'|'right'
-export type SceneTool='move'|'rotate'|'scale'
-export type SelectionMode='single'|'box'
-const S=.001
+export type View = 'iso' | 'top' | 'front' | 'left' | 'right'
+export type SceneTool = 'translate' | 'rotate' | 'scale'
+export type SelectionMode = 'single' | 'box'
+const S = 0.001
 
-type MoveManyUpdate={id:string;x:number;y:number;z:number;rotation?:number}
-
-function CameraRig({view,container,dragging,cameraQuaternion,securingMode}:{view:View;container:Container;dragging:boolean;cameraQuaternion:React.MutableRefObject<THREE.Quaternion>;securingMode:boolean}){
- const {camera}=useThree();const controls=useRef<any>(null)
- useEffect(()=>{camera.up.set(0,0,1);const L=container.length*S,W=container.width*S,H=container.height*S;const d=Math.max(L,W,H)*(securingMode?.92:1.35);const target=new THREE.Vector3(0,0,securingMode?H*.42:H*.34);const pos:Record<View,[number,number,number]>={iso:[d*1.04,d*.92,d*.68],top:[0,0,d*1.38],front:[-d*1.55,0,H*.45],left:[0,-d*1.62,H*.45],right:[0,d*1.62,H*.45]};camera.position.set(...pos[view]);camera.lookAt(target);if(controls.current){controls.current.target.copy(target);controls.current.update()}},[view,camera,container.length,container.width,container.height,securingMode])
- return <><OrbitControls ref={controls} makeDefault enabled={!dragging} enableDamping dampingFactor={.08} rotateSpeed={.5} zoomSpeed={.85} panSpeed={.65} minDistance={.65} maxDistance={28}/><CameraQuaternionSync target={cameraQuaternion}/></>
-}
-function CameraQuaternionSync({target}:{target:React.MutableRefObject<THREE.Quaternion>}){const {camera}=useThree();useFrame(()=>target.current.copy(camera.quaternion));return null}
-function Arrow({axis,color}:{axis:'x'|'y'|'z';color:string}){const rot:Record<string,[number,number,number]>={x:[0,0,-Math.PI/2],y:[0,0,0],z:[0,0,0]};const pos=axis==='x'?[.55,0,0]:axis==='y'?[0,.55,0]:[0,0,.55];return <mesh rotation={rot[axis]} position={pos as [number,number,number]} raycast={()=>null}><coneGeometry args={[.035,.10,12]}/><meshBasicMaterial color={color}/></mesh>}
-function CoordinateAxes({container}:{container:Container}){const L=container.length*S,W=container.width*S,p:[number,number,number]=[-L/2-.7,-W/2-.7,.02],len=.65;return <group position={p}><Line points={[[0,0,0],[len,0,0]]} color="#b4473d" lineWidth={2}/><Arrow axis="x" color="#b4473d"/><Line points={[[0,0,0],[0,len,0]]} color="#4d8052" lineWidth={2}/><Arrow axis="y" color="#4d8052"/><Line points={[[0,0,0],[0,0,len]]} color="#3f6f9e" lineWidth={2}/><Arrow axis="z" color="#3f6f9e"/><Html position={[len+.05,0,0]} center><div className="axis-label axis-x">X</div></Html><Html position={[0,len+.05,0]} center><div className="axis-label axis-y">Y</div></Html><Html position={[0,0,len+.05]} center><div className="axis-label axis-z">Z</div></Html></group>}
-
-function CargoInteraction({p,container,selected,onSelect,registerRef,showName}:{p:PlacedCargo;container:Container;selected:boolean;onSelect:()=>void;registerRef:(id:string,obj:THREE.Group|null)=>void;showName:boolean}){
- const ref=useRef<THREE.Group>(null)
- useEffect(()=>{registerRef(p.id,ref.current);return()=>registerRef(p.id,null)},[p.id,registerRef])
- const d=dims(p);const pivot:[number,number,number]=[(p.x+d.length/2-container.length/2)*S,(p.y+d.width/2-container.width/2)*S,(p.z+p.height/2)*S]
- return <group ref={ref} position={pivot} rotation={[0,0,p.rotation*Math.PI/180]} onPointerDown={e=>{e.stopPropagation();onSelect()}} onClick={e=>{e.stopPropagation();onSelect()}}><CargoModel p={{...p,x:0,y:0,z:0} as PlacedCargo} container={container} selected={selected} hovered={false} onPointerDown={e=>{e.stopPropagation();onSelect()}} onPointerMove={e=>e.stopPropagation()} onPointerUp={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();onSelect()}} showName={showName} local/></group>
-}
-function ZonePlate({container,side,label,detail}:{container:Container;side:-1|1;label:string;detail:string}){const L=container.length*S,y=side*(container.width*S/2+3);return <group position={[0,y,-.18]}><mesh><boxGeometry args={[L,2.55,.035]}/><meshStandardMaterial color="#d8dde1" roughness={.9}/></mesh><Line points={[[-L/2,-1.2,.022],[L/2,-1.2,.022],[L/2,1.2,.022],[-L/2,1.2,.022],[-L/2,-1.2,.022]]} color="#8b969d" lineWidth={1}/><Html position={[-L/2+.35,-1.05,.08]} center><div className="scene-zone-label"><b>{label}</b><span>{detail}</span></div></Html></group>}
-function OverflowZone({container,count,items,lang}:{container:Container;count:number;items:PlacedCargo[];lang:'zh'|'en'}){if(count<=0)return null;return <group><ZonePlate container={container} side={-1} label={lang==='zh'?'溢出货物区':'OVERFLOW CARGO'} detail={lang==='zh'?`${count} 件未装载`:`${count} unplaced`}/>{items.map(p=><group key={p.id} position={[(p.x+p.length/2-container.length/2)*S,(p.y+p.width/2-container.width/2)*S,p.z*S]}><CargoModel p={{...p,x:0,y:0,z:0} as PlacedCargo} container={container} selected={false} hovered={false} onPointerDown={e=>e.stopPropagation()} onPointerMove={e=>e.stopPropagation()} onPointerUp={e=>e.stopPropagation()} onClick={e=>e.stopPropagation()} showName={false} local/></group>)}</group>}
-function SecuringZone({container,lang}:{container:Container;lang:'zh'|'en'}){return <ZonePlate container={container} side={1} label={lang==='zh'?'加固材料区':'SECURING MATERIALS'} detail={lang==='zh'?'距集装箱侧面约 3 m':'About 3 m from container side'}/>}
-function IndustrialEnvironment(){return <Sky distance={450000} sunPosition={[25,30,55]} inclination={.48} azimuth={.25} turbidity={3.2} rayleigh={2.1} mieCoefficient={.003} mieDirectionalG={.75}/>}
-function SelectionOverlay({enabled,items,container,onSelectMany}:{enabled:boolean;items:PlacedCargo[];container:Container;onSelectMany:(ids:string[])=>void}){const {camera,gl}=useThree();const [start,setStart]=useState<[number,number]|null>(null);const [current,setCurrent]=useState<[number,number]|null>(null);if(!enabled)return null;const finish=(cx:number,cy:number)=>{if(!start)return;const rect=gl.domElement.getBoundingClientRect(),x=cx-rect.left,y=cy-rect.top,minX=Math.min(start[0],x),maxX=Math.max(start[0],x),minY=Math.min(start[1],y),maxY=Math.max(start[1],y),v=new THREE.Vector3(),ids:string[]=[];for(const p of items){const d=dims(p);v.set((p.x+d.length/2-container.length/2)*S,(p.y+d.width/2-container.width/2)*S,(p.z+p.height/2)*S).project(camera);const sx=(v.x*.5+.5)*rect.width,sy=(-v.y*.5+.5)*rect.height;if(sx>=minX&&sx<=maxX&&sy>=minY&&sy<=maxY)ids.push(p.id)}onSelectMany(ids);setStart(null);setCurrent(null)};return <Html fullscreen style={{pointerEvents:'auto'}}><div className="selection-overlay" onPointerDown={e=>{e.stopPropagation();const r=gl.domElement.getBoundingClientRect();setStart([e.clientX-r.left,e.clientY-r.top]);setCurrent([e.clientX-r.left,e.clientY-r.top])}} onPointerMove={e=>{if(!start)return;e.stopPropagation();const r=gl.domElement.getBoundingClientRect();setCurrent([e.clientX-r.left,e.clientY-r.top])}} onPointerUp={e=>{e.stopPropagation();finish(e.clientX,e.clientY)}}>{start&&current&&<div className="selection-rect" style={{left:Math.min(start[0],current[0]),top:Math.min(start[1],current[1]),width:Math.abs(current[0]-start[0]),height:Math.abs(current[1]-start[1])}}/>}</div></Html>}
-
-function Scene(props:{container:Container;items:PlacedCargo[];materials:SecuringItem[];selectedId:string|null;selectedIds:string[];selectionMode:SelectionMode;onSelect:(id:string|null)=>void;onSelectMany:(ids:string[])=>void;onMove:(id:string,x:number,y:number,z:number)=>void;onMoveMany?:(updates:MoveManyUpdate[])=>void;onRotate:(id:string,rotation:number)=>void;onRotateMaterial:(id:string,rotation:number)=>void;onMaterialMove:(id:string,x:number,y:number)=>void;onMaterialScale:(id:string,factor:number)=>void;onAddMaterial:(type:SecuringMaterialType)=>void;view:View;dragging:boolean;onDragState:(v:boolean)=>void;cameraQuaternion:React.MutableRefObject<THREE.Quaternion>;cargo:Cargo[];lang:'zh'|'en';overflowCount:number;overflowItems:PlacedCargo[];showDimensions:boolean;tool:SceneTool;selectedMaterialId:string|null;onSelectMaterial:(id:string|null)=>void;securingMode:boolean}){
- const {container,items,materials,selectedId,selectedIds,selectionMode,onSelect,onSelectMany,onMove,onMoveMany,onRotate,onRotateMaterial,onMaterialMove,onMaterialScale,onAddMaterial,view,dragging,onDragState,cameraQuaternion,cargo,lang,overflowCount,overflowItems,showDimensions,tool,selectedMaterialId,onSelectMaterial}=props
- const objectRefs=useRef<Record<string,THREE.Group>>({});const [activeObject,setActiveObject]=useState<THREE.Group|null>(null);const snapshots=useRef<Record<string,{pos:THREE.Vector3;rot:number}>>({});const [localMode,setLocalMode]=useState<'single'|'box'|'multi'>(selectionMode)
- useEffect(()=>{if(selectionMode==='box')setLocalMode('box');else if(localMode==='box')setLocalMode('single')},[selectionMode])
- const registerRef=(id:string,obj:THREE.Group|null)=>{if(obj)objectRefs.current[id]=obj;else delete objectRefs.current[id];const active=selectedMaterialId||selectedIds[0]||selectedId;if(id===active)setActiveObject(obj)}
- useEffect(()=>{const id=selectedMaterialId||selectedIds[0]||selectedId;setActiveObject(id?objectRefs.current[id]||null:null)},[selectedMaterialId,selectedIds,selectedId])
- const selectCargo=(id:string)=>{onSelectMaterial(null);if(localMode==='multi'){const next=selectedIds.includes(id)?selectedIds.filter(x=>x!==id):[...selectedIds,id];onSelectMany(next)}else onSelect(id)}
- const activeIsMaterial=!!selectedMaterialId;const transformMode=tool==='scale'?'scale':tool
- const capture=()=>{snapshots.current={};const ids=activeIsMaterial?[selectedMaterialId!]:selectedIds.length?selectedIds:(selectedId?[selectedId]:[]);for(const id of ids){const o=objectRefs.current[id];if(o)snapshots.current[id]={pos:o.position.clone(),rot:o.rotation.z}}}
- const applyGroupDelta=()=>{const active=activeObject;if(!active)return;const activeId=selectedMaterialId||selectedIds[0]||selectedId;if(!activeId)return;const s=snapshots.current[activeId];if(!s||activeIsMaterial||selectedIds.length<=1)return;const dx=active.position.x-s.pos.x,dy=active.position.y-s.pos.y,dz=active.position.z-s.pos.z,da=active.rotation.z-s.rot,c=s.pos;for(const id of selectedIds){const o=objectRefs.current[id],q=snapshots.current[id];if(!o||!q||id===activeId)continue;const rel=q.pos.clone().sub(c).applyAxisAngle(new THREE.Vector3(0,0,1),da);o.position.copy(c).add(rel).add(new THREE.Vector3(dx,dy,dz));o.rotation.z=q.rot+da}}
- const commit=()=>{if(activeIsMaterial){const m=materials.find(x=>x.id===selectedMaterialId),o=activeObject;if(m&&o){const x=Math.round((o.position.x/S-m.length/2+container.length/2)/10)*10,y=Math.round((o.position.y/S-m.width/2+container.width/2)/10)*10;onMaterialMove(m.id,x,y);onRotateMaterial(m.id,Math.round(o.rotation.z/(Math.PI/2))*90)}}else{const updates:MoveManyUpdate[]=[];for(const id of(selectedIds.length?selectedIds:(selectedId?[selectedId]:[]))){const p=items.find(x=>x.id===id),o=objectRefs.current[id];if(!p||!o)continue;const r=((Math.round(o.rotation.z/(Math.PI/2))*90)%360+360)%360,d=dims({...p,rotation:r}),x=Math.round((o.position.x/S-d.length/2+container.length/2)/10)*10,y=Math.round((o.position.y/S-d.width/2+container.width/2)/10)*10,z=Math.max(0,Math.round((o.position.z/S-p.height/2)/10)*10);updates.push({id,x,y,z,rotation:r})}if(updates.length){if(onMoveMany)onMoveMany(updates);else updates.forEach(u=>onMove(u.id,u.x,u.y,u.z))}}}
- const materialButtons:[SecuringMaterialType,string][]=[['triangleWood','三角木'],['lashingBelt','紧固带'],['airBag','充气袋'],['doorNet','柜门网']]
- return <><IndustrialEnvironment/><fog attach="fog" args={['#b9d8ef',28,85]}/><ambientLight intensity={1.55}/><directionalLight position={[5,8,16]} intensity={1.55}/><hemisphereLight intensity={.42} groundColor="#dbe3e8" color="#ffffff"/><ContainerStructure container={container} lang={lang} showDimensions={showDimensions}/><ContainerFloor container={container}/><LashingPoints container={container}/><CoordinateAxes container={container}/><OverflowZone container={container} count={overflowCount} items={overflowItems} lang={lang}/><SecuringZone container={container} lang={lang}/>{items.map(p=><CargoInteraction key={p.id} p={p} container={container} selected={selectedIds.includes(p.id)} onSelect={()=>selectCargo(p.id)} registerRef={registerRef} showName={!!cargo.find(c=>c.id===p.cargoId)?.showName}/>)}{materials.map(m=><SecuringModel key={m.id} item={m} container={container} selected={m.id===selectedMaterialId} onSelect={()=>{onSelect(null);onSelectMaterial(m.id)}} registerRef={registerRef} onMove={onMaterialMove} onRotate={onRotateMaterial} onScale={onMaterialScale} onDragState={onDragState} tool={tool}/>)}<SelectionOverlay enabled={localMode==='box'} items={items} container={container} onSelectMany={onSelectMany}/>{activeObject&&<TransformControls object={activeObject} mode={transformMode} translationSnap={.01} rotationSnap={Math.PI/2} scaleSnap={.05} size={.9} onMouseDown={()=>{capture();onDragState(true)}} onChange={applyGroupDelta} onMouseUp={()=>{onDragState(false);commit()}}/>}<CameraRig view={view} container={container} dragging={dragging} cameraQuaternion={cameraQuaternion} securingMode={securingMode}/></>
+type Props = {
+  container: Container
+  items: PlacedCargo[]
+  materials: SecuringItem[]
+  selectedId: string | null
+  selectedIds: string[]
+  selectionMode: SelectionMode
+  onSelect: (id: string | null) => void
+  onSelectMany: (ids: string[]) => void
+  onMove: (id: string, x: number, y: number, z: number) => void
+  onMoveMany?: (updates: Array<{ id: string; x: number; y: number; z: number; rotation?: number }>) => void
+  onRotate: (id: string, rotation: number) => void
+  onRotateMaterial: (id: string, rotation: number) => void
+  onMaterialMove: (id: string, x: number, y: number) => void
+  onMaterialScale: (id: string, factor: number) => void
+  onAddMaterial: (type: SecuringMaterialType) => void
+  view: View
+  dragging: boolean
+  onDragState: (v: boolean) => void
+  onView?: (v: View) => void
+  cargo: Cargo[]
+  lang: 'zh' | 'en'
+  freePlacement?: boolean
+  overflowCount: number
+  overflowItems: PlacedCargo[]
+  securingMode?: boolean
+  showDimensions: boolean
+  airBagStretch?: boolean
+  selectedMaterialId?: string | null
+  onSelectMaterial?: (id: string | null) => void
 }
 
-function WebGLGate({children}:{children:React.ReactNode}){const [ok,setOk]=useState<boolean|null>(null);useEffect(()=>{try{const canvas=document.createElement('canvas');const gl=canvas.getContext('webgl2')||canvas.getContext('webgl')||canvas.getContext('experimental-webgl');setOk(!!gl)}catch{setOk(false)}},[]);if(ok===null)return <div className="webgl-fallback"><b>INITIALIZING 3D SYSTEM</b><span>正在检测图形设备…</span></div>;if(!ok)return <div className="webgl-fallback"><b>3D SYSTEM UNAVAILABLE</b><span>当前设备或浏览器无法提供 WebGL。装载数据仍可继续查看。</span></div>;return <>{children}</>}
+function CameraSync({ target }: { target: React.MutableRefObject<THREE.Quaternion> }) {
+  const { camera } = useThree()
+  useFrame(() => target.current.copy(camera.quaternion))
+  return null
+}
 
-export default function ContainerScene(props:{container:Container;items:PlacedCargo[];materials:SecuringItem[];selectedId:string|null;selectedIds:string[];selectionMode:SelectionMode;onSelect:(id:string|null)=>void;onSelectMany:(ids:string[])=>void;onMove:(id:string,x:number,y:number,z:number)=>void;onMoveMany?:(updates:MoveManyUpdate[])=>void;onRotate:(id:string,rotation:number)=>void;onRotateMaterial:(id:string,rotation:number)=>void;onMaterialMove:(id:string,x:number,y:number)=>void;onMaterialScale:(id:string,factor:number)=>void;onAddMaterial:(type:SecuringMaterialType)=>void;view:View;dragging:boolean;onDragState:(v:boolean)=>void;onView:(v:View)=>void;cargo:Cargo[];lang:'zh'|'en';overflowCount:number;overflowItems:PlacedCargo[];showDimensions:boolean;securingMode?:boolean}){
- const cameraQuaternion=useRef(new THREE.Quaternion());const [selectedMaterialId,setSelectedMaterialId]=useState<string|null>(null);const [tool,setTool]=useState<SceneTool>('move');const selectedIsCargo=!!props.selectedId&&!selectedMaterialId
- return <div className="scene-host"><WebGLGate><Canvas dpr={1} shadows={false} frameloop="always" gl={{antialias:true,powerPreference:'high-performance',failIfMajorPerformanceCaveat:false}} camera={{position:[7,7,5],fov:42}} onPointerMissed={()=>{props.onSelect(null);setSelectedMaterialId(null)}}><Scene {...props} selectedMaterialId={selectedMaterialId} onSelectMaterial={setSelectedMaterialId} tool={tool} cameraQuaternion={cameraQuaternion} securingMode={props.securingMode??false}/></Canvas><div className="scene-toolbox"><div className="scene-tool-row"><button className={tool==='move'?'active':''} onClick={()=>setTool('move')}>↔ 移动</button><button className={tool==='rotate'?'active':''} onClick={()=>setTool('rotate')}>⟳ 旋转</button><button disabled={selectedIsCargo||!selectedMaterialId} className={tool==='scale'?'active':''} onClick={()=>setTool('scale')}>↔ 缩放</button></div><div className="scene-tool-row"><button onClick={()=>{setTool('move');setSelectedMaterialId(null);props.onSelect(null)}}>选择</button><button onClick={()=>{setTool('rotate')}}>R / 旋转</button><button onClick={()=>{setTool('scale')}} disabled={selectedIsCargo||!selectedMaterialId}>缩放材料</button></div><div className="scene-tool-title">加固材料</div><div className="scene-material-grid">{materialButtons.map(([type,label])=><button key={type} onClick={()=>props.onAddMaterial(type)}>{label}</button>)}</div><div className="scene-tool-tip">旋转固定 90° · 点击空白取消选择 · 多选后可一起移动</div></div></WebGLGate></div>
+function CameraRig({ view, container, dragging, cameraQuaternion }: { view: View; container: Container; dragging: boolean; cameraQuaternion: React.MutableRefObject<THREE.Quaternion> }) {
+  const { camera } = useThree()
+  const controls = useRef<any>(null)
+  useEffect(() => {
+    camera.up.set(0, 0, 1)
+    const L = container.length * S, W = container.width * S, H = container.height * S
+    const d = Math.max(L, W, H) * 1.28
+    const target = new THREE.Vector3(0, 0, H * 0.42)
+    const positions: Record<View, [number, number, number]> = {
+      iso: [d * 1.15, d * 0.95, d * 0.72], top: [0, 0, d * 1.45], front: [-d * 1.7, 0, H * 0.48], left: [0, -d * 1.8, H * 0.48], right: [0, d * 1.8, H * 0.48],
+    }
+    camera.position.set(...positions[view]); camera.lookAt(target)
+    if (controls.current) { controls.current.target.copy(target); controls.current.update() }
+  }, [view, container.length, container.width, container.height, camera])
+  return <><OrbitControls ref={controls} enabled={!dragging} makeDefault enableDamping dampingFactor={0.08} rotateSpeed={0.5} panSpeed={0.65} zoomSpeed={0.8} minDistance={0.45} maxDistance={35} /><CameraSync target={cameraQuaternion} /></>
+}
+
+function Arrow({ axis, color }: { axis: 'x' | 'y' | 'z'; color: string }) {
+  const rotation: Record<string, [number, number, number]> = { x: [0, 0, -Math.PI / 2], y: [0, 0, 0], z: [0, 0, 0] }
+  const position = axis === 'x' ? [0.6, 0, 0] : axis === 'y' ? [0, 0.6, 0] : [0, 0, 0.6]
+  return <mesh position={position as [number, number, number]} rotation={rotation[axis]} raycast={() => null}><coneGeometry args={[0.035, 0.11, 12]} /><meshBasicMaterial color={color} /></mesh>
+}
+function CoordinateAxes({ container }: { container: Container }) {
+  const L = container.length * S, W = container.width * S
+  const p: [number, number, number] = [-L / 2 - 0.72, -W / 2 - 0.72, 0.02]
+  return <group position={p}><Line points={[[0, 0, 0], [0.65, 0, 0]]} color="#c23b36" lineWidth={2} /><Arrow axis="x" color="#c23b36" /><Line points={[[0, 0, 0], [0, 0.65, 0]]} color="#3d7b52" lineWidth={2} /><Arrow axis="y" color="#3d7b52" /><Line points={[[0, 0, 0], [0, 0, 0.65]]} color="#376fa5" lineWidth={2} /><Arrow axis="z" color="#376fa5" /><Html position={[0.72, 0, 0]} center><div className="axis-label axis-x">X</div></Html><Html position={[0, 0.72, 0]} center><div className="axis-label axis-y">Y</div></Html><Html position={[0, 0, 0.72]} center><div className="axis-label axis-z">Z</div></Html></group>
+}
+
+function CargoObject({ p, container, selected, onSelect, registerRef, showName }: { p: PlacedCargo; container: Container; selected: boolean; onSelect: () => void; registerRef: (id: string, o: THREE.Group | null) => void; showName: boolean }) {
+  const ref = useRef<THREE.Group>(null); const [hovered, setHovered] = useState(false)
+  useEffect(() => { registerRef(p.id, ref.current); return () => registerRef(p.id, null) }, [p.id, registerRef])
+  const d = dims(p); const position: [number, number, number] = [(p.x + d.length / 2 - container.length / 2) * S, (p.y + d.width / 2 - container.width / 2) * S, (p.z + p.height / 2) * S]
+  return <group ref={ref} position={position} rotation={[0, 0, p.rotation * Math.PI / 180]} onPointerDown={e => { e.stopPropagation(); onSelect() }} onClick={e => { e.stopPropagation(); onSelect() }} onPointerOver={e => { e.stopPropagation(); setHovered(true) }} onPointerOut={e => { e.stopPropagation(); setHovered(false) }}><CargoModel p={{ ...p, x: 0, y: 0, z: 0 }} container={container} selected={selected} hovered={hovered} local showName={showName} onPointerDown={e => { e.stopPropagation(); onSelect() }} onPointerUp={e => e.stopPropagation()} onPointerMove={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); onSelect() }} /></group>
+}
+
+function MaterialObject({ item, container, selected, onSelect, registerRef }: { item: SecuringItem; container: Container; selected: boolean; onSelect: () => void; registerRef: (id: string, o: THREE.Group | null) => void }) {
+  const ref = useRef<THREE.Group>(null); useEffect(() => { registerRef(item.id, ref.current); return () => registerRef(item.id, null) }, [item.id, registerRef])
+  const center: [number, number, number] = [(item.x + item.length / 2 - container.length / 2) * S, (item.y + item.width / 2 - container.width / 2) * S, (item.z + item.height / 2) * S]
+  return <group ref={ref} position={center} rotation={[0, 0, item.rotation * Math.PI / 180]} onPointerDown={e => { e.stopPropagation(); onSelect() }} onClick={e => { e.stopPropagation(); onSelect() }}><SecuringModel item={item} container={container} selected={selected} onSelect={onSelect} /></group>
+}
+
+function SelectionBox({ items, container, onSelectMany }: { items: PlacedCargo[]; container: Container; onSelectMany: (ids: string[]) => void }) {
+  const { camera, gl } = useThree(); const [start, setStart] = useState<[number, number] | null>(null); const [current, setCurrent] = useState<[number, number] | null>(null)
+  const finish = useCallback((clientX: number, clientY: number) => { if (!start) return; const rect = gl.domElement.getBoundingClientRect(); const x = clientX - rect.left, y = clientY - rect.top; const minX = Math.min(start[0], x), maxX = Math.max(start[0], x), minY = Math.min(start[1], y), maxY = Math.max(start[1], y); const ids: string[] = []; const v = new THREE.Vector3(); for (const p of items) { const d = dims(p); v.set((p.x + d.length / 2 - container.length / 2) * S, (p.y + d.width / 2 - container.width / 2) * S, (p.z + p.height / 2) * S).project(camera); const sx = (v.x * 0.5 + 0.5) * rect.width, sy = (-v.y * 0.5 + 0.5) * rect.height; if (sx >= minX && sx <= maxX && sy >= minY && sy <= maxY) ids.push(p.id) } onSelectMany(ids); setStart(null); setCurrent(null) }, [start, camera, gl, items, container, onSelectMany])
+  return <Html fullscreen style={{ pointerEvents: 'auto' }}><div className="selection-overlay" onPointerDown={e => { e.stopPropagation(); const r = gl.domElement.getBoundingClientRect(); setStart([e.clientX - r.left, e.clientY - r.top]); setCurrent([e.clientX - r.left, e.clientY - r.top]) }} onPointerMove={e => { if (!start) return; e.stopPropagation(); const r = gl.domElement.getBoundingClientRect(); setCurrent([e.clientX - r.left, e.clientY - r.top]) }} onPointerUp={e => { e.stopPropagation(); finish(e.clientX, e.clientY) }}>{start && current && <div className="selection-rect" style={{ left: Math.min(start[0], current[0]), top: Math.min(start[1], current[1]), width: Math.abs(current[0] - start[0]), height: Math.abs(current[1] - start[1]) }} />}</div></Html>
+}
+
+function SceneContent({ props }: { props: Props }) {
+  const { container, items, materials, selectedId, selectedIds, onSelect, onSelectMany, onMove, onMoveMany, onRotate, onRotateMaterial, onMaterialMove, onMaterialScale, onAddMaterial, view, dragging, onDragState, cargo, lang, overflowItems, overflowCount, showDimensions } = props
+  const cameraQuaternion = useRef(new THREE.Quaternion()); const refs = useRef<Record<string, THREE.Group>>({}); const [tool, setTool] = useState<SceneTool>('translate'); const [localMode, setLocalMode] = useState<'single' | 'multi' | 'box'>(props.selectionMode); const snapshots = useRef<Record<string, { position: THREE.Vector3; rotation: number; scale: THREE.Vector3 }>>({})
+  useEffect(() => { setLocalMode(props.selectionMode === 'box' ? 'box' : 'single') }, [props.selectionMode])
+  const registerRef = useCallback((id: string, obj: THREE.Group | null) => { if (obj) refs.current[id] = obj; else delete refs.current[id] }, [])
+  const activeMaterial = useMemo(() => materials.find(m => m.id === props.selectedMaterialId) ?? null, [materials, props.selectedMaterialId]); const activeId = activeMaterial?.id ?? selectedId; const activeObject = activeId ? refs.current[activeId] ?? null : null
+  const selectCargo = (id: string) => { props.onSelectMaterial?.(null); if (localMode === 'multi') { const next = selectedIds.includes(id) ? selectedIds.filter(x => x !== id) : [...selectedIds, id]; onSelectMany(next) } else onSelect(id) }
+  const capture = () => { snapshots.current = {}; const ids = selectedIds.length ? selectedIds : (selectedId ? [selectedId] : []); for (const id of ids) { const o = refs.current[id]; if (o) snapshots.current[id] = { position: o.position.clone(), rotation: o.rotation.z, scale: o.scale.clone() } } if (activeMaterial && refs.current[activeMaterial.id]) { const o = refs.current[activeMaterial.id]; snapshots.current[activeMaterial.id] = { position: o.position.clone(), rotation: o.rotation.z, scale: o.scale.clone() } } }
+  const commit = () => {
+    if (activeMaterial) { const o = refs.current[activeMaterial.id]; if (!o) return; const s = snapshots.current[activeMaterial.id]; const rot = ((Math.round(o.rotation.z / (Math.PI / 2)) * 90) % 360 + 360) % 360; if (tool === 'scale' && s) { const factor = Math.max(0.25, Math.min(4, o.scale.x / Math.max(0.001, s.scale.x))); o.scale.set(1, 1, 1); onMaterialScale(activeMaterial.id, factor) } const x = Math.round((o.position.x / S - activeMaterial.length / 2 + container.length / 2) / 10) * 10; const y = Math.round((o.position.y / S - activeMaterial.width / 2 + container.width / 2) / 10) * 10; onMaterialMove(activeMaterial.id, x, y); onRotateMaterial(activeMaterial.id, rot); return }
+    const ids = selectedIds.length ? selectedIds : (selectedId ? [selectedId] : []); const updates: Array<{ id: string; x: number; y: number; z: number; rotation?: number }> = []
+    for (const id of ids) { const p = items.find(v => v.id === id), o = refs.current[id]; if (!p || !o) continue; const r = ((Math.round(o.rotation.z / (Math.PI / 2)) * 90) % 360 + 360) % 360, d = dims({ ...p, rotation: r }), x = Math.round((o.position.x / S - d.length / 2 + container.length / 2) / 10) * 10, y = Math.round((o.position.y / S - d.width / 2 + container.width / 2) / 10) * 10, z = Math.max(0, Math.round((o.position.z / S - p.height / 2) / 10) * 10), candidate = { ...p, x, y, z, rotation: r }, valid = validatePlacement(candidate, container, items.filter(q => q.id !== id)); if (valid.ok) updates.push({ id, x, y, z, rotation: r }); else if (snapshots.current[id]) o.position.copy(snapshots.current[id].position) }
+    if (updates.length) { if (onMoveMany) onMoveMany(updates); else updates.forEach(u => { onMove(u.id, u.x, u.y, u.z); if (u.rotation != null) onRotate(u.id, u.rotation) }) }
+  }
+  const applyMulti = () => { if (selectedIds.length < 2 || activeMaterial) return; const active = refs.current[selectedIds[0]]; const snap = snapshots.current[selectedIds[0]]; if (!active || !snap) return; const dx = active.position.x - snap.position.x, dy = active.position.y - snap.position.y, dz = active.position.z - snap.position.z, da = active.rotation.z - snap.rotation; for (const id of selectedIds.slice(1)) { const o = refs.current[id], s = snapshots.current[id]; if (!o || !s) continue; o.position.copy(s.position).add(new THREE.Vector3(dx, dy, dz)); o.rotation.z = s.rotation + da } }
+  const toolbar = <div className="scene-toolbox" style={{ pointerEvents: 'auto' }}><button className={tool === 'translate' ? 'active' : ''} onClick={() => setTool('translate')}>↔ 移动</button><button className={tool === 'rotate' ? 'active' : ''} onClick={() => setTool('rotate')}>⟳ 旋转</button><button className={!activeMaterial ? 'disabled' : tool === 'scale' ? 'active' : ''} disabled={!activeMaterial} onClick={() => setTool('scale')}>⤢ 缩放</button><div className="tool-divider" /><b>加固材料</b><button onClick={() => onAddMaterial('triangleWood')}>三角木</button><button onClick={() => onAddMaterial('lashingBelt')}>紧固带</button><button onClick={() => onAddMaterial('airBag')}>充气袋</button><button onClick={() => onAddMaterial('doorNet')}>柜门网</button></div>
+  return <><Sky distance={450000} sunPosition={[25, 30, 55]} inclination={0.48} azimuth={0.25} turbidity={3.2} rayleigh={2.1} mieCoefficient={0.003} mieDirectionalG={0.75} /><ambientLight intensity={1.65} /><directionalLight position={[8, 10, 18]} intensity={2.2} /><hemisphereLight intensity={0.45} groundColor="#dbe3e8" color="#ffffff" /><ContainerStructure container={container} lang={lang} showDimensions={showDimensions} /><ContainerFloor container={container} /><LashingPoints container={container} /><CoordinateAxes container={container} />{items.map(p => <CargoObject key={p.id} p={p} container={container} selected={selectedIds.includes(p.id)} onSelect={() => selectCargo(p.id)} registerRef={registerRef} showName={!!cargo.find(c => c.id === p.cargoId)?.showName} />)}{materials.map(m => <MaterialObject key={m.id} item={m} container={container} selected={m.id === props.selectedMaterialId} onSelect={() => { onSelect(null); onSelectMany([]); props.onSelectMaterial?.(m.id) }} registerRef={registerRef} />)}{overflowCount > 0 && overflowItems.map(p => <group key={p.id} position={[(p.x + p.length / 2 - container.length / 2) * S, (p.y + p.width / 2 - container.width / 2) * S, p.z * S]}><CargoModel p={{ ...p, x: 0, y: 0, z: 0 }} container={container} selected={false} hovered={false} local showName={false} onPointerDown={e => e.stopPropagation()} onPointerUp={e => e.stopPropagation()} onPointerMove={e => e.stopPropagation()} onClick={e => e.stopPropagation()} /></group>)}{activeObject && <TransformControls object={activeObject} mode={activeMaterial && tool === 'scale' ? 'scale' : tool} translationSnap={0.01} rotationSnap={Math.PI / 2} scaleSnap={0.05} onMouseDown={() => { capture(); onDragState(true) }} onChange={() => { applyMulti() }} onMouseUp={() => { onDragState(false); commit() }} />}{localMode === 'box' && <SelectionBox items={items} container={container} onSelectMany={onSelectMany} />}<CameraRig view={view} container={container} dragging={dragging} cameraQuaternion={cameraQuaternion} /><Html fullscreen style={{ pointerEvents: 'none' }}><div style={{ pointerEvents: 'auto' }}>{toolbar}</div></Html></>
+}
+
+export default function ContainerScene(props: Props) {
+  const [selectedMaterialId, setSelectedMaterialId] = useState<string | null>(null); const [mode, setMode] = useState<'single' | 'multi' | 'box'>(props.selectionMode)
+  useEffect(() => { setMode(props.selectionMode === 'box' ? 'box' : 'single') }, [props.selectionMode])
+  const sceneProps: Props = { ...props, selectedMaterialId, onSelectMaterial: setSelectedMaterialId, selectionMode: mode === 'box' ? 'box' : 'single' }
+  return <div className="scene-shell" style={{ position: 'relative', width: '100%', height: '100%' }}><Canvas shadows dpr={[1, 1.6]} gl={{ antialias: true, powerPreference: 'high-performance' }} camera={{ position: [10, 8, 6], up: [0, 0, 1], near: 0.01, far: 100 }} onPointerMissed={() => { props.onSelect(null); setSelectedMaterialId(null) }}><SceneContent props={sceneProps} /></Canvas><div className="scene-mode-strip" style={{ position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)', zIndex: 8, display: 'flex', gap: 6 }}><button className={mode === 'single' ? 'active' : ''} onClick={() => { setMode('single'); props.onSelect(props.selectedId) }}>单选</button><button className={mode === 'multi' ? 'active' : ''} onClick={() => setMode('multi')}>多选</button><button className={mode === 'box' ? 'active' : ''} onClick={() => setMode('box')}>框选</button></div></div>
 }
