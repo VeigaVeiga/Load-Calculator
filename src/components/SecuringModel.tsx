@@ -9,7 +9,7 @@ type Props = {
   item: SecuringItem
   container: Container
   selected: boolean
-  onSelect: () => void
+  onSelect?: () => void
   registerRef?: (id: string, obj: THREE.Group | null) => void
   onMove?: (id: string, x: number, y: number) => void
   onRotate?: (id: string, rotation: number) => void
