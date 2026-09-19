@@ -65,7 +65,6 @@ function supportCoverage(p: PlacedCargo, supports: PlacedCargo[]) {
   const area = d.length * d.width
   if (area <= EPS || supports.length === 0) return 0
 
-  // Exact 2D union of the support rectangles over the candidate footprint.
   const xs = new Set<number>([p.x, p.x + d.length])
   const ys = new Set<number>([p.y, p.y + d.width])
   for (const q of supports) {
@@ -105,8 +104,6 @@ function canStack(p: PlacedCargo, cargo: Cargo, items: PlacedCargo[], defs: Map<
   )
   if (!supports.length || supportCoverage(p, supports) < 0.995) return false
 
-  // A load-bearing item must support the full footprint. Non-load-bearing
-  // cargo is therefore kept above load-bearing cargo rather than below it.
   for (const q of supports) {
     const d = defs.get(q.cargoId)
     if (!d || !d.loadBearing || d.breakablePallet) return false
@@ -164,12 +161,11 @@ function contactScore(p: PlacedCargo, items: PlacedCargo[], c: Container) {
   const d = dims(p)
   let score = 0
 
-  // Strong preference for full floor support and wall/neighbor contact.
   if (p.z <= EPS) score += d.length * d.width * 20
-  if (p.x <= EPS) score += d.width * d.height
-  if (p.y <= EPS) score += d.length * d.height
-  if (p.x + d.length >= c.length - EPS) score += d.width * d.height
-  if (p.y + d.width >= c.width - EPS) score += d.length * d.height
+  if (p.x <= EPS) score += d.width * p.height
+  if (p.y <= EPS) score += d.length * p.height
+  if (p.x + d.length >= c.length - EPS) score += d.width * p.height
+  if (p.y + d.width >= c.width - EPS) score += d.length * p.height
 
   for (const q of items) {
     const qd = dims(q)
@@ -213,9 +209,6 @@ function choosePlacement(
       const unusedSide = Math.max(0, c.width - (p.y + o.width))
       const unusedTop = Math.max(0, c.height - (p.z + o.height))
 
-      // Fill low and close to existing cargo first, while avoiding a bias
-      // toward a single centre line. The side-gap penalty is deliberately
-      // stronger than the tiny coordinate tie-breakers.
       const score =
         contact * 1000 -
         z * 30 -
