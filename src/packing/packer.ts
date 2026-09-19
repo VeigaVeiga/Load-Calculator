@@ -2,9 +2,6 @@ import type { Cargo, Container, PlacedCargo } from '../types'
 import { dims, inBounds, overlap } from './geometry'
 
 const EPS = 0.5
-
-// Keep packing coordinates in millimetres. Rounding to 10 mm was creating
-// artificial gaps and could make an otherwise valid row fail to fit.
 const snap = (n: number) => Math.max(0, Math.round(n))
 
 type Orientation = { length: number; width: number; height: number; rotation: 0 | 90 }
@@ -13,22 +10,22 @@ type Unit = { cargo: Cargo; index: number }
 function orientations(c: Cargo): Orientation[] {
   const first: Orientation = { length: c.length, width: c.width, height: c.height, rotation: 0 }
   if (!c.rotatable || Math.abs(c.length - c.width) < EPS) return [first]
-  return [
-    first,
-    { length: c.width, width: c.length, height: c.height, rotation: 90 },
-  ]
+  return [first, { length: c.width, width: c.length, height: c.height, rotation: 90 }]
 }
 
 export function expandCargo(cargo: Cargo[]): Unit[] {
   const out: Unit[] = []
   for (const c of cargo) {
     const quantity = Math.max(0, Math.floor(c.quantity))
-    for (let i = 0; i < quantity; i++) out.push({ cargo: c, index: i })
+    for (let i = 0; i < quantity; i += 1) out.push({ cargo: c, index: i })
   }
   return out
 }
 
 function makePlaced(u: Unit, o: Orientation, x: number, y: number, z: number): PlacedCargo {
+  // Keep the cargo's intrinsic dimensions in PlacedCargo. Rotation is applied by
+  // geometry.dims(). Storing already-rotated dimensions here caused a second swap,
+  // which produced gaps, overflow and apparently floating cargo in the 3D view.
   return {
     id: `${u.cargo.id}-${u.index + 1}`,
     cargoId: u.cargo.id,
@@ -36,9 +33,9 @@ function makePlaced(u: Unit, o: Orientation, x: number, y: number, z: number): P
     x: snap(x),
     y: snap(y),
     z: snap(z),
-    length: o.length,
-    width: o.width,
-    height: o.height,
+    length: u.cargo.length,
+    width: u.cargo.width,
+    height: u.cargo.height,
     rotation: o.rotation,
     weight: u.cargo.weight,
     color: u.cargo.color,
@@ -79,8 +76,8 @@ function supportCoverage(p: PlacedCargo, supports: PlacedCargo[]) {
   const yv = [...ys].filter(v => v >= p.y - EPS && v <= p.y + d.width + EPS).sort((a, b) => a - b)
   let covered = 0
 
-  for (let i = 0; i < xv.length - 1; i++) {
-    for (let j = 0; j < yv.length - 1; j++) {
+  for (let i = 0; i < xv.length - 1; i += 1) {
+    for (let j = 0; j < yv.length - 1; j += 1) {
       const cx = (xv[i] + xv[i + 1]) / 2
       const cy = (yv[j] + yv[j + 1]) / 2
       if (supports.some(q => {
@@ -95,21 +92,37 @@ function supportCoverage(p: PlacedCargo, supports: PlacedCargo[]) {
   return Math.min(1, covered / area)
 }
 
+function stackLevel(p: PlacedCargo, items: PlacedCargo[], defs: Map<string, Cargo>, seen = new Set<string>()): number {
+  if (p.z <= EPS || seen.has(p.id)) return 1
+  seen.add(p.id)
+  const supports = items.filter(q =>
+    Math.abs(q.z + q.height - p.z) <= EPS && footprintArea(p, q) >= dims(p).length * dims(p).width * 0.995,
+  )
+  if (!supports.length) return 1
+  return 1 + Math.max(...supports.map(q => stackLevel(q, items, defs, new Set(seen))))
+}
+
 function canStack(p: PlacedCargo, cargo: Cargo, items: PlacedCargo[], defs: Map<string, Cargo>) {
   if (p.z <= EPS) return true
   if (!cargo.stackable) return false
 
+  const d = dims(p)
   const supports = items.filter(q =>
     Math.abs(q.z + q.height - p.z) <= EPS && footprintArea(p, q) > EPS,
   )
   if (!supports.length || supportCoverage(p, supports) < 0.995) return false
 
+  const level = Math.max(...supports.map(q => stackLevel(q, items, defs))) + 1
+  if (cargo.maxStackLayers > 0 && level > cargo.maxStackLayers) return false
+
+  // Every support that actually carries the footprint must be load-bearing and
+  // must allow the weight placed on it.
   for (const q of supports) {
-    const d = defs.get(q.cargoId)
-    if (!d || !d.loadBearing || d.breakablePallet) return false
-    if (d.maxLoadOnTop > 0 && cargo.weight > d.maxLoadOnTop + EPS) return false
+    const d0 = defs.get(q.cargoId)
+    if (!d0 || !d0.loadBearing || d0.breakablePallet) return false
+    if (d0.maxLoadOnTop > 0 && cargo.weight > d0.maxLoadOnTop + EPS) return false
   }
-  return true
+  return d.length > 0 && d.width > 0
 }
 
 function validLocked(locked: PlacedCargo[], c: Container, quantities: Map<string, number>) {
@@ -145,53 +158,47 @@ function extremePoints(items: PlacedCargo[]) {
   add(0, 0, 0)
   for (const q of items) {
     const d = dims(q)
+    // Floor/row candidates.
     add(q.x + d.length, q.y, q.z)
     add(q.x, q.y + d.width, q.z)
-    add(q.x, q.y, q.z + q.height)
     add(q.x + d.length, q.y + d.width, q.z)
+    // Stacking candidates directly over every useful footprint corner.
+    add(q.x, q.y, q.z + q.height)
     add(q.x + d.length, q.y, q.z + q.height)
     add(q.x, q.y + d.width, q.z + q.height)
+    add(q.x + d.length, q.y + d.width, q.z + q.height)
   }
 
-  return [...points]
-    .map(s => s.split(',').map(Number) as [number, number, number])
+  return [...points].map(s => s.split(',').map(Number) as [number, number, number])
 }
 
 function contactScore(p: PlacedCargo, items: PlacedCargo[], c: Container) {
   const d = dims(p)
   let score = 0
+  const floorArea = d.length * d.width
 
-  if (p.z <= EPS) score += d.length * d.width * 20
-  if (p.x <= EPS) score += d.width * p.height
-  if (p.y <= EPS) score += d.length * p.height
-  if (p.x + d.length >= c.length - EPS) score += d.width * p.height
-  if (p.y + d.width >= c.width - EPS) score += d.length * p.height
+  if (p.z <= EPS) score += floorArea * 120
+  if (p.x <= EPS) score += d.width * p.height * 4
+  if (p.y <= EPS) score += d.length * p.height * 4
+  if (p.x + d.length >= c.length - EPS) score += d.width * p.height * 4
+  if (p.y + d.width >= c.width - EPS) score += d.length * p.height * 4
 
   for (const q of items) {
     const qd = dims(q)
     if (Math.abs(q.x + qd.length - p.x) <= EPS || Math.abs(p.x + d.length - q.x) <= EPS) {
-      score += Math.max(0, Math.min(p.y + d.width, q.y + qd.width) - Math.max(p.y, q.y)) * Math.min(p.height, q.height)
+      score += Math.max(0, Math.min(p.y + d.width, q.y + qd.width) - Math.max(p.y, q.y)) * Math.min(p.height, q.height) * 3
     }
     if (Math.abs(q.y + qd.width - p.y) <= EPS || Math.abs(p.y + d.width - q.y) <= EPS) {
-      score += Math.max(0, Math.min(p.x + d.length, q.x + qd.length) - Math.max(p.x, q.x)) * Math.min(p.height, q.height)
+      score += Math.max(0, Math.min(p.x + d.length, q.x + qd.length) - Math.max(p.x, q.x)) * Math.min(p.height, q.height) * 3
     }
-    if (Math.abs(q.z + q.height - p.z) <= EPS) score += footprintArea(p, q) * 40
+    if (Math.abs(q.z + q.height - p.z) <= EPS) score += footprintArea(p, q) * 160
   }
-
   return score
 }
 
-function choosePlacement(
-  u: Unit,
-  items: PlacedCargo[],
-  c: Container,
-  defs: Map<string, Cargo>,
-  totalWeight: number,
-) {
+function choosePlacement(u: Unit, items: PlacedCargo[], c: Container, defs: Map<string, Cargo>, totalWeight: number) {
   let best: { p: PlacedCargo; score: number } | undefined
-  const points = extremePoints(items).sort((a, b) =>
-    a[2] - b[2] || a[1] - b[1] || a[0] - b[0],
-  )
+  const points = extremePoints(items).sort((a, b) => a[2] - b[2] || a[1] - b[1] || a[0] - b[0])
 
   for (const o of orientations(u.cargo)) {
     for (const [x, y, z] of points) {
@@ -205,32 +212,24 @@ function choosePlacement(
       if (!canStack(p, u.cargo, items, defs)) continue
 
       const contact = contactScore(p, items, c)
-      const unusedRight = Math.max(0, c.length - (p.x + o.length))
-      const unusedSide = Math.max(0, c.width - (p.y + o.width))
-      const unusedTop = Math.max(0, c.height - (p.z + o.height))
-
-      const score =
-        contact * 1000 -
-        z * 30 -
-        unusedRight * 0.8 -
-        unusedSide * 0.8 -
-        unusedTop * 0.02 -
-        y * 0.001 -
-        x * 0.0005
+      const rightGap = c.length - (p.x + o.length)
+      const sideGap = c.width - (p.y + o.width)
+      const topGap = c.height - (p.z + o.height)
+      const score = contact * 1000 -
+        Math.abs(rightGap) * 1.5 -
+        Math.abs(sideGap) * 1.5 -
+        topGap * 0.03 -
+        p.z * 20 -
+        p.y * 0.002 -
+        p.x * 0.001
 
       if (!best || score > best.score) best = { p, score }
     }
   }
-
   return best?.p
 }
 
-function packCore(
-  cargo: Cargo[],
-  c: Container,
-  locked: PlacedCargo[],
-  onStep?: (i: number, total: number) => void,
-) {
+function packCore(cargo: Cargo[], c: Container, locked: PlacedCargo[], onStep?: (i: number, total: number) => void) {
   const defs = new Map(cargo.map(x => [x.id, x]))
   const quantities = new Map(cargo.map(x => [x.id, Math.floor(x.quantity)]))
   const items = validLocked(locked, c, quantities)
@@ -240,7 +239,7 @@ function packCore(
   const units = orderUnits(cargo).filter(u => u.index >= (lockedCount.get(u.cargo.id) || 0))
   let totalWeight = items.reduce((sum, p) => sum + p.weight, 0)
 
-  for (let i = 0; i < units.length; i++) {
+  for (let i = 0; i < units.length; i += 1) {
     const p = choosePlacement(units[i], items, c, defs, totalWeight)
     if (p) {
       items.push(p)
@@ -255,12 +254,7 @@ export function autoPack(cargo: Cargo[], c: Container, locked: PlacedCargo[] = [
   return packCore(cargo, c, locked)
 }
 
-export async function autoPackAsync(
-  cargo: Cargo[],
-  c: Container,
-  locked: PlacedCargo[] = [],
-  onProgress?: (percent: number) => void,
-) {
+export async function autoPackAsync(cargo: Cargo[], c: Container, locked: PlacedCargo[] = [], onProgress?: (percent: number) => void) {
   const total = expandCargo(cargo).length
   if (!total) {
     onProgress?.(100)
@@ -276,13 +270,13 @@ export async function autoPackAsync(
   const units = orderUnits(cargo).filter(u => u.index >= (lockedCount.get(u.cargo.id) || 0))
   let totalWeight = items.reduce((sum, p) => sum + p.weight, 0)
 
-  for (let i = 0; i < units.length; i++) {
+  for (let i = 0; i < units.length; i += 1) {
     const p = choosePlacement(units[i], items, c, defs, totalWeight)
     if (p) {
       items.push(p)
       totalWeight += p.weight
     }
-    if (i % 4 === 0) await new Promise<void>(resolve => setTimeout(resolve, 0))
+    if (i % 3 === 0) await new Promise<void>(resolve => setTimeout(resolve, 0))
     onProgress?.(Math.round(((i + 1) / units.length) * 100))
   }
 
