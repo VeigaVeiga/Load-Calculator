@@ -643,8 +643,8 @@ function App() {
     const material: SecuringItem = {
       id: `${type}-${n}`,
       type,
-      x: 350 + ((n - 1) % 8) * 1450,
-      y: 3000 - 50 - Math.floor((n - 1) / 8) * 950,
+      x: Math.max(0, Math.round(container.length / 2 - 500)),
+      y: Math.max(0, Math.round(container.width / 2 - 500)),
       z: 0,
       length:
         type === 'triangleWood'
@@ -672,7 +672,6 @@ function App() {
               : 1800,
       rotation: 0,
     }
-    material.y = Math.round(container.width / 2 + 3000 + material.width / 2 + Math.floor((n - 1) / 8) * 950)
 
     setMaterials((items) => [
       ...items,
@@ -696,6 +695,12 @@ function App() {
           : m,
       ),
     )
+  }
+
+  const deleteMaterial = (id:string) => {
+    setMaterials(items => items.filter(m => m.id !== id))
+    setSelectedId(null)
+    setSelectedIds([])
   }
 
   const scaleMaterial = (id:string, factor:number) => {
@@ -755,7 +760,7 @@ function App() {
       const response=await fetch('/装箱方案模板.docx');if(!response.ok)throw new Error('Template not found');const template=await response.arrayBuffer();const templateBytes=new Uint8Array(template);const xmlBytes=await extractZipEntry(templateBytes,'word/document.xml');const xmlText=new TextDecoder().decode(xmlBytes)
       const parser=new DOMParser();const doc=parser.parseFromString(xmlText,'application/xml');const w='http://schemas.openxmlformats.org/wordprocessingml/2006/main';const tables=Array.from(doc.getElementsByTagNameNS(w,'tbl'));const cargoTable=tables[0],infoTable=tables[1];if(!cargoTable||!infoTable)throw new Error('Template tables not found')
       const rows=Array.from(cargoTable.getElementsByTagNameNS(w,'tr'));const containerCells=Array.from(rows[0].getElementsByTagNameNS(w,'tc'));if(containerCells[1])setCellText(containerCells[1],`${container.name}（${container.length.toLocaleString()}×${container.width.toLocaleString()}×${container.height.toLocaleString()} mm）`);if(containerCells[3])setCellText(containerCells[3],lang==='zh'?'均匀、紧凑、对称布满箱底':'Uniform, compact and symmetrical loading')
-      const totalWeight=cargo.reduce((sum,c)=>sum+c.weight*c.quantity,0);const cargoLines=cargo.map(c=>`${c.name} × ${Math.floor(c.quantity)}`).join('；');const dimsLines=cargo.map(c=>`${c.length}×${c.width}×${c.height}`).join('；');const typeLines=cargo.map(c=>c.type==='pallet'?tr.pallet:c.type==='woodCrate'?tr.crate:tr.carton).join('；');const first=Array.from(rows[2]?.getElementsByTagNameNS(w,'tc')||[]);if(first.length>=7){setCellText(first[1],cargoLines||'-');setCellText(first[2],String(cargo.reduce((s,c)=>s+Math.floor(c.quantity),0)));setCellText(first[3],cargo.length===1?cargo[0].weight.toFixed(1):'-');setCellText(first[4],totalWeight.toFixed(1));setCellText(first[5],dimsLines||'-');setCellText(first[6],typeLines||'-')}
+      const loadedById=new Map<string,PlacedCargo[]>();for(const p of placed){const a=loadedById.get(p.cargoId)||[];a.push(p);loadedById.set(p.cargoId,a)};const loaded=cargo.filter(c=>(loadedById.get(c.id)?.length||0)>0);const totalWeight=placed.reduce((sum,p)=>sum+p.weight,0);const cargoLines=loaded.map(c=>`${c.name} × ${(loadedById.get(c.id)||[]).length}`).join('；');const dimsLines=loaded.map(c=>{const p=(loadedById.get(c.id)||[])[0];const d=p.rotation%180===0?{l:p.length,w:p.width}:{l:p.width,w:p.length};return `${d.l}×${d.w}×${p.height}`}).join('；');const typeLines=loaded.map(c=>c.type==='pallet'?tr.pallet:c.type==='woodCrate'?tr.crate:tr.carton).join('；');const first=Array.from(rows[2]?.getElementsByTagNameNS(w,'tc')||[]);for(const r0 of rows.slice(3)){for(const cell of Array.from(r0.getElementsByTagNameNS(w,'tc')))setCellText(cell,'')};if(first.length>=7){setCellText(first[1],cargoLines||'-');setCellText(first[2],String(placed.length));setCellText(first[3],loaded.length===1?(loaded[0].weight||0).toFixed(1):'-');setCellText(first[4],totalWeight.toFixed(1));setCellText(first[5],dimsLines||'-');setCellText(first[6],typeLines||'-')}
       const infoRows=Array.from(infoTable.getElementsByTagNameNS(w,'tr'));if(infoRows[2]){const c=Array.from(infoRows[2].getElementsByTagNameNS(w,'tc'));if(c[1])setCellText(c[1],lang==='zh'?`根据当前3D视图内货物的实际位置、尺寸、旋转及堆叠状态生成装箱方案，共装载 ${placed.length} 件货物。`:`The loading plan is generated from the current 3D cargo arrangement; ${placed.length} units are loaded.`)}if(infoRows[3]){const c=Array.from(infoRows[3].getElementsByTagNameNS(w,'tc'));if(c[1])setCellText(c[1],lang==='zh'?`1、箱内货物紧密码靠，装载均匀、稳定、对称、配载合理。\n2、货物装箱后不影响箱门关闭。`:`1. Cargo is compact and stable.\n2. Cargo must not obstruct the doors.`)}if(infoRows[4]){const c=Array.from(infoRows[4].getElementsByTagNameNS(w,'tc'));if(c[1])setCellText(c[1],lang==='zh'?'按当前装载结果配置三角木、紧固带、气袋及其他需要的加固材料，防止运输过程中位移。':'Place securing materials at gaps and required positions to prevent movement.')}if(infoRows[5]){const c=Array.from(infoRows[5].getElementsByTagNameNS(w,'tc'));const materialText=Object.entries(materialCounts).map(([k,v])=>`${materialNames[k as SecuringMaterialType][lang]} × ${v}`).join('、')|| (lang==='zh'?'暂无加固材料':'No securing materials');if(c[1])setCellText(c[1],materialText)}
       const updatedXml=new XMLSerializer().serializeToString(doc);const top=await svgToPng(makeTopViewSvg(1000,420),1000,420);const sf=await svgToPng(makeSideFrontSvg(1000,430),1000,430);const output=await createDocxWithPlanImages(template,updatedXml,top,sf);const blob=new Blob([output],{type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'});const u=URL.createObjectURL(blob);const a=document.createElement('a');a.href=u;a.download=`${container.name}-装箱方案.docx`;a.click();setTimeout(()=>URL.revokeObjectURL(u),1500);setMessage(lang==='zh'?'已按 Word 模板导出装箱方案':'Loading plan exported from Word template')
     }catch(error){console.error(error);setMessage(lang==='zh'?'装箱方案模板导出失败，请检查模板文件':'Loading plan template export failed')}
@@ -767,7 +772,7 @@ function App() {
         <div className="hero-title">
           <div className="hero-orbit" aria-hidden="true" />
           <div className="hero-rule" aria-hidden="true" />
-          <h1>{tr.title}</h1>
+          <h1>{tr.title} <span className="beta-badge">Beta</span></h1>
         </div>
 
         <div className="top-actions">
@@ -1374,8 +1379,7 @@ function App() {
               <label className="dimension-toggle"><input type="checkbox" checked={showDimensions} onChange={e=>setShowDimensions(e.target.checked)}/>{lang==='zh'?'容器尺寸标注':'Container Dimensions'}</label>
             </div>
             <div className="toolbar-group"><b>{lang==='zh'?'模式':'MODE'}</b>
-              <button className={selectionMode==='single'?'active':''} onClick={()=>setSelectionMode('single')}>{tr.singleSelect}</button>
-              <button className={selectionMode==='box'?'active':''} onClick={()=>setSelectionMode('box')}>{tr.boxSelect}</button>
+              <button className={selectionMode==='box'?'active':''} onClick={()=>setSelectionMode('box')}>{lang==='zh'?'多选':'MULTI SELECT'}</button>
               <button className={freePlacement?'active':''} onClick={()=>setFreePlacement(v=>!v)}>{tr.freePlacement}</button>
             </div>
           </div>
@@ -1432,13 +1436,12 @@ function App() {
               airBagStretch={airBagStretch}
               onAddMaterial={addMaterial}
               onMaterialScale={scaleMaterial}
+              onDeleteMaterial={deleteMaterial}
             />
           </div>
 
           <div className="viewer-foot">
             <span>{tr.grid}</span>
-
-            <span>{tr.axis}</span>
 
             <span>
               {lang === 'zh' ? '偏载' : 'IMBALANCE'} {analysis.dominantOffset.toFixed(0)} kg
