@@ -4,15 +4,15 @@ import { dims, inBounds, overlap } from './geometry'
 const EPS = 0.5
 const STEP = 10
 
-type Orientation = { length: number; width: number; rotation: 0 | 90 }
+type Orientation = { length: number; width: number; height: number; rotation: 0 | 90 }
 type Unit = { cargo: Cargo; index: number }
 
 const snap = (n: number) => Math.max(0, Math.round(n / STEP) * STEP)
 
 function orientations(c: Cargo): Orientation[] {
-  const a: Orientation = { length: c.length, width: c.width, rotation: 0 }
+  const a: Orientation = { length: c.length, width: c.width, height: c.height, rotation: 0 }
   if (!c.rotatable || Math.abs(c.length - c.width) < EPS) return [a]
-  return [a, { length: c.width, width: c.length, rotation: 90 }]
+  return [a, { length: c.width, width: c.length, height: c.height, rotation: 90 }]
 }
 
 export function expandCargo(cargo: Cargo[]): Unit[] {
@@ -32,9 +32,9 @@ function makePlaced(u: Unit, o: Orientation, x: number, y: number, z: number): P
     x: snap(x),
     y: snap(y),
     z: snap(z),
-    length: u.cargo.length,
-    width: u.cargo.width,
-    height: u.cargo.height,
+    length: o.length,
+    width: o.width,
+    height: o.height,
     rotation: o.rotation,
     weight: u.cargo.weight,
     color: u.cargo.color,
@@ -172,7 +172,7 @@ function choosePlacement(u: Unit, items: PlacedCargo[], c: Container, defs: Map<
   for (const o of orientations(u.cargo)) {
     for (const [x, y, z] of pts) {
       if (z > EPS && !u.cargo.stackable) continue
-      if (x + o.length > c.length + EPS || y + o.width > c.width + EPS || z + u.cargo.height > c.height + EPS) continue
+      if (x + o.length > c.length + EPS || y + o.width > c.width + EPS || z + o.height > c.height + EPS) continue
       if (totalWeight + u.cargo.weight > c.maxPayload + EPS) continue
 
       const p = makePlaced(u, o, x, y, z)
