@@ -21,21 +21,48 @@ export function createDocxFromTemplate(template:ArrayBuffer,xmlText:string,image
 
 function drawingXml(rId:string,id:number,name:string,cx:number,cy:number){return `<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:drawing><wp:inline xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" distT="0" distB="0" distL="0" distR="0"><wp:extent cx="${cx}" cy="${cy}"/><wp:effectExtent l="0" t="0" r="0" b="0"/><wp:docPr id="${id}" name="${name}"/><wp:cNvGraphicFramePr><a:graphicFrameLocks xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" noChangeAspect="1"/></wp:cNvGraphicFramePr><a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:nvPicPr><pic:cNvPr id="${id}" name="${name}"/><pic:cNvPicPr><a:picLocks noChangeAspect="1"/></pic:cNvPicPr></pic:nvPicPr><pic:blipFill><a:blip xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:embed="${rId}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:noFill/><a:ln><a:noFill/></a:ln></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p>`}
 
+function cellText(cell:Element,w:string){return Array.from(cell.getElementsByTagNameNS(w,'t')).map(x=>x.textContent||'').join('')}
+function setCell(cell:Element,text:string,w:string){const ts=Array.from(cell.getElementsByTagNameNS(w,'t'));if(ts.length){ts[0].textContent=text;for(let i=1;i<ts.length;i++)ts[i].textContent=''}else{const p=cell.getElementsByTagNameNS(w,'p')[0];if(p){const r=cell.ownerDocument!.createElementNS(w,'w:r'),t=cell.ownerDocument!.createElementNS(w,'w:t');t.textContent=text;r.appendChild(t);p.appendChild(r)}}}
+
 export async function createDocxWithPlanImages(template:ArrayBuffer,xmlText:string,topPng:Uint8Array,sideFrontPng:Uint8Array){
   const bytes=new Uint8Array(template),entries=parseStoredZip(bytes),parser=new DOMParser(),doc=parser.parseFromString(xmlText,'application/xml')
   const w='http://schemas.openxmlformats.org/wordprocessingml/2006/main',r='http://schemas.openxmlformats.org/officeDocument/2006/relationships',tables=Array.from(doc.getElementsByTagNameNS(w,'tbl'))
   const cargoTable=tables[0],plan=tables[1]
   if(!cargoTable||!plan)throw new Error('Plan tables not found')
 
-  // The template contains sample cargo rows. The application writes the real
-  // loaded cargo into the first data row, so remove every stale row after it.
   const cargoRows=Array.from(cargoTable.getElementsByTagNameNS(w,'tr'))
-  for(const row of cargoRows.slice(3)) row.parentElement?.removeChild(row)
+  const dataRow=cargoRows[2]
+  if(dataRow){
+    const cells=Array.from(dataRow.getElementsByTagNameNS(w,'tc'))
+    if(cells.length>=7){
+      const names=cellText(cells[1],w).split('；').map(x=>x.trim()).filter(Boolean)
+      const weights=cellText(cells[3],w).split('；').map(x=>x.trim()).filter(Boolean)
+      const dims=cellText(cells[5],w).split('；').map(x=>x.trim()).filter(Boolean)
+      const types=cellText(cells[6],w).split('；').map(x=>x.trim()).filter(Boolean)
+      const rowsToCreate=names.length?names.map((name,i)=>{
+        const m=name.match(/^(.*?)\s*[×xX]\s*(\d+)$/)
+        const count=m?m[2]:'1',displayName=m?m[1].trim():name
+        return {name:displayName,count,weight:weights[i]||weights[0]||'-',dimension:dims[i]||dims[0]||'-',type:types[i]||types[0]||'-'}
+      }):[]
+      const templateRow=dataRow.cloneNode(true) as Element
+      for(const row of cargoRows.slice(3)) row.parentElement?.removeChild(row)
+      if(rowsToCreate.length){
+        for(const row of rowsToCreate){
+          const clone=templateRow.cloneNode(true) as Element
+          const cc=Array.from(clone.getElementsByTagNameNS(w,'tc'))
+          if(cc.length>=7){setCell(cc[1],row.name,w);setCell(cc[2],row.count,w);setCell(cc[3],row.weight,w);const total=(Number(row.weight)||0)*(Number(row.count)||0);setCell(cc[4],Number.isFinite(total)?total.toFixed(1):'-',w);setCell(cc[5],row.dimension,w);setCell(cc[6],row.type,w)}
+          cargoTable.appendChild(clone)
+        }
+        dataRow.parentElement?.removeChild(dataRow)
+      }else{
+        for(const row of cargoRows.slice(3)) row.parentElement?.removeChild(row)
+      }
+    }
+  }
 
   for(const blip of Array.from(doc.getElementsByTagNameNS('http://schemas.openxmlformats.org/drawingml/2006/main','blip'))){if(blip.getAttributeNS(r,'embed')==='rId4'){let node:Element|null=blip;while(node&&node.localName!=='p')node=node.parentElement;node?.parentElement?.removeChild(node)}}
   const rows=Array.from(plan.getElementsByTagNameNS(w,'tr'))
   const inject=(rowIndex:number,rId:string,id:number,name:string,cx:number,cy:number)=>{const cells=Array.from(rows[rowIndex].getElementsByTagNameNS(w,'tc')),cell=cells[1];if(!cell)throw new Error(`Plan image cell ${rowIndex} not found`);while(cell.firstChild)cell.removeChild(cell.firstChild);const holder=parser.parseFromString(drawingXml(rId,id,name,cx,cy),'application/xml').documentElement;cell.appendChild(doc.importNode(holder,true))}
-  // Keep the exported image proportions equal to the source PNGs.
   inject(0,'rId8',8,'俯视示意图',5200000,2184000)
   inject(1,'rId9',9,'侧视正视示意图',5200000,2236000)
   const outXml=new XMLSerializer().serializeToString(doc),relEntry=entries.find(e=>e.name==='word/_rels/document.xml.rels');if(!relEntry)throw new Error('Template relationships not found')
@@ -46,5 +73,3 @@ export async function createDocxWithPlanImages(template:ArrayBuffer,xmlText:stri
   finalEntries.push({name:'word/media/image3.png',method:0,crc:crc32(sideFrontPng),compressed:sideFrontPng,uncompressedSize:sideFrontPng.length,flags:0})
   return buildZip(finalEntries)
 }
-
-function extractRawDocumentEntry(entries:ZipEntry[]){const e=entries.find(x=>x.name==='word/document.xml');if(!e)throw new Error('document.xml missing');return e.compressed}
