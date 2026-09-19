@@ -28,7 +28,6 @@ function GizmoScene({ cameraQuaternion, onView }: { cameraQuaternion: React.Muta
         <meshStandardMaterial color="#d7dfdb" transparent opacity={0.24} wireframe />
       </mesh>
       {face([0, 0, 0.33], [0, 0, 0], 'X−', 'front')}
-      {face([0, 0, -0.33], [0, Math.PI, 0], 'X+', 'rear')}
       {face([0.33, 0, 0], [0, Math.PI / 2, 0], 'Y+', 'right')}
       {face([-0.33, 0, 0], [0, -Math.PI / 2, 0], 'Y−', 'left')}
       {face([0, 0.33, 0], [-Math.PI / 2, 0, 0], 'Z+', 'top')}
