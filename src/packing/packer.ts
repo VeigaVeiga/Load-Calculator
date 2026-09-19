@@ -129,12 +129,7 @@ function candidatePoints(items: PlacedCargo[], c: Container) {
     ys.add(snap(q.y)); ys.add(snap(q.y + d.width))
     zs.add(snap(q.z)); zs.add(snap(q.z + q.height))
   }
-
   const points: Array<[number, number, number]> = []
-  // Cross-combining all existing edges fixes the previous failure where the
-  // solver had a valid side gap but never generated the coordinate needed to
-  // close it. The dimensions are small enough that the resulting candidate
-  // set remains bounded in a normal container.
   for (const z of [...zs].sort((a, b) => a - b)) {
     for (const y of [...ys].sort((a, b) => a - b)) {
       for (const x of [...xs].sort((a, b) => a - b)) {
@@ -148,7 +143,6 @@ function candidatePoints(items: PlacedCargo[], c: Container) {
 function contactScore(p: PlacedCargo, items: PlacedCargo[], c: Container) {
   const d = dims(p)
   let score = 0
-  if (p.z <= EPS) score += 200000
   if (p.x <= EPS) score += d.width * 120
   if (p.y <= EPS) score += d.length * 120
   if (p.x + d.length >= c.length - EPS) score += d.width * 100
@@ -169,36 +163,37 @@ function contactScore(p: PlacedCargo, items: PlacedCargo[], c: Container) {
 function choosePlacement(u: Unit, items: PlacedCargo[], c: Container, defs: Map<string, Cargo>, totalWeight: number) {
   let best: { p: PlacedCargo; score: number } | undefined
   const points = candidatePoints(items, c)
-  const orientationsForCargo = orientations(u.cargo)
-
-  for (const o of orientationsForCargo) {
+  for (const o of orientations(u.cargo)) {
     for (const [x, y, z] of points) {
-      if (z > EPS && !u.cargo.stackable) continue
       if (x + o.length > c.length + EPS || y + o.width > c.width + EPS || z + o.height > c.height + EPS) continue
       if (totalWeight + u.cargo.weight > c.maxPayload + EPS) continue
       const p = makePlaced(u, o, x, y, z)
-      if (!inBounds(p, c)) continue
-      if (items.some(q => overlap(p, q))) continue
+      if (!inBounds(p, c) || items.some(q => overlap(p, q))) continue
       if (!canStack(p, u.cargo, items, defs)) continue
-
       const stacking = p.z > EPS
-      if (stacking) {
-        const supports = items.filter(q => Math.abs(q.z + q.height - p.z) <= EPS && footprintArea(p, q) > EPS)
-        if (supportCoverage(p, supports) < 0.995) continue
-      }
+      const supports = stacking
+        ? items.filter(q => Math.abs(q.z + q.height - p.z) <= EPS && footprintArea(p, q) > EPS)
+        : []
+      const support = stacking ? supportCoverage(p, supports) : 1
+      if (stacking && support < 0.995) continue
 
-      const d = dims(p)
       const contact = contactScore(p, items, c)
-      const support = stacking ? supportCoverage(p, items.filter(q => Math.abs(q.z + q.height - p.z) <= EPS && footprintArea(p, q) > EPS)) : 1
-      // Floor is preferred only while it improves compactness. Once a floor
-      // position creates a corridor larger than the next carton, a supported
-      // upper position wins and stacking continues naturally.
-      const score =
-        (stacking ? 0 : 3_000_000) +
-        support * 1_000_000 +
-        contact * 24 -
-        p.z * 600 - p.y * 2 - p.x * 0.08 +
-        d.length * d.width * 0.5
+      // The old solver gave every floor position a huge fixed bonus. That made
+      // it systematically fill the floor first, even when an upper supported
+      // position was the only way to close the remaining side gap. Compactness
+      // now dominates: supported stacking is rewarded, while floor contact is
+      // only a small tie-breaker.
+      const compactness =
+        contact +
+        support * 900_000 +
+        (stacking ? 1_200_000 : 180_000) -
+        p.x * 90 -
+        p.y * 90 -
+        p.z * 12
+      const edgePenalty =
+        Math.max(0, c.length - (p.x + o.length)) * 0.4 +
+        Math.max(0, c.width - (p.y + o.width)) * 0.4
+      const score = compactness - edgePenalty
       if (!best || score > best.score) best = { p, score }
     }
   }
@@ -212,14 +207,10 @@ function packCore(cargo: Cargo[], c: Container, locked: PlacedCargo[], onStep?: 
   const lockedCount = new Map<string, number>()
   for (const p of items) lockedCount.set(p.cargoId, (lockedCount.get(p.cargoId) || 0) + 1)
   let totalWeight = items.reduce((s, p) => s + p.weight, 0)
-
   const units = orderUnits(cargo).filter(u => u.index >= (lockedCount.get(u.cargo.id) || 0))
   for (let i = 0; i < units.length; i++) {
     const p = choosePlacement(units[i], items, c, defs, totalWeight)
-    if (p) {
-      items.push(p)
-      totalWeight += p.weight
-    }
+    if (p) { items.push(p); totalWeight += p.weight }
     onStep?.(i + 1, units.length)
   }
   return items
