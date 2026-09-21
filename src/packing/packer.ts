@@ -73,7 +73,7 @@ function stackLevel(p: PlacedCargo, items: PlacedCargo[], seen = new Set<string>
   if (p.z <= EPS || seen.has(p.id)) return 1
   seen.add(p.id)
   const pd = dims(p)
-  const supports = items.filter(q => Math.abs(q.z + q.height - p.z) <= EPS && footprintArea(p, q) >= pd.length * pd.width * 0.995)
+  const supports = items.filter(q => Math.abs(q.z + q.height - p.z) <= EPS && footprintArea(p, q) >= pd.length * pd.width * 0.98)
   if (!supports.length) return 1
   return 1 + Math.max(...supports.map(q => stackLevel(q, items, new Set(seen))))
 }
@@ -82,10 +82,10 @@ function canStack(p: PlacedCargo, cargo: Cargo, items: PlacedCargo[], defs: Map<
   if (p.z <= EPS) return true
   if (!cargo.stackable) return false
   const supports = items.filter(q => Math.abs(q.z + q.height - p.z) <= EPS && footprintArea(p, q) > EPS)
-  if (!supports.length || supportCoverage(p, supports) < 0.995) return false
+  if (!supports.length || supportCoverage(p, supports) < 0.98) return false
   const level = Math.max(...supports.map(q => stackLevel(q, items))) + 1
-  const maxLayers = cargo.maxStackLayers <= 1 ? 99 : cargo.maxStackLayers
-  if (maxLayers > 0 && level > maxLayers) return false
+  const maxLayers = Math.max(1, Math.floor(cargo.maxStackLayers || 1))
+  if (level > maxLayers) return false
   for (const q of supports) {
     const d = defs.get(q.cargoId)
     if (!d || !d.loadBearing || d.breakablePallet) return false
@@ -119,21 +119,23 @@ function orderUnits(cargo: Cargo[]) {
     })
 }
 
-function candidatePoints(items: PlacedCargo[], c: Container) {
-  const xs = new Set<number>([0])
-  const ys = new Set<number>([0])
+function candidatePoints(items: PlacedCargo[], c: Container, o: Orientation) {
+  const xs = new Set<number>([0, Math.max(0, c.length - o.length)])
+  const ys = new Set<number>([0, Math.max(0, c.width - o.width)])
   const zs = new Set<number>([0])
   for (const q of items) {
     const d = dims(q)
-    xs.add(snap(q.x)); xs.add(snap(q.x + d.length))
-    ys.add(snap(q.y)); ys.add(snap(q.y + d.width))
+    xs.add(snap(q.x)); xs.add(snap(q.x + d.length)); xs.add(snap(q.x + d.length - o.length))
+    ys.add(snap(q.y)); ys.add(snap(q.y + d.width)); ys.add(snap(q.y + d.width - o.width))
     zs.add(snap(q.z)); zs.add(snap(q.z + q.height))
   }
   const points: Array<[number, number, number]> = []
   for (const z of [...zs].sort((a, b) => a - b)) {
     for (const y of [...ys].sort((a, b) => a - b)) {
       for (const x of [...xs].sort((a, b) => a - b)) {
-        if (x <= c.length + EPS && y <= c.width + EPS && z <= c.height + EPS) points.push([x, y, z])
+        if (x >= -EPS && y >= -EPS && z >= -EPS && x + o.length <= c.length + EPS && y + o.width <= c.width + EPS && z + o.height <= c.height + EPS) {
+          points.push([x, y, z])
+        }
       }
     }
   }
@@ -162,10 +164,9 @@ function contactScore(p: PlacedCargo, items: PlacedCargo[], c: Container) {
 
 function choosePlacement(u: Unit, items: PlacedCargo[], c: Container, defs: Map<string, Cargo>, totalWeight: number) {
   let best: { p: PlacedCargo; score: number } | undefined
-  const points = candidatePoints(items, c)
   for (const o of orientations(u.cargo)) {
+    const points = candidatePoints(items, c, o)
     for (const [x, y, z] of points) {
-      if (x + o.length > c.length + EPS || y + o.width > c.width + EPS || z + o.height > c.height + EPS) continue
       if (totalWeight + u.cargo.weight > c.maxPayload + EPS) continue
       const p = makePlaced(u, o, x, y, z)
       if (!inBounds(p, c) || items.some(q => overlap(p, q))) continue
@@ -175,25 +176,16 @@ function choosePlacement(u: Unit, items: PlacedCargo[], c: Container, defs: Map<
         ? items.filter(q => Math.abs(q.z + q.height - p.z) <= EPS && footprintArea(p, q) > EPS)
         : []
       const support = stacking ? supportCoverage(p, supports) : 1
-      if (stacking && support < 0.995) continue
+      if (stacking && support < 0.98) continue
 
       const contact = contactScore(p, items, c)
-      // The old solver gave every floor position a huge fixed bonus. That made
-      // it systematically fill the floor first, even when an upper supported
-      // position was the only way to close the remaining side gap. Compactness
-      // now dominates: supported stacking is rewarded, while floor contact is
-      // only a small tie-breaker.
-      const compactness =
-        contact +
-        support * 900_000 +
-        (stacking ? 1_200_000 : 180_000) -
-        p.x * 90 -
-        p.y * 90 -
-        p.z * 12
-      const edgePenalty =
-        Math.max(0, c.length - (p.x + o.length)) * 0.4 +
-        Math.max(0, c.width - (p.y + o.width)) * 0.4
-      const score = compactness - edgePenalty
+      const floorEdge = (p.x <= EPS ? 1 : 0) + (p.y <= EPS ? 1 : 0) +
+        (p.x + o.length >= c.length - EPS ? 1 : 0) + (p.y + o.width >= c.width - EPS ? 1 : 0)
+      const localTightness = contact + floorEdge * 2500
+      const stackingBonus = stacking ? 1_600_000 : 180_000
+      const supportBonus = support * 1_000_000
+      const heightPenalty = p.z * 18
+      const score = localTightness * 3 + stackingBonus + supportBonus - heightPenalty
       if (!best || score > best.score) best = { p, score }
     }
   }
