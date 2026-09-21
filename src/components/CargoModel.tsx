@@ -25,10 +25,10 @@ function CargoModel({p,container,selected,onPointerDown,onPointerUp,onPointerMov
 
     {pallet ? <>
       <group position={[0,0,-p.height*S/2+baseH*S/2]}>
-        <mesh position={[0,0,0]}><boxGeometry args={[dl*S,dw*S,baseH*S*.22]}/><meshStandardMaterial color="#b57b45" roughness={.86}/></mesh>
-        {[-1,0,1].map(i=><mesh key={`deck-${i}`} position={[0,i*dw*S*.30,baseH*S*.23]}><boxGeometry args={[dl*S,dw*S*.16,baseH*S*.28]}/><meshStandardMaterial color="#8a5a32" roughness={.86}/></mesh>)}
-        {[-.34,0,.34].map(i=><mesh key={`runner-${i}`} position={[i*dl*S,0,-baseH*S*.18]}><boxGeometry args={[Math.max(70,dl*.13)*S,dw*S*.82,baseH*S*.52]}/><meshStandardMaterial color="#76502f" roughness={.88}/></mesh>)}
-        {[-.42,.42].map(i=><mesh key={`foot-${i}`} position={[i*dl*S,0,-baseH*S*.48]}><boxGeometry args={[Math.max(55,dl*.10)*S,dw*S*.76,baseH*S*.20]}/><meshStandardMaterial color="#69472b" roughness={.9}/></mesh>)}
+        <mesh><boxGeometry args={[dl*S,dw*S,baseH*S*.18]}/><meshStandardMaterial color="#b57b45" roughness={.86}/></mesh>
+        {[-1,0,1].map(i=><mesh key={`deck-${i}`} position={[0,i*dw*S*.30,baseH*S*.22]}><boxGeometry args={[dl*S,dw*S*.16,baseH*S*.25]}/><meshStandardMaterial color="#8a5a32" roughness={.86}/></mesh>)}
+        {[-.34,0,.34].map(i=><mesh key={`runner-${i}`} position={[i*dl*S,0,-baseH*S*.16]}><boxGeometry args={[Math.max(70,dl*.13)*S,dw*S*.82,baseH*S*.50]}/><meshStandardMaterial color="#76502f" roughness={.88}/></mesh>)}
+        {[-.42,0,.42].map(i=><mesh key={`foot-${i}`} position={[i*dl*S,0,-baseH*S*.46]}><boxGeometry args={[Math.max(55,dl*.10)*S,dw*S*.76,baseH*S*.18]}/><meshStandardMaterial color="#69472b" roughness={.9}/></mesh>)}
       </group>
       <mesh position={[0,0,baseH*S/2]}><boxGeometry args={[dl*S,dw*S,bodyH*S]}/><meshStandardMaterial color={mainColor} roughness={.68}/></mesh>
     </> : crate ? <>
@@ -37,8 +37,6 @@ function CargoModel({p,container,selected,onPointerDown,onPointerUp,onPointerMov
       {[-.44,0,.44].map((t,i)=><mesh key={`sz${i}`} position={[t*dl*S,0,0]}><boxGeometry args={[Math.max(18,dl*.055)*S,dw*S*1.01,bodyH*S*1.02]}/><meshStandardMaterial color="#b97d46" roughness={.84}/></mesh>)}
     </> : <>
       <mesh><boxGeometry args={[dl*S,dw*S,bodyH*S]}/><meshStandardMaterial color={mainColor} roughness={.62}/></mesh>
-      <mesh position={[0,0,bodyH*S/2+.002]}><boxGeometry args={[Math.min(dl*.18,180)*S,dw*S-.002,.018]}/><meshStandardMaterial color="#d6bd82" roughness={.8}/></mesh>
-      <mesh position={[0,0,0]}><boxGeometry args={[dl*S-.004,dw*S-.004,bodyH*S-.004]}/><meshStandardMaterial color={mainColor} roughness={.62} transparent opacity={.985}/></mesh>
     </>}
     {showName&&<Html position={[0,0,p.height*S/2+.02]} center><div className="cargo-name-label">{p.cargoId}</div></Html>}
   </group>
