@@ -1,86 +1,39 @@
 import type { Cargo, Container, PlacedCargo } from '../types'
-import { dims, inBounds, overlap } from './geometry'
+import { dims, inBounds, overlap, supportRatio } from './geometry'
 
 const EPS = 0.5
-const SNAP = 10
+const GRID = 100
 const SUPPORT = 0.98
-const snap = (n:number) => Math.max(0, Math.round(n / SNAP) * SNAP)
+const snap = (n:number) => Math.max(0, Math.round(n / 10) * 10)
 type Ori = { length:number; width:number; height:number; rotation:0|90 }
 type Unit = { cargo:Cargo; index:number }
 
+autoPack
 function orientations(c:Cargo):Ori[]{
   const a:Ori={length:c.length,width:c.width,height:c.height,rotation:0}
   if(!c.rotatable || Math.abs(c.length-c.width)<EPS)return[a]
   return[a,{length:c.width,width:c.length,height:c.height,rotation:90}]
 }
 export function expandCargo(cargo:Cargo[]):Unit[]{const out:Unit[]=[];for(const c of cargo)for(let i=0;i<Math.max(0,Math.floor(c.quantity));i++)out.push({cargo:c,index:i});return out}
-function placed(u:Unit,o:Ori,x:number,y:number,z:number):PlacedCargo{return{id:`${u.cargo.id}-${u.index+1}`,cargoId:u.cargo.id,cargoType:u.cargo.type,x:snap(x),y:snap(y),z:snap(z),length:u.cargo.length,width:u.cargo.width,height:o.height,weight:u.cargo.weight,color:u.cargo.color,rotation:o.rotation,placementMode:'automatic',locked:false}}
-function area(a:PlacedCargo,b:PlacedCargo){const A=dims(a),B=dims(b);return Math.max(0,Math.min(a.x+A.length,b.x+B.length)-Math.max(a.x,b.x))*Math.max(0,Math.min(a.y+A.width,b.y+B.width)-Math.max(a.y,b.y))}
-function coverage(p:PlacedCargo,s:PlacedCargo[]){if(p.z<=EPS)return 1;const d=dims(p),total=d.length*d.width;if(!s.length)return 0;const xs=[p.x,p.x+d.length,...s.flatMap(q=>{const qd=dims(q);return[Math.max(p.x,q.x),Math.min(p.x+d.length,q.x+qd.length)]})].filter(x=>x>=p.x-EPS&&x<=p.x+d.length+EPS).sort((a,b)=>a-b);const ys=[p.y,p.y+d.width,...s.flatMap(q=>{const qd=dims(q);return[Math.max(p.y,q.y),Math.min(p.y+d.width,q.y+qd.width)]})].filter(y=>y>=p.y-EPS&&y<=p.y+d.width+EPS).sort((a,b)=>a-b);let covered=0;for(let i=0;i<xs.length-1;i++)for(let j=0;j<ys.length-1;j++){const x=(xs[i]+xs[i+1])/2,y=(ys[j]+ys[j+1])/2;if(s.some(q=>{const qd=dims(q);return x>=q.x-EPS&&x<=q.x+qd.length+EPS&&y>=q.y-EPS&&y<=q.y+qd.width+EPS}))covered+=(xs[i+1]-xs[i])*(ys[j+1]-ys[j])}return Math.min(1,covered/total)}
-function supportsAt(p:PlacedCargo,items:PlacedCargo[]){return items.filter(q=>Math.abs(q.z+q.height-p.z)<=EPS&&area(p,q)>EPS)}
-function level(p:PlacedCargo,items:PlacedCargo[],seen=new Set<string>()):number{if(p.z<=EPS||seen.has(p.id))return 1;seen.add(p.id);const s=supportsAt(p,items);return s.length?1+Math.max(...s.map(q=>level(q,items,new Set(seen)))):1}
-function canPlace(p:PlacedCargo,c:Cargo,items:PlacedCargo[],defs:Map<string,Cargo>){
-  if(p.z<=EPS)return true
-  if(!c.stackable)return false
-  const s=supportsAt(p,items)
-  if(coverage(p,s)<SUPPORT)return false
-  if(level(p,items)>Math.max(1,Math.floor(c.maxStackLayers||1)))return false
-  return s.every(q=>{const d=defs.get(q.cargoId);return !!d&&d.loadBearing&&!d.breakablePallet})
-}
+function makePlaced(u:Unit,o:Ori,x:number,y:number,z:number):PlacedCargo{return{id:`${u.cargo.id}-${u.index+1}`,cargoId:u.cargo.id,cargoType:u.cargo.type,x:snap(x),y:snap(y),z:snap(z),length:u.cargo.length,width:u.cargo.width,height:o.height,weight:u.cargo.weight,color:u.cargo.color,rotation:o.rotation,placementMode:'automatic',locked:false}}
+function supports(p:PlacedCargo,items:PlacedCargo[]){return items.filter(q=>Math.abs(q.z+q.height-p.z)<=EPS && dims(q).length>0 && Math.max(0,Math.min(p.x+dims(p).length,q.x+dims(q).length)-Math.max(p.x,q.x))*Math.max(0,Math.min(p.y+dims(p).width,q.y+dims(q).width)-Math.max(p.y,q.y))>EPS)}
+function stackLevel(p:PlacedCargo,items:PlacedCargo[],seen=new Set<string>()):number{if(p.z<=EPS||seen.has(p.id))return 1;seen.add(p.id);const s=supports(p,items);return s.length?1+Math.max(...s.map(q=>stackLevel(q,items,new Set(seen)))):1}
+function loadAbove(q:PlacedCargo,items:PlacedCargo[]){return items.filter(p=>p.id!==q.id&&Math.abs(q.z+q.height-p.z)<=EPS).reduce((s,p)=>s+p.weight,0)}
+function canStack(p:PlacedCargo,c:Cargo,items:PlacedCargo[],defs:Map<string,Cargo>){if(p.z<=EPS)return true;if(!c.stackable)return false;const s=supports(p,items);if(!s.length||supportRatio(p,items)<SUPPORT)return false;if(stackLevel(p,items)>Math.max(1,Math.floor(c.maxStackLayers||1)))return false;return s.every(q=>{const d=defs.get(q.cargoId);if(!d||!d.loadBearing||d.breakablePallet)return false;return !Number.isFinite(d.maxLoadOnTop)||d.maxLoadOnTop<=0||loadAbove(q,items)+c.weight<=d.maxLoadOnTop+EPS})}
 function validLocked(lock:PlacedCargo[],c:Container,qty:Map<string,number>){const out:PlacedCargo[]=[];for(const p of lock){if(!qty.get(p.cargoId)||!inBounds(p,c)||out.some(q=>overlap(p,q)))continue;out.push(p)}return out}
-function units(cargo:Cargo[]){return expandCargo(cargo).filter(u=>u.cargo.length>0&&u.cargo.width>0&&u.cargo.height>0).sort((a,b)=>{const av=a.cargo.length*a.cargo.width*a.cargo.height,bv=b.cargo.length*b.cargo.width*b.cargo.height;return(b.cargo.loadBearing?1:0)-(a.cargo.loadBearing?1:0)||(b.cargo.stackable?1:0)-(a.cargo.stackable?1:0)||(bv-av)||(b.cargo.weight-a.cargo.weight)})}
-
-function candidateXY(items:PlacedCargo[],c:Container,o:Ori){
-  const xs=new Set<number>([0,snap(c.length-o.length)])
-  const ys=new Set<number>([0,snap(c.width-o.width)])
-  for(const q of items){
-    const d=dims(q)
-    xs.add(snap(q.x));xs.add(snap(q.x+d.length));xs.add(snap(q.x-o.length));xs.add(snap(q.x+d.length-o.length))
-    ys.add(snap(q.y));ys.add(snap(q.y+d.width));ys.add(snap(q.y-o.width));ys.add(snap(q.y+d.width-o.width))
-  }
-  return {xs:[...xs].filter(x=>x>=-EPS&&x+o.length<=c.length+EPS).sort((a,b)=>a-b),ys:[...ys].filter(y=>y>=-EPS&&y+o.width<=c.width+EPS).sort((a,b)=>a-b)}
-}
-
-function choose(u:Unit,items:PlacedCargo[],c:Container,defs:Map<string,Cargo>,weight:number){
-  let floorBest:PlacedCargo|undefined,floorScore=-Infinity
-  let stackBest:PlacedCargo|undefined,stackScore=-Infinity
-  const same=items.filter(q=>q.cargoId===u.cargo.id)
-  const centerY=c.width/2
-
-  for(const o of orientations(u.cargo)){
-    const {xs,ys}=candidateXY(items,c,o)
-    const zs=[0,...items.map(q=>snap(q.z+q.height))].filter((v,i,a)=>a.indexOf(v)===i).sort((a,b)=>a-b)
-    for(const z of zs)for(const y of ys)for(const x of xs){
-      if(weight+u.cargo.weight>c.maxPayload+EPS)continue
-      const p=placed(u,o,x,y,z)
-      if(!inBounds(p,c)||items.some(q=>overlap(p,q))||!canPlace(p,u.cargo,items,defs))continue
-      const supports=supportsAt(p,items),cov=coverage(p,supports)
-      if(p.z>EPS&&cov<SUPPORT)continue
-      const nearest=same.length?Math.min(...same.map(q=>Math.hypot(p.x-q.x,p.y-q.y))):999999
-      const aligned=same.reduce((n,q)=>n+(Math.abs(p.x-q.x)<=SNAP?1:0)+(Math.abs(p.y-q.y)<=SNAP?1:0),0)
-      if(p.z<=EPS){
-        /* Floor-first packing: fill from the header toward the doors in regular rows.
-           This prevents the old scorer from jumping to a stack while a large floor gap remained. */
-        const rowCenter=Math.abs((p.y+o.width/2)-centerY)
-        const score=5000000-p.x*2200-rowCenter*80+aligned*500000+Math.max(0,500000-nearest*400)
-        if(score>floorScore){floorScore=score;floorBest=p}
-      }else{
-        /* Stack only after no floor placement exists. Prefer same-type footprints and low Z. */
-        const score=2500000+aligned*700000+cov*600000+Math.max(0,500000-nearest*350)-p.z*150
-        if(score>stackScore){stackScore=score;stackBest=p}
-      }
-    }
-  }
-  return floorBest??stackBest
-}
-
-function pack(cargo:Cargo[],c:Container,locked:PlacedCargo[],step?:(i:number,n:number)=>void){
-  const defs=new Map(cargo.map(x=>[x.id,x])),qty=new Map(cargo.map(x=>[x.id,Math.floor(x.quantity)])),items=validLocked(locked,c,qty),count=new Map<string,number>()
-  for(const p of items)count.set(p.cargoId,(count.get(p.cargoId)||0)+1)
-  let w=items.reduce((s,p)=>s+p.weight,0)
-  const us=units(cargo).filter(u=>u.index>=(count.get(u.cargo.id)||0))
-  for(let i=0;i<us.length;i++){const p=choose(us[i],items,c,defs,w);if(p){items.push(p);w+=p.weight}step?.(i+1,us.length)}
-  return items
-}
+function units(cargo:Cargo[]){return expandCargo(cargo).filter(u=>u.cargo.length>0&&u.cargo.width>0&&u.cargo.height>0).sort((a,b)=>{const av=a.cargo.length*a.cargo.width*a.cargo.height,bv=b.cargo.length*b.cargo.width*b.cargo.height;return(bv-av)||(b.cargo.loadBearing?1:0)-(a.cargo.loadBearing?1:0)||(b.cargo.stackable?1:0)-(a.cargo.stackable?1:0)||(b.cargo.weight-a.cargo.weight)})}
+function gridKey(ix:number,iy:number){return `${ix}:${iy}`}
+function markGrid(grid:Set<string>,x:number,y:number,o:Ori){const ix0=Math.max(0,Math.floor(x/GRID)),iy0=Math.max(0,Math.floor(y/GRID)),ix1=Math.ceil((x+o.length)/GRID)-1,iy1=Math.ceil((y+o.width)/GRID)-1;for(let ix=ix0;ix<=ix1;ix++)for(let iy=iy0;iy<=iy1;iy++)grid.add(gridKey(ix,iy))}
+function freeGrid(grid:Set<string>,x:number,y:number,o:Ori){const ix0=Math.max(0,Math.floor(x/GRID)),iy0=Math.max(0,Math.floor(y/GRID)),ix1=Math.ceil((x+o.length)/GRID)-1,iy1=Math.ceil((y+o.width)/GRID)-1;for(let ix=ix0;ix<=ix1;ix++)for(let iy=iy0;iy<=iy1;iy++)if(grid.has(gridKey(ix,iy)))return false;return true}
+function floorCandidates(c:Container,o:Ori){const maxX=Math.max(0,c.length-o.length),maxY=Math.max(0,c.width-o.width),xs:number[]=[];const ys:number[]=[];for(let x=0;x<=maxX;x+=GRID)xs.push(x);if(!xs.includes(maxX))xs.push(maxX);for(let y=0;y<=maxY;y+=GRID)ys.push(y);if(!ys.includes(maxY))ys.push(maxY);const cx=c.length/2-o.length/2,cy=c.width/2-o.width/2;return xs.flatMap(x=>ys.map(y=>({x,y,d:Math.hypot((x-o.length/2)-c.length/2,(y-o.width/2)-c.width/2)}))).sort((a,b)=>a.d-b.d)}
+function stackCandidates(items:PlacedCargo[],c:Container,o:Ori,u:Unit){const centerX=c.length/2-o.length/2,centerY=c.width/2-o.width/2;const same=items.filter(q=>q.cargoId===u.cargo.id).sort((a,b)=>Math.hypot(a.x-centerX,a.y-centerY)-Math.hypot(b.x-centerX,b.y-centerY));const source=(same.length?same:items).slice(0,80);const out:{x:number;y:number;z:number;d:number}[]=[];for(const q of source){const qd=dims(q);const z=q.z+q.height;for(const x of [q.x,q.x+qd.length-o.length])for(const y of [q.y,q.y+qd.width-o.width])if(x>=0&&y>=0&&x+o.length<=c.length&&y+o.width<=c.width){out.push({x,y,z,d:Math.hypot((x+o.length/2)-c.length/2,(y+o.width/2)-c.width/2)+z*.35})}}return out.sort((a,b)=>a.d-b.d)}
+function cgScore(items:PlacedCargo,p:PlacedCargo,c:Container,totalW:number,sumX:number,sumY:number){const w=totalW+p.weight;const gx=(sumX+p.weight*(p.x+dims(p).length/2))/w;const gy=(sumY+p.weight*(p.y+dims(p).width/2))/w;const cg=Math.hypot(gx-c.length/2,gy-c.width/2);const center=Math.hypot((p.x+dims(p).length/2)-c.length/2,(p.y+dims(p).width/2)-c.width/2);return -cg*100000-center*80-p.z*25}
+function choose(u:Unit,items:PlacedCargo[],c:Container,defs:Map<string,Cargo>,weight:number,sumX:number,sumY:number,floorGrid:Set<string>){let best:PlacedCargo|undefined,bestScore=-Infinity;for(const o of orientations(u)){
+  for(const q of floorCandidates(c,o)){if(!freeGrid(floorGrid,q.x,q.y,o))continue;const p=makePlaced(u,o,q.x,q.y,0);if(weight+p.weight>c.maxPayload+EPS||items.some(x=>overlap(p,x)))continue;const score=cgScore(items,p,c,weight,sumX,sumY);if(score>bestScore){bestScore=score;best=p}}
+  if(!best){for(const q of stackCandidates(items,c,o,u)){const p=makePlaced(u,o,q.x,q.y,q.z);if(weight+p.weight>c.maxPayload+EPS||items.some(x=>overlap(p,x))||!canStack(p,u.cargo,items,defs))continue;const score=cgScore(items,p,c,weight,sumX,sumY)-q.d*1200;if(score>bestScore){bestScore=score;best=p}}}
+ }return best}
+function buildState(cargo:Cargo[],c:Container,locked:PlacedCargo[]){const defs=new Map(cargo.map(x=>[x.id,x])),qty=new Map(cargo.map(x=>[x.id,Math.floor(x.quantity)])),items=validLocked(locked,c,qty),count=new Map<string,number>();for(const p of items)count.set(p.cargoId,(count.get(p.cargoId)||0)+1);const grid=new Set<string>();for(const p of items)if(p.z<=EPS)markGrid(grid,p.x,p.y,{length:dims(p).length,width:dims(p).width,height:p.height,rotation:0});let weight=items.reduce((s,p)=>s+p.weight,0),sumX=items.reduce((s,p)=>s+p.weight*(p.x+dims(p).length/2),0),sumY=items.reduce((s,p)=>s+p.weight*(p.y+dims(p).width/2),0);const us=units(cargo).filter(u=>u.index>=(count.get(u.cargo.id)||0));return{defs,items,grid,weight,sumX,sumY,us}}
+function placeOne(state:ReturnType<typeof buildState>,u:Unit,c:Container){const p=choose(u,state.items,c,state.defs,state.weight,state.sumX,state.sumY,state.grid);if(!p)return;state.items.push(p);state.weight+=p.weight;state.sumX+=p.weight*(p.x+dims(p).length/2);state.sumY+=p.weight*(p.y+dims(p).width/2);if(p.z<=EPS)markGrid(state.grid,p.x,p.y,{length:dims(p).length,width:dims(p).width,height:p.height,rotation:0})}
+function pack(cargo:Cargo[],c:Container,locked:PlacedCargo[],step?:(i:number,n:number)=>void){const state=buildState(cargo,c,locked);for(let i=0;i<state.us.length;i++){placeOne(state,state.us[i],c);step?.(i+1,state.us.length)}return state.items}
 export function autoPack(cargo:Cargo[],c:Container,locked:PlacedCargo[]=[]){return pack(cargo,c,locked)}
-export async function autoPackAsync(cargo:Cargo[],c:Container,locked:PlacedCargo[]=[],progress?:(percent:number)=>void){const result=pack(cargo,c,locked);progress?.(100);return result}
+export async function autoPackAsync(cargo:Cargo[],c:Container,locked:PlacedCargo[]=[],progress?:(percent:number)=>void){const state=buildState(cargo,c,locked);const n=state.us.length;for(let i=0;i<n;i++){placeOne(state,state.us[i],c);progress?.(n?i/n*100:100);if((i&7)===7)await new Promise<void>(resolve=>requestAnimationFrame(()=>resolve()))}progress?.(100);return state.items}
