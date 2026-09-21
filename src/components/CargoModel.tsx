@@ -2,7 +2,7 @@ import { Html } from '@react-three/drei'
 import type { Container, PlacedCargo } from '../types'
 import { dims } from '../packing/geometry'
 import { memo } from 'react'
-const S=.001,GAP=14
+const S=.001,GAP=6
 function CargoModel({p,container,selected,onPointerDown,onPointerUp,onPointerMove,onClick,showName=false,local=false,hovered=false}:{p:PlacedCargo;container:Container;selected:boolean;onPointerDown:(e:any)=>void;onPointerUp:(e:any)=>void;onPointerMove:(e:any)=>void;onClick:(e:any)=>void;showName?:boolean;local?:boolean;hovered?:boolean}){
  const d=dims(p),pos:[number,number,number]=local?[0,0,0]:[(p.x+d.length/2-container.length/2)*S,(p.y+d.width/2-container.width/2)*S,(p.z+p.height/2)*S]
  const mainColor=selected?'#f2c94c':hovered?'#ffd166':p.color,crate=p.cargoType==='woodCrate',pallet=p.cargoType==='pallet'
