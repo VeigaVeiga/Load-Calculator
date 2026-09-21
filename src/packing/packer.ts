@@ -20,7 +20,10 @@ function orientations(c:Cargo):Ori[]{
 
 export function expandCargo(cargo:Cargo[]):Unit[]{
   const out:Unit[]=[]
-  for(const c of cargo)for(let i=0;i<Math.max(0,Math.floor(c.quantity));i++)out.push({cargo:c,index:i})
+  for(const c of cargo){
+    const n=Math.max(0,Math.floor(c.quantity))
+    for(let i=0;i<n;i++)out.push({cargo:c,index:i})
+  }
   return out
 }
 
@@ -67,10 +70,12 @@ function validLocked(lock:PlacedCargo[],c:Container,qty:Map<string,number>){
 }
 
 function units(cargo:Cargo[]){
-  return expandCargo(cargo).filter(u=>u.cargo.length>0&&u.cargo.width>0&&u.cargo.height>0).sort((a,b)=>{
+  const out=expandCargo(cargo).filter(u=>u.cargo.length>0&&u.cargo.width>0&&u.cargo.height>0)
+  out.sort((a,b)=>{
     const av=a.cargo.length*a.cargo.width*a.cargo.height,bv=b.cargo.length*b.cargo.width*b.cargo.height
     return(bv-av)||(b.cargo.loadBearing?1:0)-(a.cargo.loadBearing?1:0)||(b.cargo.stackable?1:0)-(a.cargo.stackable?1:0)||(b.cargo.weight-a.cargo.weight)
   })
+  return out
 }
 
 function cellKey(ix:number,iy:number){return `${ix}:${iy}`}
@@ -96,7 +101,10 @@ function addFloorIndex(index:FloorIndex,p:PlacedCargo){
 function floorFree(index:FloorIndex,x:number,y:number,o:Ori,itemsById:Map<string,PlacedCargo>){
   const probe:PlacedCargo={id:'__probe__',cargoId:'__probe__',cargoType:'carton',x,y,z:0,length:o.length,width:o.width,height:o.height,rotation:0,weight:0,color:'#000',placementMode:'automatic',locked:false}
   const ids=new Set<string>()
-  for(const key of floorCells(x,y,o))for(const id of index.get(key)??[])ids.add(id)
+  for(const key of floorCells(x,y,o)){
+    const cell=index.get(key)
+    if(cell)for(const id of cell)ids.add(id)
+  }
   for(const id of ids){const q=itemsById.get(id);if(q&&overlap(probe,q))return false}
   return true
 }
@@ -105,7 +113,8 @@ const floorCache=new Map<string,Candidate[]>()
 function floorCandidates(c:Container,o:Ori){
   const maxX=Math.max(0,c.length-o.length),maxY=Math.max(0,c.width-o.width),key=`${c.length}x${c.width}:${o.length}x${o.width}`
   const cached=floorCache.get(key);if(cached)return cached
-  const cx=maxX/2,cy=maxY/2,step=GRID;const out:Candidate[]=[]
+  const cx=maxX/2,cy=maxY/2,step=GRID
+  const out:Candidate[]=[]
   const maxIx=Math.floor(maxX/step),maxIy=Math.floor(maxY/step)
   for(let ix=0;ix<=maxIx;ix++)for(let iy=0;iy<=maxIy;iy++){
     const x=ix*step,y=iy*step
@@ -128,9 +137,7 @@ function stackCandidates(items:PlacedCargo[],c:Container,o:Ori,u:Unit){
   for(const q of source){
     const qd=dims(q),z=q.z+q.height
     for(const x of [q.x,q.x+qd.length-o.length])for(const y of [q.y,q.y+qd.width-o.width]){
-      if(x>=0&&y>=0&&x+o.length<=c.length&&y+o.width<=c.width){
-        out.push({x,y,z,d:Math.hypot((x+o.length/2)-c.length/2,(y+o.width/2)-c.width/2)+z*.35})
-      }
+      if(x>=0&&y>=0&&x+o.length<=c.length&&y+o.width<=c.width)out.push({x,y,z,d:Math.hypot((x+o.length/2)-c.length/2,(y+o.width/2)-c.width/2)+z*.35})
     }
   }
   return out.sort((a,b)=>a.d-b.d)
