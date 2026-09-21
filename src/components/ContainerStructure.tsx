@@ -19,7 +19,7 @@ function SideWall({y,container}:{y:number;container:Container}){
 }
 function HeadWall({container}:{container:Container}){
  const W=container.outerWidth*S,H=container.outerHeight*S,x=-container.outerLength*S/2
- return <group><mesh position={[x,0,H/2]}><boxGeometry args={[container.wallThickness*S,W,H]}/><meshStandardMaterial color="#315f83" transparent opacity={0.24} roughness={0.78} metalness={0.08}/></mesh><Beam position={[x+0.012,0,H/2]} size={[0.05,W,H]} color="#3d78a5" opacity={0.42}/></group>
+ return <group><mesh position={[x,0,H/2]}><boxGeometry args={[container.wallThickness*S,W,H]}/><meshStandardMaterial color="#315f83" transparent opacity={0.24} roughness={.78} metalness={.08}/></mesh><Beam position={[x+0.012,0,H/2]} size={[0.05,W,H]} color="#3d78a5" opacity={0.42}/></group>
 }
 function Roof({container}:{container:Container}){
  const L=container.outerLength*S,W=container.outerWidth*S,H=container.outerHeight*S,t=container.roofThickness*S; const ribs:ReactNode[]=[]
@@ -58,12 +58,12 @@ function LengthRuler({container}:{container:Container}){
  return <group><Line points={[[-L/2,y,z],[L/2,y,z]]} color="#465260" lineWidth={1.1}/>{marks}</group>
 }
 export default function ContainerStructure({container,lang='zh',showDimensions=true}:{container:Container;lang?:'zh'|'en';showDimensions?:boolean}){
- const L=container.outerLength*S,W=container.outerWidth*S,H=container.outerHeight*S,IL=container.length*S,IW=container.width*S,IH=container.height*S,floor=container.floorThickness*S,post=0.075,rail=0.055,rightX=L/2
+ const L=container.outerLength*S,W=container.outerWidth*S,H=container.outerHeight*S,IL=container.length*S,IW=container.width*S,IH=container.height*S,post=0.075,rail=0.055,rightX=L/2
  return <group>
-  <Beam position={[0,0,-floor/2]} size={[L,W,floor]} color="#315f83"/><Roof container={container}/><HeadWall container={container}/><SideWall y={-W/2} container={container}/><SideWall y={W/2} container={container}/>
-  {[-L/2,L/2].flatMap(x=>[-W/2,W/2].map(y=><Beam key={`${x}-${y}`} position={[x,y,(H-floor)/2]} size={[post,post,H+floor]} color="#454945"/>))}
+  <Roof container={container}/><HeadWall container={container}/><SideWall y={-W/2} container={container}/><SideWall y={W/2} container={container}/>
+  {[-L/2,L/2].flatMap(x=>[-W/2,W/2].map(y=><Beam key={`${x}-${y}`} position={[x,y,H/2]} size={[post,post,H]} color="#454945"/>))}
   <Beam position={[0,-W/2,H-rail/2]} size={[L,rail,rail]}/><Beam position={[0,W/2,H-rail/2]} size={[L,rail,rail]}/><DoorFrame container={container}/><DoorLeaf container={container} side={-1}/><DoorLeaf container={container} side={1}/>
-  {showDimensions && <>  <LengthRuler container={container}/>
+  {showDimensions && <> <LengthRuler container={container}/>
   <DimensionLine axis="y" points={[[rightX+0.28,-IW/2,0.12],[rightX+0.28,IW/2,0.12]]} label={`${lang==='zh'?'内部宽度':'INTERNAL WIDTH'} · ${container.width.toLocaleString()} mm`} position={[rightX+0.28,0,0.29]}/>
   <DimensionLine axis="y" points={[[rightX+0.62,-container.doorWidth*S/2,-0.08],[rightX+0.62,container.doorWidth*S/2,-0.08]]} label={`${lang==='zh'?'柜门宽度':'DOOR WIDTH'} · ${container.doorWidth.toLocaleString()} mm`} position={[rightX+0.62,0,-0.23]}/>
   <DimensionLine axis="y" vertical points={[[rightX+0.30,IW/2+0.28,0],[rightX+0.30,IW/2+0.28,IH]]} label={`${lang==='zh'?'内部高度':'INTERNAL HEIGHT'} · ${container.height.toLocaleString()} mm`} position={[rightX+0.30,IW/2+0.28,IH/2]}/>
