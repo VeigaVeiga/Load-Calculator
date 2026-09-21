@@ -27,18 +27,19 @@ function Rope({a,b,radius=.022,color='#8b8f91'}:{a:THREE.Vector3;b:THREE.Vector3
   return <mesh position={mid} quaternion={quaternion} raycast={()=>null}><cylinderGeometry args={[radius,radius,len,8]}/><meshStandardMaterial color={color} roughness={.72}/></mesh>
 }
 
-export default function SecuringModel({item,container,selected,registerRef,local=false}:Props){
-  const center: [number,number,number]=local?[0,0,0]:[(item.x+item.length/2-container.length/2)*S,(item.y+item.width/2-container.width/2)*S,(item.z+item.height/2)*S]
+export default function SecuringModel({item,container,selected,registerRef,local=false,onSelect}:Props){
+  const center:[number,number,number]=local?[0,0,0]:[(item.x+item.length/2-container.length/2)*S,(item.y+item.width/2-container.width/2)*S,(item.z+item.height/2)*S]
   const material=(color:string)=><meshStandardMaterial color={selected?'#f4a23b':color} roughness={.58} metalness={.06}/>
   let body:ReactNode
 
   if(item.type==='triangleWood'){
     const L=item.length*S,W=item.width*S,H=item.height*S
-    const shape=new THREE.Shape();shape.moveTo(-L/2,0);shape.lineTo(L/2,0);shape.lineTo(-L/2,H);shape.closePath()
-    body=<group>
-      <mesh position={[0,-W/2,-H/2]} rotation={[Math.PI/2,0,0]}><extrudeGeometry args={[shape,{depth:W,bevelEnabled:true,bevelThickness:.006,bevelSize:.006,bevelSegments:2}]}/>{material('#3979b8')}</mesh>
-      <mesh position={[0,0,-H*.46]} raycast={()=>null}><boxGeometry args={[L*.88,W*.9,H*.035]}/>{material('#2f669e')}</mesh>
-    </group>
+    const shape=new THREE.Shape()
+    shape.moveTo(-L/2,-H/2)
+    shape.lineTo(L/2,-H/2)
+    shape.lineTo(-L/2,H/2)
+    shape.closePath()
+    body=<mesh rotation={[0,0,0]}><extrudeGeometry args={[shape,{depth:W,bevelEnabled:true,bevelThickness:.003,bevelSize:.003,bevelSegments:1}]}/>{material('#3979b8')}</mesh>
   }else if(item.type==='airBag'){
     const L=item.length*S,W=Math.max(100,item.width)*S,H=Math.min(220,item.height)*S
     body=<group>
@@ -50,13 +51,7 @@ export default function SecuringModel({item,container,selected,registerRef,local
     const w=Math.max(30,item.width)*S,h=Math.max(30,item.height)*S,cols=18,rows=14,ropes:ReactNode[]=[]
     for(let i=0;i<=cols;i++){const x=-w/2+i*w/cols;ropes.push(<Rope key={`v${i}`} a={new THREE.Vector3(0,x,-h/2)} b={new THREE.Vector3(0,x,h/2)} radius={.026} color={selected?'#f4a23b':'#737b82'}/>)}
     for(let j=0;j<=rows;j++){const z=-h/2+j*h/rows;ropes.push(<Rope key={`h${j}`} a={new THREE.Vector3(0,-w/2,z)} b={new THREE.Vector3(0,w/2,z)} radius={.026} color={selected?'#f4a23b':'#737b82'}/>)}
-    body=<group>
-      {ropes}
-      <mesh position={[0,-w/2,0]} raycast={()=>null}><boxGeometry args={[.035,.035,h]}/><meshStandardMaterial color="#626970"/></mesh>
-      <mesh position={[0,w/2,0]} raycast={()=>null}><boxGeometry args={[.035,.035,h]}/><meshStandardMaterial color="#626970"/></mesh>
-      <mesh position={[0,0,-h/2]} raycast={()=>null}><boxGeometry args={[.035,w,.035]}/><meshStandardMaterial color="#626970"/></mesh>
-      <mesh position={[0,0,h/2]} raycast={()=>null}><boxGeometry args={[.035,w,.035]}/><meshStandardMaterial color="#626970"/></mesh>
-    </group>
+    body=<group>{ropes}<mesh position={[0,-w/2,0]} raycast={()=>null}><boxGeometry args={[.035,.035,h]}/><meshStandardMaterial color="#626970"/></mesh><mesh position={[0,w/2,0]} raycast={()=>null}><boxGeometry args={[.035,.035,h]}/><meshStandardMaterial color="#626970"/></mesh><mesh position={[0,0,-h/2]} raycast={()=>null}><boxGeometry args={[.035,w,.035]}/><meshStandardMaterial color="#626970"/></mesh><mesh position={[0,0,h/2]} raycast={()=>null}><boxGeometry args={[.035,w,.035]}/><meshStandardMaterial color="#626970"/></mesh></group>
   }else{
     const points=item.path&&item.path.length>1?item.path.map(q=>new THREE.Vector3((q.x-container.length/2)*S,(q.y-container.width/2)*S,q.z*S)):[new THREE.Vector3(-1.5,0,.05),new THREE.Vector3(0,0,.5),new THREE.Vector3(1.5,0,.05)]
     const curve=new THREE.CatmullRomCurve3(points),geometry=new THREE.TubeGeometry(curve,20,.012,8,false)
@@ -64,8 +59,8 @@ export default function SecuringModel({item,container,selected,registerRef,local
   }
 
   const hitL=Math.max(item.length,360),hitW=Math.max(item.width,360),hitH=Math.max(item.height,220)
-  return <group ref={group=>registerRef?.(item.id,group)} position={center} rotation={[0,0,item.rotation*Math.PI/180]} onPointerDown={e=>{e.stopPropagation()}} onClick={e=>{e.stopPropagation()}} onContextMenu={e=>{e.stopPropagation();e.nativeEvent.preventDefault()}}>
-    <mesh userData={{collisionBody:false,securingBody:true}}><boxGeometry args={[hitL*S,hitW*S,hitH*S]}/><meshBasicMaterial transparent opacity={0.001} depthWrite={false}/></mesh>
+  return <group ref={group=>registerRef?.(item.id,group)} position={center} rotation={[0,0,item.rotation*Math.PI/180]} onPointerDown={e=>{e.stopPropagation();onSelect?.()}} onClick={e=>{e.stopPropagation();onSelect?.()}} onContextMenu={e=>{e.stopPropagation();e.nativeEvent.preventDefault()}}>
+    <mesh userData={{collisionBody:false,securingBody:true}} onPointerDown={e=>{e.stopPropagation();onSelect?.()}} onClick={e=>{e.stopPropagation();onSelect?.()}}><boxGeometry args={[hitL*S,hitW*S,hitH*S]}/><meshBasicMaterial transparent opacity={0.001} depthWrite={false}/></mesh>
     {body}
   </group>
 }
