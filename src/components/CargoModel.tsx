@@ -35,6 +35,18 @@ function Box({ size, position = [0, 0, 0], color, roughness = .7, eventProps }: 
   return <mesh geometry={UNIT_BOX} material={material} position={position} scale={size} {...eventProps} />
 }
 
+const MemoBox = memo(Box, (a, b) =>
+  a.color === b.color &&
+  a.roughness === b.roughness &&
+  a.size[0] === b.size[0] &&
+  a.size[1] === b.size[1] &&
+  a.size[2] === b.size[2] &&
+  (a.position?.[0] ?? 0) === (b.position?.[0] ?? 0) &&
+  (a.position?.[1] ?? 0) === (b.position?.[1] ?? 0) &&
+  (a.position?.[2] ?? 0) === (b.position?.[2] ?? 0) &&
+  a.eventProps === b.eventProps
+)
+
 type CargoModelProps = {
   p: PlacedCargo
   container: Container
@@ -67,22 +79,22 @@ function CargoModel({ p, container, selected, onPointerDown, onPointerUp, onPoin
   const pallet = p.cargoType === 'pallet'
   const palletBaseH = pallet ? Math.min(145, Math.max(90, p.height * .12)) : 0
   const bodyH = pallet ? Math.max(40, visualH - palletBaseH) : visualH
-  const eventProps = { onPointerDown, onPointerMove, onPointerUp, onClick }
+  const eventProps = useMemo(() => ({ onPointerDown, onPointerMove, onPointerUp, onClick }), [onPointerDown, onPointerMove, onPointerUp, onClick])
 
   return <group position={pos} rotation={[0, 0, local ? 0 : p.rotation * Math.PI / 180]}>
     {pallet ? <>
       <group position={[0, 0, -p.height * S / 2 + palletBaseH * S / 2]}>
-        <Box size={[visualL * S, visualW * S, palletBaseH * S * .18]} color="#b57b45" roughness={.86} eventProps={eventProps} />
-        {[-1, 0, 1].map(i => <Box key={`deck-${i}`} position={[0, i * visualW * S * .30, palletBaseH * S * .22]} size={[visualL * S, visualW * S * .16, palletBaseH * S * .25]} color="#8a5a32" roughness={.86} />)}
-        {[-.34, 0, .34].map(i => <Box key={`runner-${i}`} position={[i * visualL * S, 0, -palletBaseH * S * .16]} size={[Math.max(70, visualL * .13) * S, visualW * S * .82, palletBaseH * S * .50]} color="#76502f" roughness={.88} />)}
-        {[-.42, 0, .42].map(i => <Box key={`foot-${i}`} position={[i * visualL * S, 0, -palletBaseH * S * .46]} size={[Math.max(55, visualL * .10) * S, visualW * S * .76, palletBaseH * S * .18]} color="#69472b" roughness={.9} />)}
+        <MemoBox size={[visualL * S, visualW * S, palletBaseH * S * .18]} color="#b57b45" roughness={.86} eventProps={eventProps} />
+        {[-1, 0, 1].map(i => <MemoBox key={`deck-${i}`} position={[0, i * visualW * S * .30, palletBaseH * S * .22]} size={[visualL * S, visualW * S * .16, palletBaseH * S * .25]} color="#8a5a32" roughness={.86} />)}
+        {[-.34, 0, .34].map(i => <MemoBox key={`runner-${i}`} position={[i * visualL * S, 0, -palletBaseH * S * .16]} size={[Math.max(70, visualL * .13) * S, visualW * S * .82, palletBaseH * S * .50]} color="#76502f" roughness={.88} />)}
+        {[-.42, 0, .42].map(i => <MemoBox key={`foot-${i}`} position={[i * visualL * S, 0, -palletBaseH * S * .46]} size={[Math.max(55, visualL * .10) * S, visualW * S * .76, palletBaseH * S * .18]} color="#69472b" roughness={.9} />)}
       </group>
-      <Box size={[visualL * S, visualW * S, bodyH * S]} position={[0, 0, palletBaseH * S / 2]} color={mainColor} roughness={.68} eventProps={eventProps} />
+      <MemoBox size={[visualL * S, visualW * S, bodyH * S]} position={[0, 0, palletBaseH * S / 2]} color={mainColor} roughness={.68} eventProps={eventProps} />
     </> : crate ? <>
-      <Box size={[visualL * S, visualW * S, bodyH * S]} color="#9a6638" roughness={.82} eventProps={eventProps} />
-      {[-.42, -.14, .14, .42].map((t, i) => <Box key={`sx${i}`} position={[0, t * visualW * S, 0]} size={[visualL * S * .98, Math.max(18, visualW * .055) * S, bodyH * S * 1.02]} color="#c08a52" roughness={.84} />)}
-      {[-.44, 0, .44].map((t, i) => <Box key={`sz${i}`} position={[t * visualL * S, 0, 0]} size={[Math.max(18, visualL * .055) * S, visualW * S * 1.01, bodyH * S * 1.02]} color="#b97d46" roughness={.84} />)}
-    </> : <Box size={[visualL * S, visualW * S, bodyH * S]} color={mainColor} roughness={.62} eventProps={eventProps} />}
+      <MemoBox size={[visualL * S, visualW * S, bodyH * S]} color="#9a6638" roughness={.82} eventProps={eventProps} />
+      {[-.42, -.14, .14, .42].map((t, i) => <MemoBox key={`sx${i}`} position={[0, t * visualW * S, 0]} size={[visualL * S * .98, Math.max(18, visualW * .055) * S, bodyH * S * 1.02]} color="#c08a52" roughness={.84} />)}
+      {[-.44, 0, .44].map((t, i) => <MemoBox key={`sz${i}`} position={[t * visualL * S, 0, 0]} size={[Math.max(18, visualL * .055) * S, visualW * S * 1.01, bodyH * S * 1.02]} color="#b97d46" roughness={.84} />)}
+    </> : <MemoBox size={[visualL * S, visualW * S, bodyH * S]} color={mainColor} roughness={.62} eventProps={eventProps} />}
     {showName && <Html position={[0, 0, p.height * S / 2 + .02]} center><div className="cargo-name-label">{p.cargoId}</div></Html>}
   </group>
 }
