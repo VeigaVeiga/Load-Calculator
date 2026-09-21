@@ -31,22 +31,20 @@ export default function SecuringModel({item,container,selected,registerRef,local
   const center:[number,number,number]=local?[0,0,0]:[(item.x+item.length/2-container.length/2)*S,(item.y+item.width/2-container.width/2)*S,(item.z+item.height/2)*S]
   const material=(color:string)=><meshStandardMaterial color={selected?'#f4a23b':color} roughness={.58} metalness={.06}/>
   let body:ReactNode
+  let visualLength=item.length,visualWidth=item.width,visualHeight=item.height
 
   if(item.type==='triangleWood'){
-    const L=item.length*S,W=item.width*S,H=item.height*S
+    visualLength=150;visualWidth=150;visualHeight=150
+    const L=150*S,W=150*S,H=150*S
     const shape=new THREE.Shape()
     shape.moveTo(-L/2,-H/2)
     shape.lineTo(L/2,-H/2)
     shape.lineTo(-L/2,H/2)
     shape.closePath()
-    body=<mesh rotation={[0,0,0]}><extrudeGeometry args={[shape,{depth:W,bevelEnabled:true,bevelThickness:.003,bevelSize:.003,bevelSegments:1}]}/>{material('#3979b8')}</mesh>
+    body=<mesh><extrudeGeometry args={[shape,{depth:W,bevelEnabled:true,bevelThickness:.003,bevelSize:.003,bevelSegments:1}]}/>{material('#3979b8')}</mesh>
   }else if(item.type==='airBag'){
     const L=item.length*S,W=Math.max(100,item.width)*S,H=Math.min(220,item.height)*S
-    body=<group>
-      <mesh scale={[L*.46,W*.34,H*.30]}><sphereGeometry args={[1,16,8]}/>{material('#3fa36b')}</mesh>
-      <mesh position={[L*.27,0,0]} scale={[L*.25,W*.30,H*.27]}><sphereGeometry args={[1,14,8]}/>{material('#3fa36b')}</mesh>
-      <mesh position={[-L*.27,0,0]} scale={[L*.25,W*.30,H*.27]}><sphereGeometry args={[1,14,8]}/>{material('#3fa36b')}</mesh>
-    </group>
+    body=<group><mesh scale={[L*.46,W*.34,H*.30]}><sphereGeometry args={[1,16,8]}/>{material('#3fa36b')}</mesh><mesh position={[L*.27,0,0]} scale={[L*.25,W*.30,H*.27]}><sphereGeometry args={[1,14,8]}/>{material('#3fa36b')}</mesh><mesh position={[-L*.27,0,0]} scale={[L*.25,W*.30,H*.27]}><sphereGeometry args={[1,14,8]}/>{material('#3fa36b')}</mesh></group>
   }else if(item.type==='doorNet'){
     const w=Math.max(30,item.width)*S,h=Math.max(30,item.height)*S,cols=18,rows=14,ropes:ReactNode[]=[]
     for(let i=0;i<=cols;i++){const x=-w/2+i*w/cols;ropes.push(<Rope key={`v${i}`} a={new THREE.Vector3(0,x,-h/2)} b={new THREE.Vector3(0,x,h/2)} radius={.026} color={selected?'#f4a23b':'#737b82'}/>)}
@@ -58,7 +56,7 @@ export default function SecuringModel({item,container,selected,registerRef,local
     body=<mesh geometry={geometry}><meshStandardMaterial color={selected?'#ff7b55':'#e86d43'} roughness={.45}/></mesh>
   }
 
-  const hitL=Math.max(item.length,360),hitW=Math.max(item.width,360),hitH=Math.max(item.height,220)
+  const hitL=Math.max(visualLength,360),hitW=Math.max(visualWidth,360),hitH=Math.max(visualHeight,220)
   return <group ref={group=>registerRef?.(item.id,group)} position={center} rotation={[0,0,item.rotation*Math.PI/180]} onPointerDown={e=>{e.stopPropagation();onSelect?.()}} onClick={e=>{e.stopPropagation();onSelect?.()}} onContextMenu={e=>{e.stopPropagation();e.nativeEvent.preventDefault()}}>
     <mesh userData={{collisionBody:false,securingBody:true}} onPointerDown={e=>{e.stopPropagation();onSelect?.()}} onClick={e=>{e.stopPropagation();onSelect?.()}}><boxGeometry args={[hitL*S,hitW*S,hitH*S]}/><meshBasicMaterial transparent opacity={0.001} depthWrite={false}/></mesh>
     {body}
