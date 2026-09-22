@@ -4,8 +4,6 @@ import { packLaff } from './laff'
 type PackOptions = { signal?: AbortSignal }
 type Progress = (percent: number) => void
 
-// Production packing is delegated to the batch LAFF/free-space engine.
-// Keep the historical exports stable for the rest of the application.
 export function expandCargo(cargo: Cargo[]) {
   const out: { cargo: Cargo; index: number }[] = []
   for (const c of cargo) {
@@ -32,7 +30,6 @@ function makePlaced(c: Cargo, index: number, x: number, y: number, z: number, ro
   }
 }
 
-// Synchronous compatibility path. It avoids the old per-box O(n²) collision loop.
 function packSync(cargo: Cargo[], container: Container, locked: PlacedCargo[]) {
   const result = locked.slice()
   const groups = cargo
@@ -51,9 +48,13 @@ function packSync(cargo: Cargo[], container: Container, locked: PlacedCargo[]) {
       const cols = Math.floor(container.length / L)
       const rows = Math.floor(container.width / W)
       let layers = Math.floor(container.height / c.height)
-      if (!c.stackable) layers = Math.min(layers, 1)
-      if (c.maxStackLayers > 0) layers = Math.min(layers, Math.floor(c.maxStackLayers))
-      if (c.maxLoadOnTop > 0 && c.weight > 0) layers = Math.min(layers, Math.floor(c.maxLoadOnTop / c.weight) + 1)
+      if (!c.stackable || !c.loadBearing) layers = Math.min(layers, 1)
+      const configured = Number.isFinite(c.maxStackLayers) ? Math.floor(c.maxStackLayers) : 0
+      if (configured > 0) layers = Math.min(layers, configured)
+      const topLoad = Number.isFinite(c.maxLoadOnTop) ? c.maxLoadOnTop : 0
+      if (c.stackable && c.loadBearing && topLoad > 0 && c.weight > 0) {
+        layers = Math.min(layers, Math.floor(topLoad / c.weight) + 1)
+      }
       if (cols <= 0 || rows <= 0 || layers <= 0) continue
       const cap = cols * rows * layers
       const take = Math.min(n - placed, cap)
