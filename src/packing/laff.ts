@@ -45,13 +45,11 @@ function splitCenteredSpace(s: FreeSpace, used: { x: number; y: number; length: 
   const push = (x: number, y: number, z: number, length: number, width: number, height: number) => {
     if (length > EPS && width > EPS && height > EPS) out.push({ x, y, z, length, width, height })
   }
-  // Same-height residuals surround the centered footprint. They are disjoint.
   push(s.x, s.y, s.z, used.x - s.x, s.width, used.height)
   push(ux2, s.y, s.z, sx2 - ux2, s.width, used.height)
   push(used.x, s.y, s.z, used.length, used.y - s.y, used.height)
   push(used.x, uy2, s.z, used.length, sy2 - uy2, used.height)
-  // Only the exact footprint that has been physically occupied can support
-  // another layer. Never expose the whole parent space above a partial batch.
+  // Only the occupied footprint may create a support space above it.
   push(used.x, used.y, s.z + used.height, used.length, used.width, s.height - used.height)
   return out
 }
@@ -69,7 +67,6 @@ function scoreSpace(s: FreeSpace, o: Orientation, c: Container) {
   const remW = s.width - o.width * Math.floor((s.width + EPS) / o.width)
   const waste = remL * s.width + remW * s.length
   const heightWaste = Math.max(0, s.height - o.height * Math.floor((s.height + EPS) / o.height))
-  // Prefer spaces with a large immediate footprint and low residual waste.
   return centerPenalty + waste * 0.08 + heightWaste * 0.03
 }
 
@@ -103,10 +100,33 @@ function makePlaced(c: Cargo, index: number, o: Orientation, x: number, y: numbe
   return { id: `${c.id}-${index + 1}`, cargoId: c.id, cargoType: c.type, x, y, z, length: c.length, width: c.width, height: o.height, weight: c.weight, color: c.color, rotation: o.rotation, placementMode: 'automatic', locked: false }
 }
 
+// Once all batches are packed, center the occupied footprint as a whole.
+// This removes the common case where an unusable final row leaves a large
+// one-sided void. Translation is applied to every automatic item together,
+// so relative positions, layers, support footprints and non-overlap are kept.
+function centerPackedFootprint(items: PlacedCargo[], container: Container) {
+  if (!items.length) return items
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity
+  for (const p of items) {
+    const length = p.rotation % 180 === 90 ? p.width : p.length
+    const width = p.rotation % 180 === 90 ? p.length : p.width
+    minX = Math.min(minX, p.x)
+    maxX = Math.max(maxX, p.x + length)
+    minY = Math.min(minY, p.y)
+    maxY = Math.max(maxY, p.y + width)
+  }
+  const occupiedL = maxX - minX
+  const occupiedW = maxY - minY
+  const shiftX = (container.length - occupiedL) / 2 - minX
+  const shiftY = (container.width - occupiedW) / 2 - minY
+  if (!Number.isFinite(shiftX) || !Number.isFinite(shiftY)) return items
+  return items.map(p => ({ ...p, x: p.x + shiftX, y: p.y + shiftY }))
+}
+
 export async function packLaff(cargo: Cargo[], container: Container, progress?: Progress, options: Options = {}) {
   const groups = groupBySignature(cargo)
   const total = groups.reduce((n, g) => n + g.quantity, 0)
-  const result: PlacedCargo[] = []
+  let result: PlacedCargo[] = []
   if (!total) { progress?.(100); return result }
 
   let completed = 0
@@ -169,6 +189,8 @@ export async function packLaff(cargo: Cargo[], container: Container, progress?: 
     }
   }
 
+  // Balance the final occupied footprint without changing the real cargo dimensions.
+  result = centerPackedFootprint(result, container)
   progress?.(100)
   return result
 }
