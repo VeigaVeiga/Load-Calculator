@@ -152,14 +152,43 @@ function cgScore(p:PlacedCargo,c:Container,totalW:number,sumX:number,sumY:number
   return -cg*100000-center*80-p.z*25
 }
 
+function floorAdjacency(p:PlacedCargo,items:PlacedCargo[]){
+  const d=dims(p)
+  let score=0
+  for(const q of items){
+    if(q.z>EPS)continue
+    const qd=dims(q)
+    const overlapY=Math.max(0,Math.min(p.y+d.width,q.y+qd.width)-Math.max(p.y,q.y))
+    const overlapX=Math.max(0,Math.min(p.x+d.length,q.x+qd.length)-Math.max(p.x,q.x))
+    if(Math.abs(p.x+d.length-q.x)<=EPS||Math.abs(q.x+qd.length-p.x)<=EPS)score+=overlapY
+    if(Math.abs(p.y+d.width-q.y)<=EPS||Math.abs(q.y+qd.width-p.y)<=EPS)score+=overlapX
+  }
+  return score
+}
+
 function choose(u:Unit,items:PlacedCargo[],c:Container,defs:Map<string,Cargo>,weight:number,sumX:number,sumY:number,floorIndex:FloorIndex,itemsById:Map<string,PlacedCargo>){
   let best:PlacedCargo|undefined,bestScore=-Infinity
   for(const o of orientations(u.cargo)){
-    for(const q of floorCandidates(c,o)){
+    const base=floorCandidates(c,o)
+    const candidates=base.slice()
+    const edgeXs=new Set<number>([0,Math.max(0,c.length-o.length)])
+    const edgeYs=new Set<number>([0,Math.max(0,c.width-o.width)])
+    for(const q of items){
+      if(q.z>EPS)continue
+      const qd=dims(q)
+      edgeXs.add(Math.max(0,Math.min(c.length-o.length,q.x)))
+      edgeXs.add(Math.max(0,Math.min(c.length-o.length,q.x+qd.length-o.length)))
+      edgeYs.add(Math.max(0,Math.min(c.width-o.width,q.y)))
+      edgeYs.add(Math.max(0,Math.min(c.width-o.width,q.y+qd.width-o.width)))
+    }
+    for(const x of edgeXs)for(const y of edgeYs)candidates.push({x,y,d:Math.hypot(x+o.length/2-c.length/2,y+o.width/2-c.width/2)})
+    candidates.sort((a,b)=>a.d-b.d)
+    for(const q of candidates.slice(0,MAX_FLOOR_CANDIDATES)){
       if(!floorFree(floorIndex,q.x,q.y,o,itemsById))continue
       const p=makePlaced(u,o,q.x,q.y,0)
       if(weight+p.weight>c.maxPayload+EPS)continue
-      const score=cgScore(p,c,weight,sumX,sumY)-q.d*.05
+      const compact=floorAdjacency(p,items)
+      const score=cgScore(p,c,weight,sumX,sumY)+compact*45-q.d*.05
       if(score>bestScore){bestScore=score;best=p}
     }
     if(!best){
