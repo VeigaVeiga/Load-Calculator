@@ -40,8 +40,11 @@ export default function InstancedCartons({ items, container, onSelect }: Props) 
 
     items.forEach((p, i) => {
       const d = dims(p)
-      const l = Math.max(40, d.length - GAP_XY * 2) * S
-      const w = Math.max(40, d.width - GAP_XY * 2) * S
+      // dims(p) is already rotation-aware for placement bounds. The rendered
+      // box must keep its original local length/width and let the quaternion
+      // apply the visual rotation exactly once.
+      const l = Math.max(40, p.length - GAP_XY * 2) * S
+      const w = Math.max(40, p.width - GAP_XY * 2) * S
       const zg = p.z > 0 ? Math.min(GAP_Z, Math.max(0, p.height - 20)) : 0
       const h = Math.max(40, p.height - zg) * S
       const x = (p.x + d.length / 2 - container.length / 2) * S
