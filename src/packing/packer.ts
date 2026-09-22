@@ -59,7 +59,6 @@ function canStack(p:PlacedCargo,c:Cargo,items:PlacedCargo[],defs:Map<string,Carg
   if(!c.stackable)return false
   const s=supports(p,items)
   if(!s.length||supportRatio(p,items)<SUPPORT)return false
-  // Treat a checked stackable flag as at least two layers when the UI value is 0/1.
   const configured=Math.floor(c.maxStackLayers||0)
   const maxLayers=configured>1?configured:2
   if(stackLevel(p,items)>maxLayers)return false
@@ -88,7 +87,6 @@ function floorPositions(c:Container,o:Ori){
   for(let y=0;y<=maxY+EPS;y+=STEP)ys.push(Math.min(y,maxY))
   if(xs[xs.length-1]!==maxX)xs.push(maxX)
   if(ys[ys.length-1]!==maxY)ys.push(maxY)
-  // Raster order is deliberate: fill rows/columns instead of making a pyramid.
   const cx=maxX/2,cy=maxY/2
   xs.sort((a,b)=>Math.abs(a-cx)-Math.abs(b-cx)||a-b)
   ys.sort((a,b)=>Math.abs(a-cy)-Math.abs(b-cy)||a-b)
@@ -97,10 +95,9 @@ function floorPositions(c:Container,o:Ori){
   return out
 }
 
-function stackPositions(items:PlacedCargo[],c:Container,o:Ori,u:Unit){
+function stackPositions(items:PlacedCargo[],c:Container,o:Ori){
   const out:{x:number;y:number;z:number;distance:number}[]=[]
   const seen=new Set<string>()
-  // Lowest existing support surface first. This creates complete lower layers before upper layers.
   const sources=items.slice().sort((a,b)=>a.z-b.z||a.y-b.y||a.x-b.x)
   for(const q of sources){
     const qd=dims(q),z=q.z+q.height
@@ -119,17 +116,15 @@ function stackPositions(items:PlacedCargo[],c:Container,o:Ori,u:Unit){
 }
 
 function choose(u:Unit,items:PlacedCargo[],c:Container,defs:Map<string,Cargo>){
-  // Phase 1: completely exhaust usable floor space. No stacking is considered while a floor slot exists.
   for(const o of orientations(u.cargo)){
     for(const pos of floorPositions(c,o)){
       const p=makePlaced(u,o,pos.x,pos.y,0)
       if(inBounds(p,c)&&!overlapsAny(p,items))return p
     }
   }
-  // Phase 2: stack only after the floor is exhausted, and always choose the lowest support level first.
   if(!u.cargo.stackable)return undefined
   for(const o of orientations(u.cargo)){
-    for(const pos of stackPositions(items,c,o,u)){
+    for(const pos of stackPositions(items,c,o)){
       const p=makePlaced(u,o,pos.x,pos.y,pos.z)
       if(!inBounds(p,c)||overlapsAny(p,items)||!canStack(p,u.cargo,items,defs))continue
       return p
@@ -145,6 +140,45 @@ function buildState(cargo:Cargo[],c:Container,locked:PlacedCargo[]){
   return {defs,items,us}
 }
 
+function sameCargo(a:Cargo,b:Cargo){
+  return a.id===b.id&&a.length===b.length&&a.width===b.width&&a.height===b.height&&a.weight===b.weight&&a.stackable===b.stackable&&a.loadBearing===b.loadBearing&&a.rotatable===b.rotatable&&a.maxStackLayers===b.maxStackLayers&&a.maxLoadOnTop===b.maxLoadOnTop
+}
+
+/**
+ * Fast path for the very common case of hundreds of identical cartons/pallets.
+ * It computes complete rectangular layers directly instead of testing thousands
+ * of 10 mm candidate positions against every previously placed item.
+ */
+function fastUniformPack(state:ReturnType<typeof buildState>,c:Container,step?:(i:number,n:number)=>void){
+  if(state.items.length!==0||state.us.length<40)return false
+  const base=state.us[0].cargo
+  if(!state.us.every(u=>sameCargo(u.cargo,base)))return false
+  const choices=orientations(base).map(o=>{
+    const cols=Math.floor(c.length/o.length),rows=Math.floor(c.width/o.width)
+    return {o,cols,rows,perLayer:cols*rows,score:cols*rows}
+  }).sort((a,b)=>b.score-a.score)
+  const best=choices[0]
+  if(!best||best.perLayer<=0)return true
+  const configured=Math.floor(base.maxStackLayers||0)
+  let maxLayers=configured>1?configured:Math.floor(c.height/base.height)
+  if(!base.stackable)maxLayers=1
+  maxLayers=Math.max(1,Math.min(maxLayers,Math.floor(c.height/base.height)))
+  if(Number.isFinite(base.maxLoadOnTop)&&base.maxLoadOnTop>0&&base.weight>0){
+    maxLayers=Math.min(maxLayers,Math.floor(base.maxLoadOnTop/base.weight)+1)
+  }
+  const capacity=Math.min(state.us.length,best.perLayer*maxLayers)
+  const xOffset=Math.max(0,(c.length-best.cols*best.o.length)/2)
+  const yOffset=Math.max(0,(c.width-best.rows*best.o.width)/2)
+  for(let i=0;i<capacity;i++){
+    const layer=Math.floor(i/best.perLayer),slot=i%best.perLayer
+    const row=Math.floor(slot/best.cols),col=slot%best.cols
+    const u=state.us[i]
+    state.items.push(makePlaced(u,best.o,xOffset+col*best.o.length,yOffset+row*best.o.width,layer*best.o.height))
+    step?.(i+1,capacity)
+  }
+  return true
+}
+
 function placeOne(state:ReturnType<typeof buildState>,u:Unit,c:Container){
   const p=choose(u,state.items,c,state.defs)
   if(p)state.items.push(p)
@@ -152,6 +186,7 @@ function placeOne(state:ReturnType<typeof buildState>,u:Unit,c:Container){
 
 function pack(cargo:Cargo[],c:Container,locked:PlacedCargo[],step?:(i:number,n:number)=>void){
   const state=buildState(cargo,c,locked)
+  if(fastUniformPack(state,c,step))return state.items
   for(let i=0;i<state.us.length;i++){placeOne(state,state.us[i],c);step?.(i+1,state.us.length)}
   return state.items
 }
@@ -160,10 +195,17 @@ export function autoPack(cargo:Cargo[],c:Container,locked:PlacedCargo[]=[]){retu
 
 export async function autoPackAsync(cargo:Cargo[],c:Container,locked:PlacedCargo[]=[],progress?:(percent:number)=>void){
   const state=buildState(cargo,c,locked),n=state.us.length
+  if(n===0){progress?.(100);return state.items}
+  let last=-1
+  const report=(i:number,total:number)=>{const p=Math.min(100,Math.round(i/Math.max(1,total)*100));if(p!==last){last=p;progress?.(p)}}
+  if(fastUniformPack(state,c,report)){
+    progress?.(100)
+    return state.items
+  }
   for(let i=0;i<n;i++){
     placeOne(state,state.us[i],c)
-    progress?.(n?(i+1)/n*100:100)
-    if((i&7)===7)await new Promise<void>(resolve=>requestAnimationFrame(()=>resolve()))
+    report(i+1,n)
+    if((i&3)===3)await new Promise<void>(resolve=>requestAnimationFrame(()=>resolve()))
   }
   progress?.(100)
   return state.items
