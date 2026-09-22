@@ -8,18 +8,10 @@ const S = .001
 const GAP_XY = 8
 const GAP_Z = 1
 
-// RoundedBoxGeometry has no vertex-color attribute by default. When an
-// InstancedMesh uses vertexColors without that attribute, some Three.js
-// versions render the instances black. Add an explicit white base color so
-// instanceColor is multiplied by white instead of an undefined color.
+// Keep the material unlit and use InstancedMesh.instanceColor directly.
+// Combining vertexColors with instanceColor made some Three.js builds render
+// the batched cartons black when RoundedBoxGeometry had no compatible color attribute.
 const CARTON_GEOMETRY = new RoundedBoxGeometry(1, 1, 1, 2, .035)
-const whiteVertexColors = new Float32Array(CARTON_GEOMETRY.attributes.position.count * 3)
-for (let i = 0; i < whiteVertexColors.length; i += 3) {
-  whiteVertexColors[i] = 1
-  whiteVertexColors[i + 1] = 1
-  whiteVertexColors[i + 2] = 1
-}
-CARTON_GEOMETRY.setAttribute('color', new THREE.Float32BufferAttribute(whiteVertexColors, 3))
 
 type Props = {
   items: PlacedCargo[]
@@ -31,8 +23,8 @@ type Props = {
 export default function InstancedCartons({ items, container, onSelect }: Props) {
   const meshRef = useRef<THREE.InstancedMesh>(null)
   const material = useMemo(() => new THREE.MeshBasicMaterial({
-    color: '#ffffff',
-    vertexColors: true,
+    color: 0xffffff,
+    vertexColors: false,
     toneMapped: false,
   }), [])
   const matrix = useMemo(() => new THREE.Matrix4(), [])
@@ -64,6 +56,7 @@ export default function InstancedCartons({ items, container, onSelect }: Props) 
       mesh.setColorAt(i, instanceColor)
     })
 
+    mesh.count = items.length
     mesh.instanceMatrix.needsUpdate = true
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true
     mesh.computeBoundingSphere()
