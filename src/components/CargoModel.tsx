@@ -6,10 +6,9 @@ import * as THREE from 'three'
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js'
 
 const S = .001
-const VISUAL_GAP_XY = 8
-const VISUAL_GAP_Z = 1
 
-// Low-segment, shallow bevel: only enough to separate adjacent cargo visually.
+// Visual separation comes from the shallow bevel + outline only.
+// The rendered body now keeps the exact same dimensions used by packing/collision logic.
 export const UNIT_BOX = new RoundedBoxGeometry(1, 1, 1, 1, .006)
 const UNIT_EDGES = new THREE.EdgesGeometry(UNIT_BOX, 24)
 const MATERIAL_CACHE = new Map<string, THREE.MeshStandardMaterial>()
@@ -77,11 +76,15 @@ type CargoModelProps = {
 
 function CargoModel({ p, container, selected, onPointerDown, onPointerUp, onPointerMove, onClick, showName = false, local = false, hovered = false }: CargoModelProps) {
   const d = dims(p)
-  const visualL = Math.max(40, d.length - VISUAL_GAP_XY * 2)
-  const visualW = Math.max(40, d.width - VISUAL_GAP_XY * 2)
-  const visualZGap = local && p.z > 0 ? Math.min(VISUAL_GAP_Z, Math.max(0, p.height - 20)) : 0
-  const visualH = Math.max(40, p.height - visualZGap)
-  const pos: [number, number, number] = local ? [0, 0, visualZGap * S / 2] : [(p.x + d.length / 2 - container.length / 2) * S, (p.y + d.width / 2 - container.width / 2) * S, (p.z + visualH / 2) * S]
+  // IMPORTANT: do not shrink the visible model. Packing/collision dimensions and
+  // rendered dimensions must be identical. The bevel and outline provide the
+  // visual separation between adjacent pieces.
+  const visualL = d.length
+  const visualW = d.width
+  const visualH = p.height
+  const pos: [number, number, number] = local
+    ? [0, 0, 0]
+    : [(p.x + d.length / 2 - container.length / 2) * S, (p.y + d.width / 2 - container.width / 2) * S, (p.z + visualH / 2) * S]
   const mainColor = selected ? '#f2c94c' : hovered ? '#ffd166' : (p.color || '#c7ced3')
   const crate = p.cargoType === 'woodCrate'
   const pallet = p.cargoType === 'pallet'
