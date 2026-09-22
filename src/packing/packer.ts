@@ -1,5 +1,5 @@
 import type { Cargo, Container, PlacedCargo } from '../types'
-import { packLaff } from './laff'
+import { autoPackExtreme } from './extremePack'
 
 type PackOptions = { signal?: AbortSignal }
 type Progress = (percent: number) => void
@@ -78,19 +78,6 @@ export function autoPack(cargo: Cargo[], container: Container, locked: PlacedCar
   return packSync(cargo, container, locked)
 }
 
-// LAFF internally stores the already-rotated footprint in length/width while
-// also returning a rotation flag. The rest of the application treats
-// length/width as the unrotated cargo dimensions and applies rotation exactly
-// once. Normalize the LAFF result at the boundary so collision checks,
-// rendering, manual editing and export all use the same physical box.
-function normalizeLaffResult(items: PlacedCargo[]) {
-  return items.map((p) => {
-    const quarterTurns = Math.abs(Math.round(p.rotation / 90)) % 2
-    if (quarterTurns === 0) return p
-    return { ...p, length: p.width, width: p.length }
-  })
-}
-
 export async function autoPackAsync(
   cargo: Cargo[],
   container: Container,
@@ -98,7 +85,8 @@ export async function autoPackAsync(
   progress?: Progress,
   options: PackOptions = {},
 ) {
-  const packed = normalizeLaffResult(await packLaff(cargo, container, progress, options))
-  if (!locked.length) return packed
-  return [...locked, ...packed]
+  // Use the extreme-point solver for the automatic planner. It is deterministic,
+  // fast enough for hundreds of cartons, and unlike the previous LAFF/free-space
+  // splitter it keeps every placement tied to an explicit physical support point.
+  return autoPackExtreme(cargo, container, locked, progress, options)
 }
