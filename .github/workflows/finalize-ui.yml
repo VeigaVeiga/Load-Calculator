@@ -1,0 +1,58 @@
+name: finalize-ui
+on:
+  push:
+    branches: [main]
+permissions:
+  contents: write
+jobs:
+  patch:
+    if: ${{ !startsWith(github.event.head_commit.message, 'Finalize UI fixes') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Patch application behavior and export
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          p=Path('src/App.tsx')
+          s=p.read_text()
+          s=s.replace("const [showDimensions, setShowDimensions] = useState(true)", "const [showDimensions, setShowDimensions] = useState(false)")
+          old="""  const cargoSignature = useMemo(() => cargo.map(c => `${c.id}:${c.quantity}:${c.length}:${c.width}:${c.height}:${c.weight}:${c.type}:${c.stackable}:${c.loadBearing}:${c.rotatable}:${c.maxStackLayers}:${c.maxLoadOnTop}`).join('|'), [cargo])\n  useEffect(() => {\n    if (!cargoSignatureRef.current) { cargoSignatureRef.current = cargoSignature; return }\n    if (cargoSignatureRef.current === cargoSignature) return\n    cargoSignatureRef.current = cargoSignature\n    const timer = window.setTimeout(() => { void runPacking(container) }, 550)\n    return () => window.clearTimeout(timer)\n  }, [cargoSignature])\n\n"""
+          if old not in s: raise SystemExit('automatic packing block not found')
+          s=s.replace(old, "")
+          s=s.replace("  const cargoSignatureRef = useRef('')\n", "")
+          s=s.replace("  const cargoSignature = useMemo(() => cargo.map(c => `${c.id}:${c.quantity}:${c.length}:${c.width}:${c.height}:${c.weight}:${c.type}:${c.stackable}:${c.loadBearing}:${c.rotatable}:${c.maxStackLayers}:${c.maxLoadOnTop}`).join('|'), [cargo])\n", "")
+          s=s.replace("      maxStackLayers: 4,\n      maxLoadOnTop: 100,", "      maxStackLayers: 0,\n      maxLoadOnTop: 0,")
+          old_export=re.compile(r"  const exportThree=async\(\)=>\{.*?\n  \}\n\n  const setCellText", re.S)
+          new_export="""  const exportThree=async()=>{\n    // Export uses one common physical scale and letterboxed viewports; no view is stretched.\n    const W=1800,H=1100,margin=60,titleH=44,gap=36\n    const topSvg=makeTopViewSvg(W-2*margin,Math.round((W-2*margin)*container.width/container.length*0.72))\n    const sideSvg=makeSideFrontSvg(W-2*margin,Math.round((W-2*margin)*container.height/container.length*0.72))\n    const topH=Math.round((W-2*margin)*container.width/container.length*0.72)\n    const sideH=Math.round((W-2*margin)*container.height/container.length*0.72)\n    const top=await svgToPng(topSvg,W-2*margin,topH),sf=await svgToPng(sideSvg,W-2*margin,sideH)\n    const canvas=document.createElement('canvas');canvas.width=W;canvas.height=H;const ctx=canvas.getContext('2d');if(!ctx)throw new Error('Canvas unavailable');ctx.fillStyle='#fff';ctx.fillRect(0,0,W,H)\n    const drawFit=async(bytes:Uint8Array,x:number,y:number,maxW:number,maxH:number)=>{const bmp=await createImageBitmap(new Blob([bytes],{type:'image/png'}));const r=Math.min(maxW/bmp.width,maxH/bmp.height);const w=bmp.width*r,h=bmp.height*r;ctx.drawImage(bmp,x+(maxW-w)/2,y+(maxH-h)/2,w,h);bmp.close()}\n    await drawFit(top,margin,margin+titleH,(W-2*margin),H/2-margin-titleH-gap/2)\n    await drawFit(sf,margin,H/2+gap/2,(W-2*margin),H/2-margin-gap/2)\n    const blob=await new Promise<Blob|null>(r=>canvas.toBlob(r,'image/png'));if(!blob)throw new Error('PNG export failed');const u=URL.createObjectURL(blob);const a=document.createElement('a');a.href=u;a.download=`${container.name}-three-views.png`;a.click();setTimeout(()=>URL.revokeObjectURL(u),1000)\n  }\n\n  const setCellText"""
+          s,n=old_export.subn(new_export,s,count=1)
+          if n!=1: raise SystemExit('export function not found')
+          p.write_text(s)
+          PY
+      - name: Add stable UI sizing rules
+        run: |
+          cat >> src/App.css <<'EOF'
+
+/* Final UI consistency: one baseline for adjacent controls. */
+.view-toolbar button,.view-toolbar select,.scene-toolbox button,.scene-toolbox b{font-size:13px;line-height:1.2;min-height:32px}
+.view-toolbar button,.scene-toolbox button{font-family:inherit;font-weight:600}
+.scene-toolbox{z-index:30}
+EOF
+      - name: Build before commit
+        run: npm run build
+      - name: Commit finalized changes and remove temporary workflow
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          rm -f .github/workflows/finalize-ui.yml
+          git add src/App.tsx src/App.css .github/workflows/finalize-ui.yml
+          git commit -m "Finalize UI fixes and manual packing behavior" || exit 0
+          git push
