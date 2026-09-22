@@ -9,10 +9,10 @@ const VISUAL_GAP_XY = 8
 const VISUAL_GAP_Z = 8
 
 // Shared geometry/materials keep large carton loads lightweight.
-const UNIT_BOX = new THREE.BoxGeometry(1, 1, 1)
+export const UNIT_BOX = new THREE.BoxGeometry(1, 1, 1)
 const MATERIAL_CACHE = new Map<string, THREE.MeshStandardMaterial>()
 
-const materialFor = (color: string, roughness: number) => {
+export const materialFor = (color: string, roughness: number) => {
   const key = `${color}|${roughness}`
   let material = MATERIAL_CACHE.get(key)
   if (!material) {
@@ -36,11 +36,8 @@ function Box({ size, position = [0, 0, 0], color, roughness = .7, eventProps }: 
 }
 
 const MemoBox = memo(Box, (a, b) =>
-  a.color === b.color &&
-  a.roughness === b.roughness &&
-  a.size[0] === b.size[0] &&
-  a.size[1] === b.size[1] &&
-  a.size[2] === b.size[2] &&
+  a.color === b.color && a.roughness === b.roughness &&
+  a.size[0] === b.size[0] && a.size[1] === b.size[1] && a.size[2] === b.size[2] &&
   (a.position?.[0] ?? 0) === (b.position?.[0] ?? 0) &&
   (a.position?.[1] ?? 0) === (b.position?.[1] ?? 0) &&
   (a.position?.[2] ?? 0) === (b.position?.[2] ?? 0) &&
@@ -66,14 +63,7 @@ function CargoModel({ p, container, selected, onPointerDown, onPointerUp, onPoin
   const visualW = Math.max(40, d.width - VISUAL_GAP_XY * 2)
   const visualZGap = local && p.z > 0 ? Math.min(VISUAL_GAP_Z, Math.max(0, p.height - 20)) : 0
   const visualH = Math.max(40, p.height - visualZGap)
-  const pos: [number, number, number] = local
-    ? [0, 0, visualZGap * S / 2]
-    : [
-        (p.x + d.length / 2 - container.length / 2) * S,
-        (p.y + d.width / 2 - container.width / 2) * S,
-        (p.z + (p.height - visualZGap) / 2 + visualZGap) * S,
-      ]
-
+  const pos: [number, number, number] = local ? [0, 0, visualZGap * S / 2] : [(p.x + d.length / 2 - container.length / 2) * S, (p.y + d.width / 2 - container.width / 2) * S, (p.z + (p.height - visualZGap) / 2 + visualZGap) * S]
   const mainColor = selected ? '#f2c94c' : hovered ? '#ffd166' : p.color
   const crate = p.cargoType === 'woodCrate'
   const pallet = p.cargoType === 'pallet'
@@ -99,23 +89,9 @@ function CargoModel({ p, container, selected, onPointerDown, onPointerUp, onPoin
   </group>
 }
 
-// ContainerScene creates lightweight wrapper props during pointer handling. A custom
-// comparator prevents those wrapper-object changes from forcing hundreds of identical
-// cargo meshes to re-render when the camera or selection UI changes.
 const cargoEqual = (a: CargoModelProps, b: CargoModelProps) => {
-  const ap = a.p
-  const bp = b.p
-  return ap.id === bp.id &&
-    ap.cargoId === bp.cargoId &&
-    ap.cargoType === bp.cargoType &&
-    ap.x === bp.x && ap.y === bp.y && ap.z === bp.z &&
-    ap.length === bp.length && ap.width === bp.width && ap.height === bp.height &&
-    ap.rotation === bp.rotation && ap.color === bp.color &&
-    a.selected === b.selected && a.showName === b.showName &&
-    a.local === b.local && a.hovered === b.hovered &&
-    a.container.length === b.container.length &&
-    a.container.width === b.container.width &&
-    a.container.height === b.container.height
+  const ap = a.p; const bp = b.p
+  return ap.id === bp.id && ap.cargoId === bp.cargoId && ap.cargoType === bp.cargoType && ap.x === bp.x && ap.y === bp.y && ap.z === bp.z && ap.length === bp.length && ap.width === bp.width && ap.height === bp.height && ap.rotation === bp.rotation && ap.color === bp.color && a.selected === b.selected && a.showName === b.showName && a.local === b.local && a.hovered === b.hovered && a.container.length === b.container.length && a.container.width === b.container.width && a.container.height === b.container.height
 }
 
 export default memo(CargoModel, cargoEqual)
