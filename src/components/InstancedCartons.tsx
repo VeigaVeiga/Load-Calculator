@@ -5,12 +5,11 @@ import type { Container, PlacedCargo } from '../types'
 import { dims } from '../packing/geometry'
 
 const S = .001
+// Keep real collision dimensions untouched; these values only shrink the
+// rendered mesh so adjacent cartons remain visually distinguishable.
 const GAP_XY = 8
-const GAP_Z = 1
+const GAP_Z = 3
 const CARTON_GEOMETRY = new RoundedBoxGeometry(1, 1, 1, 2, .035)
-// RoundedBoxGeometry has no vertex color attribute by default. Supplying a
-// white base color lets InstancedMesh.instanceColor work without multiplying
-// against an undefined attribute (the cause of the previous black cartons).
 const baseColors = new Float32Array(CARTON_GEOMETRY.getAttribute('position').count * 3)
 baseColors.fill(1)
 CARTON_GEOMETRY.setAttribute('color', new THREE.Float32BufferAttribute(baseColors, 3))
@@ -22,11 +21,20 @@ type Props = {
   onSelect: (id: string) => void
 }
 
+function safeCartonColor(value?: string) {
+  if (!value) return '#c7c7c7'
+  const color = new THREE.Color(value)
+  // Prevent a bad/legacy black cargo color from turning every carton into a
+  // black silhouette. Very dark colors are still rendered as cardboard grey.
+  if (color.r + color.g + color.b < 0.18) return '#c7c7c7'
+  return value
+}
+
 export default function InstancedCartons({ items, container, onSelect }: Props) {
   const meshRef = useRef<THREE.InstancedMesh>(null)
   const lineRef = useRef<THREE.LineSegments>(null)
   const material = useMemo(() => new THREE.MeshBasicMaterial({ color: 0xffffff, vertexColors: true, toneMapped: false }), [])
-  const lineMaterial = useMemo(() => new THREE.LineBasicMaterial({ color: 0x58636b, transparent: true, opacity: 0.82, depthTest: true }), [])
+  const lineMaterial = useMemo(() => new THREE.LineBasicMaterial({ color: 0x59636b, transparent: true, opacity: 0.92, depthTest: true }), [])
   const lineGeometry = useMemo(() => new THREE.BufferGeometry(), [])
   const matrix = useMemo(() => new THREE.Matrix4(), [])
   const quaternion = useMemo(() => new THREE.Quaternion(), [])
@@ -58,7 +66,7 @@ export default function InstancedCartons({ items, container, onSelect }: Props) 
       scale.set(visualL * S, visualW * S, visualH * S)
       matrix.compose(position, quaternion, scale)
       mesh.setMatrixAt(i, matrix)
-      instanceColor.set(p.color || '#c7c7c7')
+      instanceColor.set(safeCartonColor(p.color))
       mesh.setColorAt(i, instanceColor)
 
       for (let v = 0; v < verticesPerBox; v++) {
