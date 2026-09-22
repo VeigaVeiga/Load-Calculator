@@ -23,8 +23,13 @@ function orientations(c: Cargo): Orientation[] {
   return [a, { length: c.width, width: c.length, height: c.height, rotation: 90 }]
 }
 
-function maxLayers(c: Cargo, o: Orientation, containerHeight: number) {
-  let n = Math.floor((containerHeight + EPS) / o.height)
+// IMPORTANT: stacking capacity is governed by the container's INTERNAL HEIGHT.
+// doorHeight is only the door opening reference and must never cap the usable
+// stacking height inside the container. Oversize cargo that exceeds the door
+// opening may require a real-world loading maneuver check, but that is a
+// separate planning warning and not an internal stacking constraint.
+function maxLayers(c: Cargo, o: Orientation, innerHeight: number) {
+  let n = Math.floor((innerHeight + EPS) / o.height)
   if (!c.stackable || !c.loadBearing) n = Math.min(n, 1)
   const configured = Math.floor(c.maxStackLayers || 0)
   if (configured > 0) n = Math.min(n, configured)
@@ -101,9 +106,6 @@ function makePlaced(c: Cargo, index: number, o: Orientation, x: number, y: numbe
 }
 
 // Once all batches are packed, center the occupied footprint as a whole.
-// This removes the common case where an unusable final row leaves a large
-// one-sided void. Translation is applied to every automatic item together,
-// so relative positions, layers, support footprints and non-overlap are kept.
 function centerPackedFootprint(items: PlacedCargo[], container: Container) {
   if (!items.length) return items
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity
@@ -129,8 +131,11 @@ export async function packLaff(cargo: Cargo[], container: Container, progress?: 
   let result: PlacedCargo[] = []
   if (!total) { progress?.(100); return result }
 
+  // The packing volume uses the internal container dimensions only. In
+  // particular, do NOT substitute container.doorHeight for this height.
+  const usableInnerHeight = container.height
   let completed = 0
-  let spaces: FreeSpace[] = [{ x: 0, y: 0, z: 0, length: container.length, width: container.width, height: container.height }]
+  let spaces: FreeSpace[] = [{ x: 0, y: 0, z: 0, length: container.length, width: container.width, height: usableInnerHeight }]
   let sequence = 0
 
   for (const group of groups) {
@@ -145,7 +150,8 @@ export async function packLaff(cargo: Cargo[], container: Container, progress?: 
       const { space, orientation } = choice
       const cols = Math.floor((space.length + EPS) / orientation.length)
       const rows = Math.floor((space.width + EPS) / orientation.width)
-      const layers = maxLayers(c, orientation, space.height)
+      const layers = maxLayers(c, orientation, usableInnerHeight >= space.z ? usableInnerHeight - space.z : 0)
+      if (layers <= 0) break
       const capacity = cols * rows * layers
       if (capacity <= 0) break
 
@@ -189,7 +195,6 @@ export async function packLaff(cargo: Cargo[], container: Container, progress?: 
     }
   }
 
-  // Balance the final occupied footprint without changing the real cargo dimensions.
   result = centerPackedFootprint(result, container)
   progress?.(100)
   return result
