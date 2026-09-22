@@ -7,7 +7,6 @@ import { dims } from '../packing/geometry'
 const S = .001
 const GAP_XY = 8
 const GAP_Z = 1
-
 const CARTON_GEOMETRY = new RoundedBoxGeometry(1, 1, 1, 2, .035)
 
 type Props = {
@@ -19,10 +18,10 @@ type Props = {
 /** GPU-batched renderer for ordinary cartons. */
 export default function InstancedCartons({ items, container, onSelect }: Props) {
   const meshRef = useRef<THREE.InstancedMesh>(null)
-  const material = useMemo(() => new THREE.MeshStandardMaterial({
+  // MeshBasicMaterial is intentionally used here: instance colors must remain
+  // visible even when the scene lighting changes or a view has weak lighting.
+  const material = useMemo(() => new THREE.MeshBasicMaterial({
     color: '#ffffff',
-    roughness: .62,
-    metalness: 0,
     vertexColors: true,
   }), [])
   const matrix = useMemo(() => new THREE.Matrix4(), [])
@@ -50,7 +49,6 @@ export default function InstancedCartons({ items, container, onSelect }: Props) 
       scale.set(l, w, visualH * S)
       matrix.compose(position, quaternion, scale)
       mesh.setMatrixAt(i, matrix)
-
       instanceColor.set(p.color || '#c7c7c7')
       mesh.setColorAt(i, instanceColor)
     })
