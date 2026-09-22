@@ -298,9 +298,8 @@ function App() {
   const [message, setMessage] = useState('')
 
   const [securingMode, setSecuringMode] = useState(false)
-  const [showDimensions, setShowDimensions] = useState(true)
+  const [showDimensions, setShowDimensions] = useState(false)
   const [airBagStretch] = useState(false)
-  const cargoSignatureRef = useRef('')
   const [packingProgress, setPackingProgress] = useState<number | null>(null)
 
 
@@ -315,15 +314,6 @@ function App() {
 
     return () => window.clearTimeout(timer)
   }, [message])
-
-  const cargoSignature = useMemo(() => cargo.map(c => `${c.id}:${c.quantity}:${c.length}:${c.width}:${c.height}:${c.weight}:${c.type}:${c.stackable}:${c.loadBearing}:${c.rotatable}:${c.maxStackLayers}:${c.maxLoadOnTop}`).join('|'), [cargo])
-  useEffect(() => {
-    if (!cargoSignatureRef.current) { cargoSignatureRef.current = cargoSignature; return }
-    if (cargoSignatureRef.current === cargoSignature) return
-    cargoSignatureRef.current = cargoSignature
-    const timer = window.setTimeout(() => { void runPacking(container) }, 550)
-    return () => window.clearTimeout(timer)
-  }, [cargoSignature])
 
   const totals = useMemo(
     () => ({
@@ -511,8 +501,8 @@ function App() {
       stackable: true,
       loadBearing: true,
       rotatable: true,
-      maxStackLayers: 4,
-      maxLoadOnTop: 100,
+      maxStackLayers: 0,
+      maxLoadOnTop: 0,
       breakablePallet: false,
     }
 
