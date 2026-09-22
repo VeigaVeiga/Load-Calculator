@@ -6,7 +6,8 @@ import * as THREE from 'three'
 
 const S = .001
 const VISUAL_GAP_XY = 8
-const VISUAL_GAP_Z = 8
+// Keep the visual separation subtle. The actual cargo/support geometry remains unchanged.
+const VISUAL_GAP_Z = 2
 
 // Shared geometry/materials keep large carton loads lightweight.
 export const UNIT_BOX = new THREE.BoxGeometry(1, 1, 1)
