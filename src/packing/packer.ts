@@ -1,5 +1,5 @@
 import type { Cargo, Container, PlacedCargo } from '../types'
-import { autoPackExtreme } from './extremePack'
+import { packLaff } from './laff'
 
 type PackOptions = { signal?: AbortSignal }
 type Progress = (percent: number) => void
@@ -85,8 +85,7 @@ export async function autoPackAsync(
   progress?: Progress,
   options: PackOptions = {},
 ) {
-  // Use the extreme-point solver for the automatic planner. It is deterministic,
-  // fast enough for hundreds of cartons, and unlike the previous LAFF/free-space
-  // splitter it keeps every placement tied to an explicit physical support point.
-  return autoPackExtreme(cargo, container, locked, progress, options)
+  const packed = await packLaff(cargo, container, progress, options)
+  if (!locked.length) return packed
+  return [...locked, ...packed]
 }
