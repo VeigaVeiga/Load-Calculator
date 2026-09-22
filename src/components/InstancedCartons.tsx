@@ -8,6 +8,12 @@ const S = .001
 const GAP_XY = 8
 const GAP_Z = 1
 const CARTON_GEOMETRY = new RoundedBoxGeometry(1, 1, 1, 2, .035)
+// RoundedBoxGeometry has no vertex color attribute by default. Supplying a
+// white base color lets InstancedMesh.instanceColor work without multiplying
+// against an undefined attribute (the cause of the previous black cartons).
+const baseColors = new Float32Array(CARTON_GEOMETRY.getAttribute('position').count * 3)
+baseColors.fill(1)
+CARTON_GEOMETRY.setAttribute('color', new THREE.Float32BufferAttribute(baseColors, 3))
 const OUTLINE_SOURCE = new THREE.EdgesGeometry(new THREE.BoxGeometry(1, 1, 1))
 
 type Props = {
@@ -16,12 +22,10 @@ type Props = {
   onSelect: (id: string) => void
 }
 
-/** GPU-batched carton renderer with a small visual inset and a single
- * lightweight line overlay. Collision/packing dimensions remain untouched. */
 export default function InstancedCartons({ items, container, onSelect }: Props) {
   const meshRef = useRef<THREE.InstancedMesh>(null)
   const lineRef = useRef<THREE.LineSegments>(null)
-  const material = useMemo(() => new THREE.MeshBasicMaterial({ color: 0xffffff, vertexColors: false, toneMapped: false }), [])
+  const material = useMemo(() => new THREE.MeshBasicMaterial({ color: 0xffffff, vertexColors: true, toneMapped: false }), [])
   const lineMaterial = useMemo(() => new THREE.LineBasicMaterial({ color: 0x58636b, transparent: true, opacity: 0.82, depthTest: true }), [])
   const lineGeometry = useMemo(() => new THREE.BufferGeometry(), [])
   const matrix = useMemo(() => new THREE.Matrix4(), [])
@@ -60,10 +64,7 @@ export default function InstancedCartons({ items, container, onSelect }: Props) 
       for (let v = 0; v < verticesPerBox; v++) {
         const si = v * 3
         const target = (i * verticesPerBox + v) * 3
-        const vx = sourceArray[si] ?? 0
-        const vy = sourceArray[si + 1] ?? 0
-        const vz = sourceArray[si + 2] ?? 0
-        position.set(vx, vy, vz).applyMatrix4(matrix)
+        position.set(sourceArray[si] ?? 0, sourceArray[si + 1] ?? 0, sourceArray[si + 2] ?? 0).applyMatrix4(matrix)
         outline[target] = position.x
         outline[target + 1] = position.y
         outline[target + 2] = position.z
