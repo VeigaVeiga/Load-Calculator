@@ -57,10 +57,18 @@ function splitCenteredSpace(s: FreeSpace, used: { x: number; y: number; length: 
   const push = (x: number, y: number, z: number, length: number, width: number, height: number) => {
     if (length > EPS && width > EPS && height > EPS) out.push({ x, y, z, length, width, height })
   }
-  push(s.x, s.y, s.z, used.x - s.x, s.width, used.height)
-  push(ux2, s.y, s.z, sx2 - ux2, s.width, used.height)
-  push(used.x, s.y, s.z, used.length, used.y - s.y, used.height)
-  push(used.x, uy2, s.z, used.length, sy2 - uy2, used.height)
+
+  // Side free spaces extend through the ORIGINAL vertical extent of the
+  // parent space.  Using used.height here incorrectly clipped these regions
+  // to the height of the cargo just placed, which could strand a large amount
+  // of usable container height and make later cargo appear impossible to load.
+  push(s.x, s.y, s.z, used.x - s.x, s.width, s.height)
+  push(ux2, s.y, s.z, sx2 - ux2, s.width, s.height)
+  push(used.x, s.y, s.z, used.length, used.y - s.y, s.height)
+  push(used.x, uy2, s.z, used.length, sy2 - uy2, s.height)
+
+  // The space directly above the placed block starts at the top of that block
+  // and retains the remaining vertical capacity of the parent space.
   push(used.x, used.y, s.z + used.height, used.length, used.width, s.height - used.height)
   return out
 }
