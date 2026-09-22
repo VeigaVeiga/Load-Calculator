@@ -134,10 +134,18 @@ function stackCandidates(items:PlacedCargo[],c:Container,o:Ori,u:Unit){
   const same=items.filter(q=>q.cargoId===u.cargo.id).sort((a,b)=>Math.hypot(a.x-centerX,a.y-centerY)-Math.hypot(b.x-centerX,b.y-centerY))
   const source=(same.length?same:items).slice(0,MAX_STACK_SOURCES)
   const out:{x:number;y:number;z:number;d:number}[]=[]
+  const seen=new Set<string>()
   for(const q of source){
     const qd=dims(q),z=q.z+q.height
-    for(const x of [q.x,q.x+qd.length-o.length])for(const y of [q.y,q.y+qd.width-o.width]){
-      if(x>=0&&y>=0&&x+o.length<=c.length&&y+o.width<=c.width)out.push({x,y,z,d:Math.hypot((x+o.length/2)-c.length/2,(y+o.width/2)-c.width/2)+z*.35})
+    const xs=[q.x,q.x+qd.length-o.length,q.x+(qd.length-o.length)/2]
+    const ys=[q.y,q.y+qd.width-o.width,q.y+(qd.width-o.width)/2]
+    for(const x of xs)for(const y of ys){
+      const xx=Math.max(0,Math.min(c.length-o.length,snap(x)))
+      const yy=Math.max(0,Math.min(c.width-o.width,snap(y)))
+      const key=`${xx}:${yy}:${z}`
+      if(seen.has(key))continue
+      seen.add(key)
+      if(xx+o.length<=c.length&&yy+o.width<=c.width)out.push({x:xx,y:yy,z,d:Math.hypot((xx+o.length/2)-c.length/2,(yy+o.width/2)-c.width/2)+z*.35})
     }
   }
   return out.sort((a,b)=>a.d-b.d)
@@ -195,7 +203,9 @@ function choose(u:Unit,items:PlacedCargo[],c:Container,defs:Map<string,Cargo>,we
       for(const q of stackCandidates(items,c,o,u)){
         const p=makePlaced(u,o,q.x,q.y,q.z)
         if(weight+p.weight>c.maxPayload+EPS||items.some(x=>overlap(p,x))||!canStack(p,u.cargo,items,defs))continue
-        const score=cgScore(p,c,weight,sumX,sumY)-q.d*1200
+        const support=supports(p,items)
+        const supportArea=Math.max(0,supportRatio(p,items))
+        const score=cgScore(p,c,weight,sumX,sumY)+supportArea*1200+support.length*180-q.d*1200
         if(score>bestScore){bestScore=score;best=p}
       }
     }
