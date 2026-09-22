@@ -6,7 +6,7 @@ import { UNIT_BOX, materialFor } from './CargoModel'
 
 const S = .001
 const GAP_XY = 8
-const GAP_Z = 8
+const GAP_Z = 2
 
 type Props = {
   items: PlacedCargo[]
@@ -40,9 +40,6 @@ export default function InstancedCartons({ items, container, onSelect }: Props) 
 
     items.forEach((p, i) => {
       const d = dims(p)
-      // dims(p) is already rotation-aware for placement bounds. The rendered
-      // box must keep its original local length/width and let the quaternion
-      // apply the visual rotation exactly once.
       const l = Math.max(40, p.length - GAP_XY * 2) * S
       const w = Math.max(40, p.width - GAP_XY * 2) * S
       const zg = p.z > 0 ? Math.min(GAP_Z, Math.max(0, p.height - 20)) : 0
