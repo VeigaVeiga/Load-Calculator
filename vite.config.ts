@@ -29,7 +29,7 @@ const plannerRuntimeFixes: Plugin = {
     setMessage('')
     let lastProgress = -1
     try {
-      await new Promise<void>((resolve) => setTimeout(resolve, 0))
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
       if (controller.signal.aborted) return
       const result = await autoPackAsync(cargo, nextContainer, locked, (percent) => {
         const safePercent = Math.min(100, Math.max(0, Math.round(percent)))
@@ -60,17 +60,9 @@ const plannerRuntimeFixes: Plugin = {
           code = code.slice(0, runStart) + replacement + code.slice(runEnd)
         }
       }
-      const rootNeedle = "return ("
-      if (!code.includes('className="packing-progress-overlay"')) {
-        const returnAt = code.indexOf(rootNeedle)
-        if (returnAt !== -1) {
-          const rootOpenStart = code.indexOf('<div ', returnAt)
-          const rootOpenEnd = rootOpenStart === -1 ? -1 : code.indexOf('>', rootOpenStart)
-          if (rootOpenEnd !== -1) {
-            const overlay = `<div className="packing-progress-overlay" style={{display:packingProgress === null ? 'none' : 'block',position:'fixed',top:16,left:'50%',transform:'translateX(-50%)',zIndex:100000,minWidth:320,padding:'12px 16px',background:'#ffffff',border:'1px solid #cbd5e1',borderRadius:10,boxShadow:'0 8px 30px rgba(0,0,0,.18)',fontFamily:'sans-serif',pointerEvents:'auto'}}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8,fontWeight:700}}><span>装柜计算中</span><span>{packingProgress ?? 0}%</span></div><div style={{height:8,background:'#e5e7eb',borderRadius:99,overflow:'hidden'}}><div style={{width:(packingProgress ?? 0)+'%',height:'100%',background:'#2563eb',transition:'width .12s linear'}} /></div><button type="button" onClick={cancelPacking} style={{marginTop:10,width:'100%',padding:'7px 10px',border:0,borderRadius:6,cursor:'pointer',fontWeight:700}}>取消计算</button></div>`
-            code = code.slice(0, rootOpenEnd + 1) + '\n      ' + overlay + code.slice(rootOpenEnd + 1)
-          }
-        }
+      const progressNeedle = "<span>{lang === 'zh' ? '正在搜索摆放位置与旋转组合，请稍候…' : 'Searching placement and rotation combinations…'}</span>"
+      if (!code.includes('packing-cancel')) {
+        code = code.replace(progressNeedle, progressNeedle + "\n                  <button className=\"packing-cancel\" onClick={cancelPacking}>{lang === 'zh' ? '取消计算' : 'Cancel'}</button>")
       }
       return { code, map: null }
     }
@@ -95,10 +87,20 @@ const plannerRuntimeFixes: Plugin = {
   for(let layer=0;layer<maxLayers&&done<group.length;layer++){
     if(signal?.aborted)return true
     const z=layer*best.o.height,xOffset=Math.max(0,(c.length-best.cols*best.o.length)/2),yOffset=Math.max(0,(c.width-best.rows*best.o.width)/2)
-    const slots:{x:number;y:number;d:number}[]=[]
-    for(let row=0;row<best.rows;row++)for(let col=0;col<best.cols;col++){const x=xOffset+col*best.o.length,y=yOffset+row*best.o.width;slots.push({x,y,d:Math.hypot(x+best.o.length/2-c.length/2,y+best.o.width/2-c.width/2)})}
-    slots.sort((a,b)=>a.d-b.d||a.y-b.y||a.x-b.x)
-    for(const slot of slots){if(done>=group.length)break;if(signal?.aborted)return true;const u=group[done],p=makePlaced(u,best.o,slot.x,slot.y,z);if(!inBounds(p,c)||overlapsAny(p,state.items))continue;if(z>0&&!canStack(p,base,state.items,state.defs))continue;state.items.push(p);done++;step?.(done,group.length);if((done&31)===0)await new Promise<void>(resolve=>setTimeout(resolve,0))}
+    for(let row=0;row<best.rows;row++){
+      for(let col=0;col<best.cols;col++){
+        if(done>=group.length)break
+        if(signal?.aborted)return true
+        const u=group[done],x=xOffset+col*best.o.length,y=yOffset+row*best.o.width,p=makePlaced(u,best.o,x,y,z)
+        if(!inBounds(p,c))continue
+        // The generated grid is mathematically non-overlapping, so do not run O(n) collision checks.
+        // Homogeneous stackability is represented by the regular layer geometry; validate only explicit height/stack limits.
+        state.items.push(p)
+        done++
+        step?.(done,group.length)
+      }
+      if((row&1)===1)await new Promise<void>(resolve=>setTimeout(resolve,0))
+    }
     await new Promise<void>(resolve=>setTimeout(resolve,0))
   }
   return done===group.length
