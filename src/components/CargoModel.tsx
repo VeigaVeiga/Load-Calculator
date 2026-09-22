@@ -3,14 +3,14 @@ import type { Container, PlacedCargo } from '../types'
 import { dims } from '../packing/geometry'
 import { memo, useMemo } from 'react'
 import * as THREE from 'three'
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js'
 
 const S = .001
 const VISUAL_GAP_XY = 8
-// Keep the visual separation subtle. The actual cargo/support geometry remains unchanged.
-const VISUAL_GAP_Z = 2
+const VISUAL_GAP_Z = 1
 
-// Shared geometry/materials keep large carton loads lightweight.
-export const UNIT_BOX = new THREE.BoxGeometry(1, 1, 1)
+// A very small bevel keeps adjacent cartons/crates visually separated without changing their real dimensions.
+export const UNIT_BOX = new RoundedBoxGeometry(1, 1, 1, 2, .035)
 const MATERIAL_CACHE = new Map<string, THREE.MeshStandardMaterial>()
 
 export const materialFor = (color: string, roughness: number) => {
@@ -64,7 +64,8 @@ function CargoModel({ p, container, selected, onPointerDown, onPointerUp, onPoin
   const visualW = Math.max(40, d.width - VISUAL_GAP_XY * 2)
   const visualZGap = local && p.z > 0 ? Math.min(VISUAL_GAP_Z, Math.max(0, p.height - 20)) : 0
   const visualH = Math.max(40, p.height - visualZGap)
-  const pos: [number, number, number] = local ? [0, 0, visualZGap * S / 2] : [(p.x + d.length / 2 - container.length / 2) * S, (p.y + d.width / 2 - container.width / 2) * S, (p.z + (p.height - visualZGap) / 2 + visualZGap) * S]
+  // Align the bottom of the visual model with the real support plane; the reduced visual height creates the edge separation without floating.
+  const pos: [number, number, number] = local ? [0, 0, visualZGap * S / 2] : [(p.x + d.length / 2 - container.length / 2) * S, (p.y + d.width / 2 - container.width / 2) * S, (p.z + visualH / 2) * S]
   const mainColor = selected ? '#f2c94c' : hovered ? '#ffd166' : p.color
   const crate = p.cargoType === 'woodCrate'
   const pallet = p.cargoType === 'pallet'
