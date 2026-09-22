@@ -28,9 +28,7 @@ function maxLayers(c: Cargo, o: Orientation, containerHeight: number) {
   if (!c.stackable) n = Math.min(n, 1)
   const configured = Math.floor(c.maxStackLayers || 0)
   if (configured > 0) n = Math.min(n, configured)
-  if (c.maxLoadOnTop > 0 && Number.isFinite(c.maxLoadOnTop) && c.weight > 0) {
-    n = Math.min(n, Math.floor(c.maxLoadOnTop / c.weight) + 1)
-  }
+  if (c.maxLoadOnTop > 0 && Number.isFinite(c.maxLoadOnTop) && c.weight > 0) n = Math.min(n, Math.floor(c.maxLoadOnTop / c.weight) + 1)
   return Math.max(1, n)
 }
 
@@ -38,30 +36,19 @@ function fits(s: FreeSpace, o: Orientation) {
   return o.length <= s.length + EPS && o.width <= s.width + EPS && o.height <= s.height + EPS
 }
 
-/**
- * Subtract a centered rectangular block from a free-space box without losing
- * any usable volume. The old implementation placed a centered batch but split
- * from the space origin, creating phantom gaps. This six-region subtraction
- * keeps the left/right and front/back residuals symmetrical and disjoint.
- */
 function splitCenteredSpace(s: FreeSpace, used: { x: number; y: number; length: number; width: number; height: number }): FreeSpace[] {
   const out: FreeSpace[] = []
   const sx2 = s.x + s.length
   const sy2 = s.y + s.width
   const ux2 = used.x + used.length
   const uy2 = used.y + used.width
-
   const push = (x: number, y: number, z: number, length: number, width: number, height: number) => {
     if (length > EPS && width > EPS && height > EPS) out.push({ x, y, z, length, width, height })
   }
-
-  // Left and right keep the entire original depth.
   push(s.x, s.y, s.z, used.x - s.x, s.width, used.height)
   push(ux2, s.y, s.z, sx2 - ux2, s.width, used.height)
-  // Front and rear occupy only the footprint band between left/right edges.
   push(used.x, s.y, s.z, used.length, used.y - s.y, used.height)
   push(used.x, uy2, s.z, used.length, sy2 - uy2, used.height)
-  // Everything above the placed block remains available as one full layer.
   push(s.x, s.y, s.z + used.height, s.length, s.width, s.height - used.height)
   return out
 }
@@ -147,10 +134,6 @@ export async function packLaff(cargo: Cargo[], container: Container, progress?: 
       const usedLength = cols * orientation.length
       const usedWidth = usedRows * orientation.width
       const usedHeight = usedLayers * orientation.height
-
-      // Center the footprint inside this free space. A partial final row is
-      // centered as well, so unavoidable leftovers are distributed instead of
-      // becoming a 300 mm wall on only one side of the container.
       const centeredX = space.x + Math.max(0, (space.length - usedLength) / 2)
       const centeredY = space.y + Math.max(0, (space.width - usedWidth) / 2)
       const used = { x: centeredX, y: centeredY, length: usedLength, width: usedWidth, height: usedHeight }
@@ -159,11 +142,13 @@ export async function packLaff(cargo: Cargo[], container: Container, progress?: 
       let placedHere = 0
       for (let layer = 0; layer < usedLayers && placedHere < take; layer++) {
         const z = space.z + layer * orientation.height
-        const rowLimit = layer < fullLayers ? rows : usedRows
-        for (let row = 0; row < rowLimit && placedHere < take; row++) {
-          const remainingInRow = take - placedHere - (usedLayers - layer - 1) * perLayer
-          const colLimit = Math.min(cols, Math.max(0, remainingInRow))
-          for (let col = 0; col < colLimit && placedHere < take; col++) {
+        const countThisLayer = layer < fullLayers ? perLayer : remainder
+        if (countThisLayer <= 0) continue
+        const rowsThisLayer = layer < fullLayers ? rows : usedRows
+        for (let row = 0; row < rowsThisLayer && placedHere < take; row++) {
+          const colsThisRow = Math.min(cols, countThisLayer - row * cols)
+          if (colsThisRow <= 0) break
+          for (let col = 0; col < colsThisRow; col++) {
             abort(options.signal)
             result.push(makePlaced(c, sequence++, orientation, centeredX + col * orientation.length, centeredY + row * orientation.width, z))
             placedHere++
