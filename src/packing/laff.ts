@@ -25,7 +25,7 @@ function orientations(c: Cargo): Orientation[] {
 
 function maxLayers(c: Cargo, o: Orientation, containerHeight: number) {
   let n = Math.floor((containerHeight + EPS) / o.height)
-  if (!c.stackable) n = Math.min(n, 1)
+  if (!c.stackable || !c.loadBearing) n = Math.min(n, 1)
   const configured = Math.floor(c.maxStackLayers || 0)
   if (configured > 0) n = Math.min(n, configured)
   if (c.maxLoadOnTop > 0 && Number.isFinite(c.maxLoadOnTop) && c.weight > 0) n = Math.min(n, Math.floor(c.maxLoadOnTop / c.weight) + 1)
@@ -45,11 +45,14 @@ function splitCenteredSpace(s: FreeSpace, used: { x: number; y: number; length: 
   const push = (x: number, y: number, z: number, length: number, width: number, height: number) => {
     if (length > EPS && width > EPS && height > EPS) out.push({ x, y, z, length, width, height })
   }
+  // Same-height residuals surround the centered footprint. They are disjoint.
   push(s.x, s.y, s.z, used.x - s.x, s.width, used.height)
   push(ux2, s.y, s.z, sx2 - ux2, s.width, used.height)
   push(used.x, s.y, s.z, used.length, used.y - s.y, used.height)
   push(used.x, uy2, s.z, used.length, sy2 - uy2, used.height)
-  push(s.x, s.y, s.z + used.height, s.length, s.width, s.height - used.height)
+  // Only the exact footprint that has been physically occupied can support
+  // another layer. Never expose the whole parent space above a partial batch.
+  push(used.x, used.y, s.z + used.height, used.length, used.width, s.height - used.height)
   return out
 }
 
@@ -66,6 +69,7 @@ function scoreSpace(s: FreeSpace, o: Orientation, c: Container) {
   const remW = s.width - o.width * Math.floor((s.width + EPS) / o.width)
   const waste = remL * s.width + remW * s.length
   const heightWaste = Math.max(0, s.height - o.height * Math.floor((s.height + EPS) / o.height))
+  // Prefer spaces with a large immediate footprint and low residual waste.
   return centerPenalty + waste * 0.08 + heightWaste * 0.03
 }
 
