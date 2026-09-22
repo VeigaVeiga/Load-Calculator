@@ -6,7 +6,7 @@ type Progress = (percent: number) => void
 type Options = { signal?: AbortSignal }
 type Orientation = { length: number; width: number; height: number; rotation: 0 | 90 }
 type FreeSpace = { x: number; y: number; z: number; length: number; width: number; height: number }
-type Group = { cargo: Cargo; quantity: number; startIndex: number }
+type Group = { cargo: Cargo; quantity: number }
 
 const abort = (signal?: AbortSignal) => {
   if (signal?.aborted) throw new DOMException('Packing cancelled', 'AbortError')
@@ -24,7 +24,7 @@ function orientations(c: Cargo): Orientation[] {
 }
 
 function maxLayers(c: Cargo, o: Orientation, containerHeight: number) {
-  let n = Math.floor(containerHeight / o.height)
+  let n = Math.floor((containerHeight + EPS) / o.height)
   if (!c.stackable) n = Math.min(n, 1)
   const configured = Math.floor(c.maxStackLayers || 0)
   if (configured > 0) n = Math.min(n, configured)
@@ -38,12 +38,14 @@ function fits(s: FreeSpace, o: Orientation) {
   return o.length <= s.length + EPS && o.width <= s.width + EPS && o.height <= s.height + EPS
 }
 
+// The occupied block starts at the free-space origin. This is important:
+// centering a batch while splitting from the origin creates phantom free space
+// and can cause the next batch to overlap it.
 function splitSpace(s: FreeSpace, used: { length: number; width: number; height: number }): FreeSpace[] {
   const out: FreeSpace[] = []
-  const x = s.x, y = s.y, z = s.z
-  if (s.length - used.length > EPS) out.push({ x: x + used.length, y, z, length: s.length - used.length, width: s.width, height: used.height })
-  if (s.width - used.width > EPS) out.push({ x, y: y + used.width, z, length: used.length, width: s.width - used.width, height: used.height })
-  if (s.height - used.height > EPS) out.push({ x, y, z: z + used.height, length: s.length, width: s.width, height: s.height - used.height })
+  if (s.length - used.length > EPS) out.push({ x: s.x + used.length, y: s.y, z: s.z, length: s.length - used.length, width: s.width, height: used.height })
+  if (s.width - used.width > EPS) out.push({ x: s.x, y: s.y + used.width, z: s.z, length: used.length, width: s.width - used.width, height: used.height })
+  if (s.height - used.height > EPS) out.push({ x: s.x, y: s.y, z: s.z + used.height, length: s.length, width: s.width, height: s.height - used.height })
   return out
 }
 
@@ -56,9 +58,13 @@ function scoreSpace(s: FreeSpace, o: Orientation, c: Container) {
   const cx = s.x + s.length / 2, cy = s.y + s.width / 2
   const dx = cx - c.length / 2, dy = cy - c.width / 2
   const centerPenalty = Math.hypot(dx, dy) * 0.35
-  const waste = (s.length * s.width * s.height) - (o.length * o.width * o.height)
-  const fit = Math.min(s.length - o.length, s.width - o.width, s.height - o.height)
-  return centerPenalty + waste * 0.00001 + Math.max(0, fit) * 0.02
+  // Prefer spaces that can take a complete row/column/layer. This gives a
+  // compact floor plan and avoids the previous pyramid-like fragmentation.
+  const remL = s.length - o.length * Math.floor((s.length + EPS) / o.length)
+  const remW = s.width - o.width * Math.floor((s.width + EPS) / o.width)
+  const waste = remL * s.width + remW * s.length
+  const heightWaste = Math.max(0, s.height - o.height * Math.floor((s.height + EPS) / o.height))
+  return centerPenalty + waste * 0.08 + heightWaste * 0.03
 }
 
 function choosePlacement(spaces: FreeSpace[], cargo: Cargo, c: Container) {
@@ -79,7 +85,7 @@ function groupBySignature(cargo: Cargo[]): Group[] {
     const key = `${c.length}|${c.width}|${c.height}|${c.weight}|${c.stackable}|${c.loadBearing}|${c.rotatable}|${c.maxStackLayers}|${c.maxLoadOnTop}|${c.breakablePallet}`
     const existing = groups.get(key)
     if (existing) existing.quantity += quantity
-    else groups.set(key, { cargo: c, quantity, startIndex: 0 })
+    else groups.set(key, { cargo: c, quantity })
   }
   return [...groups.values()].sort((a, b) => {
     const aa = a.cargo.length * a.cargo.width, bb = b.cargo.length * b.cargo.width
@@ -92,9 +98,16 @@ function makePlaced(c: Cargo, index: number, o: Orientation, x: number, y: numbe
 }
 
 /**
- * Batch LAFF-style packer. It works on rectangular free spaces instead of
- * testing every new box against every already placed box. This is deliberately
- * heuristic: speed and stable, supportable layers are preferred over brute force.
+ * Batch LAFF/free-space packer.
+ *
+ * Important correctness rules:
+ * - a batch always occupies the exact free-space origin that is subsequently
+ *   split, so batches cannot overlap one another;
+ * - full columns/rows are consumed before a partial final row, maximizing fill;
+ * - no arbitrary centering of a partial batch is used, avoiding large phantom
+ *   gaps caused by the old centered-batch implementation;
+ * - unlimited stacking means the physical container height is the limit when
+ *   maxStackLayers is empty/zero.
  */
 export async function packLaff(cargo: Cargo[], container: Container, progress?: Progress, options: Options = {}) {
   const groups = groupBySignature(cargo)
@@ -123,28 +136,31 @@ export async function packLaff(cargo: Cargo[], container: Container, progress?: 
       if (capacity <= 0) break
 
       const take = Math.min(remaining, capacity)
-      const batchCols = Math.min(cols, Math.max(1, Math.ceil(Math.sqrt(take * cols / Math.max(1, rows)))))
-      const batchRows = Math.min(rows, Math.ceil(take / batchCols))
-      const usedCols = Math.min(cols, batchCols)
-      const usedRows = Math.min(rows, batchRows)
-      const perLayer = usedCols * usedRows
-      const takeLayers = Math.ceil(take / perLayer)
-      const usedHeight = Math.min(space.height, takeLayers * orientation.height)
+
+      // Fill complete columns and rows first. Only the final row/layer is
+      // partial, so a 600-box load stays compact instead of forming a pyramid.
+      const perLayer = cols * rows
+      const fullLayers = Math.floor(take / perLayer)
+      const remainder = take % perLayer
+      const usedLayers = fullLayers + (remainder > 0 ? 1 : 0)
+      const usedRows = remainder > 0 ? Math.ceil(remainder / cols) : rows
+      const usedCols = cols
+      const usedHeight = usedLayers * orientation.height
       const usedLength = usedCols * orientation.length
       const usedWidth = usedRows * orientation.width
-      const ox = space.x + Math.max(0, (space.length - usedLength) / 2)
-      const oy = space.y + Math.max(0, (space.width - usedWidth) / 2)
 
       const used = { length: usedLength, width: usedWidth, height: usedHeight }
       spaces = pruneSpaces([...spaces.filter(s => s !== space), ...splitSpace(space, used)])
 
       let placedHere = 0
-      for (let layer = 0; layer < takeLayers && placedHere < take; layer++) {
+      for (let layer = 0; layer < usedLayers && placedHere < take; layer++) {
         const z = space.z + layer * orientation.height
-        for (let row = 0; row < usedRows && placedHere < take; row++) {
-          for (let col = 0; col < usedCols && placedHere < take; col++) {
+        const rowLimit = layer < fullLayers ? rows : usedRows
+        for (let row = 0; row < rowLimit && placedHere < take; row++) {
+          const colLimit = (layer === fullLayers && remainder > 0 && row === rowLimit - 1) ? Math.min(cols, remainder - row * cols) : cols
+          for (let col = 0; col < colLimit && placedHere < take; col++) {
             abort(options.signal)
-            result.push(makePlaced(c, sequence++, orientation, ox + col * orientation.length, oy + row * orientation.width, z))
+            result.push(makePlaced(c, sequence++, orientation, space.x + col * orientation.length, space.y + row * orientation.width, z))
             placedHere++
             completed++
             progress?.(Math.min(99, Math.round(completed / total * 100)))
@@ -152,6 +168,7 @@ export async function packLaff(cargo: Cargo[], container: Container, progress?: 
         }
         if ((completed & 31) === 0) await yieldBrowser()
       }
+
       remaining -= placedHere
       if (!placedHere) break
       await yieldBrowser()
