@@ -34,7 +34,7 @@ function loadAbove(q:PlacedCargo,items:PlacedCargo[]){return items.filter(p=>p.i
 function canStack(p:PlacedCargo,c:Cargo,items:PlacedCargo[],defs:Map<string,Cargo>){
   if(p.z<=EPS)return true;if(!c.stackable)return false
   const s=supports(p,items);if(!s.length||supportRatio(p,items)<SUPPORT)return false
-  const configured=Math.floor(c.maxStackLayers||0),maxLayers=configured>1?configured:2
+  const configured=Math.floor(c.maxStackLayers||0),maxLayers=configured>0?configured:Number.POSITIVE_INFINITY
   if(stackLevel(p,items)>maxLayers)return false
   return s.every(q=>{const d=defs.get(q.cargoId);if(!d||!d.loadBearing||d.breakablePallet)return false;return !Number.isFinite(d.maxLoadOnTop)||d.maxLoadOnTop<=0||loadAbove(q,items)+c.weight<=d.maxLoadOnTop+EPS})
 }
@@ -43,7 +43,7 @@ function overlapsAny(p:PlacedCargo,items:PlacedCargo[]){return items.some(q=>ove
 function floorPositions(c:Container,o:Ori){
   const maxX=Math.max(0,c.length-o.length),maxY=Math.max(0,c.width-o.width),xs:number[]=[],ys:number[]=[]
   for(let x=0;x<=maxX+EPS;x+=STEP)xs.push(Math.min(x,maxX));for(let y=0;y<=maxY+EPS;y+=STEP)ys.push(Math.min(y,maxY));if(xs[xs.length-1]!==maxX)xs.push(maxX);if(ys[ys.length-1]!==maxY)ys.push(maxY)
-  const cx=maxX/2,cy=maxY/2;xs.sort((a,b)=>Math.abs(a-cx)-Math.abs(b-cx)||a-b);ys.sort((a,b)=>Math.abs(a-cy)-Math.abs(b-cy)||a-b)
+  const cx=maxX/2,cy=maxY/2;xs.sort((a,b)=>Math.abs(a-cx)-Math.abs(b-cy)||a-b);ys.sort((a,b)=>Math.abs(a-cy)-Math.abs(b-cy)||a-b)
   const out:{x:number;y:number;distance:number}[]=[];for(const y of ys)for(const x of xs)out.push({x,y,distance:Math.hypot(x+o.length/2-c.length/2,y+o.width/2-c.width/2)});return out
 }
 function stackPositions(items:PlacedCargo[],c:Container,o:Ori){
@@ -64,7 +64,7 @@ function uniformSignature(c:Cargo){return `${c.length}|${c.width}|${c.height}|${
 function fastUniformGroup(state:ReturnType<typeof buildState>,group:Unit[],c:Container,step?:(done:number,total:number)=>void){
   if(!group.length)return true;const base=group[0].cargo;if(!group.every(u=>sameCargo(u.cargo,base)))return false
   const choices=orientations(base).map(o=>{const cols=Math.floor(c.length/o.length),rows=Math.floor(c.width/o.width);return {o,cols,rows,perLayer:cols*rows}}).sort((a,b)=>b.perLayer-a.perLayer),best=choices[0];if(!best||best.perLayer<=0)return false
-  let maxLayers=Math.floor(c.height/best.o.height);const configured=Math.floor(base.maxStackLayers||0);if(!base.stackable)maxLayers=1;else if(configured>1)maxLayers=Math.min(maxLayers,configured);if(Number.isFinite(base.maxLoadOnTop)&&base.maxLoadOnTop>0&&base.weight>0)maxLayers=Math.min(maxLayers,Math.floor(base.maxLoadOnTop/base.weight)+1);maxLayers=Math.max(1,maxLayers)
+  let maxLayers=Math.floor(c.height/best.o.height);const configured=Math.floor(base.maxStackLayers||0);if(!base.stackable)maxLayers=1;else if(configured>0)maxLayers=Math.min(maxLayers,configured);if(Number.isFinite(base.maxLoadOnTop)&&base.maxLoadOnTop>0&&base.weight>0)maxLayers=Math.min(maxLayers,Math.floor(base.maxLoadOnTop/base.weight)+1);maxLayers=Math.max(1,maxLayers)
   let done=0
   for(let layer=0;layer<maxLayers&&done<group.length;layer++){
     const z=layer*best.o.height,xOffset=Math.max(0,(c.length-best.cols*best.o.length)/2),yOffset=Math.max(0,(c.width-best.rows*best.o.width)/2),slots:{x:number;y:number;d:number}[]=[]
