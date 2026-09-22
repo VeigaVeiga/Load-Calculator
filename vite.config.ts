@@ -23,6 +23,7 @@ const plannerRuntimeFixes: Plugin = {
     if (packingProgress !== null) return
     const controller = new AbortController()
     packingAbortRef.current = controller
+    ;(globalThis as any).__packingAbortSignal = controller.signal
     const locked = placed.filter((p) => p.locked)
     setPackingProgress(0)
     setMessage('')
@@ -36,13 +37,14 @@ const plannerRuntimeFixes: Plugin = {
           lastProgress = safePercent
           setPackingProgress(safePercent)
         }
-      }, controller.signal)
+      })
       if (controller.signal.aborted) return
       setPlaced(result)
       setSelectedId(null)
       setSelectedIds([])
       setMessage(lang === 'zh' ? '自动装柜完成' : 'Auto packing complete')
     } finally {
+      if ((globalThis as any).__packingAbortSignal === controller.signal) (globalThis as any).__packingAbortSignal = undefined
       packingAbortRef.current = null
       setPackingProgress(null)
     }
@@ -50,6 +52,7 @@ const plannerRuntimeFixes: Plugin = {
 
   const cancelPacking = () => {
     packingAbortRef.current?.abort()
+    ;(globalThis as any).__packingAbortSignal = undefined
     packingAbortRef.current = null
     setPackingProgress(null)
     setMessage(lang === 'zh' ? '已取消装柜计算' : 'Packing cancelled')
@@ -66,8 +69,7 @@ const plannerRuntimeFixes: Plugin = {
       const old = "for(const x of [q.x,q.x+qd.length-o.length])for(const y of [q.y,q.y+qd.width-o.width]){"
       const replacement = "for(const x of [q.x,q.x+(qd.length-o.length)/2,q.x+qd.length-o.length])for(const y of [q.y,q.y+(qd.width-o.width)/2,q.y+qd.width-o.width]){"
       code = code.replace(old, replacement)
-      code = code.replace("export async function autoPackAsync(cargo:Cargo[],c:Container,locked:PlacedCargo[]=[],progress?:(percent:number)=>void){", "export async function autoPackAsync(cargo:Cargo[],c:Container,locked:PlacedCargo[]=[],progress?:(percent:number)=>void,signal?:AbortSignal){")
-      code = code.replace("const state=buildState(cargo,c,locked),n=state.us.length;if(n===0){", "const state=buildState(cargo,c,locked),n=state.us.length;if(signal?.aborted)return state.items;if(n===0){")
+      code = code.replace("const state=buildState(cargo,c,locked),n=state.us.length;if(n===0){", "const state=buildState(cargo,c,locked),n=state.us.length;const signal=(globalThis as any).__packingAbortSignal as AbortSignal|undefined;if(signal?.aborted)return state.items;if(n===0){")
       code = code.replace("for(const group of groups.values()){", "for(const group of groups.values()){if(signal?.aborted)return state.items;")
       code = code.replace("for(const u of group){placeOne(state,u,c);done++;report(done,total);", "for(const u of group){if(signal?.aborted)return state.items;placeOne(state,u,c);done++;report(done,total);")
       code = code.replace("for(let i=0;i<n;i++){placeOne(state,state.us[i],c);report(i+1,n);", "for(let i=0;i<n;i++){if(signal?.aborted)return state.items;placeOne(state,state.us[i],c);report(i+1,n);")
