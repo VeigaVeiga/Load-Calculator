@@ -7,11 +7,8 @@ import { dims } from '../packing/geometry'
 const S = .001
 const GAP_XY = 8
 const GAP_Z = 1
-
-// Keep the material unlit and use InstancedMesh.instanceColor directly.
-// Combining vertexColors with instanceColor made some Three.js builds render
-// the batched cartons black when RoundedBoxGeometry had no compatible color attribute.
 const CARTON_GEOMETRY = new RoundedBoxGeometry(1, 1, 1, 2, .035)
+const OUTLINE_SOURCE = new THREE.EdgesGeometry(new THREE.BoxGeometry(1, 1, 1))
 
 type Props = {
   items: PlacedCargo[]
@@ -19,14 +16,14 @@ type Props = {
   onSelect: (id: string) => void
 }
 
-/** GPU-batched renderer for ordinary cartons. */
+/** GPU-batched carton renderer with a small visual inset and a single
+ * lightweight line overlay. Collision/packing dimensions remain untouched. */
 export default function InstancedCartons({ items, container, onSelect }: Props) {
   const meshRef = useRef<THREE.InstancedMesh>(null)
-  const material = useMemo(() => new THREE.MeshBasicMaterial({
-    color: 0xffffff,
-    vertexColors: false,
-    toneMapped: false,
-  }), [])
+  const lineRef = useRef<THREE.LineSegments>(null)
+  const material = useMemo(() => new THREE.MeshBasicMaterial({ color: 0xffffff, vertexColors: false, toneMapped: false }), [])
+  const lineMaterial = useMemo(() => new THREE.LineBasicMaterial({ color: 0x58636b, transparent: true, opacity: 0.82, depthTest: true }), [])
+  const lineGeometry = useMemo(() => new THREE.BufferGeometry(), [])
   const matrix = useMemo(() => new THREE.Matrix4(), [])
   const quaternion = useMemo(() => new THREE.Quaternion(), [])
   const scale = useMemo(() => new THREE.Vector3(), [])
@@ -36,43 +33,66 @@ export default function InstancedCartons({ items, container, onSelect }: Props) 
 
   useLayoutEffect(() => {
     const mesh = meshRef.current
-    if (!mesh) return
+    const lines = lineRef.current
+    if (!mesh || !lines) return
+
+    const source = OUTLINE_SOURCE.getAttribute('position')
+    const sourceArray = source.array as ArrayLike<number>
+    const verticesPerBox = source.count
+    const outline = new Float32Array(items.length * verticesPerBox * 3)
 
     items.forEach((p, i) => {
       const d = dims(p)
-      const l = Math.max(40, d.length - GAP_XY * 2) * S
-      const w = Math.max(40, d.width - GAP_XY * 2) * S
+      const visualL = Math.max(40, d.length - GAP_XY * 2)
+      const visualW = Math.max(40, d.width - GAP_XY * 2)
       const visualH = Math.max(40, p.height - (p.z > 0 ? GAP_Z : 0))
       const x = (p.x + d.length / 2 - container.length / 2) * S
       const y = (p.y + d.width / 2 - container.width / 2) * S
       const z = (p.z + visualH / 2) * S
-
       position.set(x, y, z)
       quaternion.setFromAxisAngle(axisZ, p.rotation * Math.PI / 180)
-      scale.set(l, w, visualH * S)
+      scale.set(visualL * S, visualW * S, visualH * S)
       matrix.compose(position, quaternion, scale)
       mesh.setMatrixAt(i, matrix)
       instanceColor.set(p.color || '#c7c7c7')
       mesh.setColorAt(i, instanceColor)
+
+      for (let v = 0; v < verticesPerBox; v++) {
+        const si = v * 3
+        const target = (i * verticesPerBox + v) * 3
+        const vx = sourceArray[si] ?? 0
+        const vy = sourceArray[si + 1] ?? 0
+        const vz = sourceArray[si + 2] ?? 0
+        position.set(vx, vy, vz).applyMatrix4(matrix)
+        outline[target] = position.x
+        outline[target + 1] = position.y
+        outline[target + 2] = position.z
+      }
     })
 
+    lineGeometry.setAttribute('position', new THREE.Float32BufferAttribute(outline, 3))
+    lineGeometry.computeBoundingSphere()
+    lines.visible = items.length > 0
     mesh.count = items.length
     mesh.instanceMatrix.needsUpdate = true
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true
     mesh.computeBoundingSphere()
-  }, [items, container, matrix, position, quaternion, scale, axisZ, instanceColor])
+  }, [items, container, matrix, position, quaternion, scale, axisZ, instanceColor, lineGeometry])
 
   if (!items.length) return null
 
   return (
-    <instancedMesh
-      ref={meshRef}
-      args={[CARTON_GEOMETRY, material, items.length]}
-      onClick={(e) => {
-        e.stopPropagation()
-        const index = e.instanceId
-        if (index != null && items[index]) onSelect(items[index].id)
-      }}
-    />
+    <>
+      <instancedMesh
+        ref={meshRef}
+        args={[CARTON_GEOMETRY, material, items.length]}
+        onClick={(e) => {
+          e.stopPropagation()
+          const index = e.instanceId
+          if (index != null && items[index]) onSelect(items[index].id)
+        }}
+      />
+      <lineSegments ref={lineRef} geometry={lineGeometry} material={lineMaterial} raycast={() => null} />
+    </>
   )
 }
