@@ -9,8 +9,8 @@ const S = .001
 const VISUAL_GAP_XY = 8
 const VISUAL_GAP_Z = 1
 
-// Small, low-segment bevel: enough to separate adjacent cargo visually without making large crates look rounded.
-export const UNIT_BOX = new RoundedBoxGeometry(1, 1, 1, 1, .012)
+// Low-segment, shallow bevel: only enough to separate adjacent cargo visually.
+export const UNIT_BOX = new RoundedBoxGeometry(1, 1, 1, 1, .006)
 const UNIT_EDGES = new THREE.EdgesGeometry(UNIT_BOX, 24)
 const MATERIAL_CACHE = new Map<string, THREE.MeshStandardMaterial>()
 const EDGE_MATERIAL_CACHE = new Map<string, THREE.LineBasicMaterial>()
@@ -29,7 +29,7 @@ const edgeMaterialFor = (color: string) => {
   const key = `edge:${color}`
   let material = EDGE_MATERIAL_CACHE.get(key)
   if (!material) {
-    material = new THREE.LineBasicMaterial({ color: '#4d5458', transparent: true, opacity: .72 })
+    material = new THREE.LineBasicMaterial({ color: '#4d5458', transparent: true, opacity: .78 })
     EDGE_MATERIAL_CACHE.set(key, material)
   }
   return material
@@ -82,7 +82,7 @@ function CargoModel({ p, container, selected, onPointerDown, onPointerUp, onPoin
   const visualZGap = local && p.z > 0 ? Math.min(VISUAL_GAP_Z, Math.max(0, p.height - 20)) : 0
   const visualH = Math.max(40, p.height - visualZGap)
   const pos: [number, number, number] = local ? [0, 0, visualZGap * S / 2] : [(p.x + d.length / 2 - container.length / 2) * S, (p.y + d.width / 2 - container.width / 2) * S, (p.z + visualH / 2) * S]
-  const mainColor = selected ? '#f2c94c' : hovered ? '#ffd166' : p.color
+  const mainColor = selected ? '#f2c94c' : hovered ? '#ffd166' : (p.color || '#c7ced3')
   const crate = p.cargoType === 'woodCrate'
   const pallet = p.cargoType === 'pallet'
   const palletBaseH = pallet ? Math.min(145, Math.max(90, p.height * .12)) : 0
@@ -93,16 +93,16 @@ function CargoModel({ p, container, selected, onPointerDown, onPointerUp, onPoin
     {pallet ? <>
       <group position={[0, 0, -p.height * S / 2 + palletBaseH * S / 2]}>
         <MemoBox size={[visualL * S, visualW * S, palletBaseH * S * .18]} color="#b57b45" roughness={.86} eventProps={eventProps} outline />
-        {[-1, 0, 1].map(i => <MemoBox key={`deck-${i}`} position={[0, i * visualW * S * .30, palletBaseH * S * .22]} size={[visualL * S, visualW * S * .16, palletBaseH * S * .25]} color="#8a5a32" roughness={.86} />)}
-        {[-.34, 0, .34].map(i => <MemoBox key={`runner-${i}`} position={[i * visualL * S, 0, -palletBaseH * S * .16]} size={[Math.max(70, visualL * .13) * S, visualW * S * .82, palletBaseH * S * .50]} color="#76502f" roughness={.88} />)}
-        {[-.42, 0, .42].map(i => <MemoBox key={`foot-${i}`} position={[i * visualL * S, 0, -palletBaseH * S * .46]} size={[Math.max(55, visualL * .10) * S, visualW * S * .76, palletBaseH * S * .18]} color="#69472b" roughness={.9} />)}
+        {[-1, 0, 1].map(i => <MemoBox key={`deck-${i}`} position={[0, i * visualW * S * .30, palletBaseH * S * .22]} size={[visualL * S, visualW * S * .16, palletBaseH * S * .25]} color="#8a5a32" roughness={.86} outline />)}
+        {[-.34, 0, .34].map(i => <MemoBox key={`runner-${i}`} position={[i * visualL * S, 0, -palletBaseH * S * .16]} size={[Math.max(70, visualL * .13) * S, visualW * S * .82, palletBaseH * S * .50]} color="#76502f" roughness={.88} outline />)}
+        {[-.42, 0, .42].map(i => <MemoBox key={`foot-${i}`} position={[i * visualL * S, 0, -palletBaseH * S * .46]} size={[Math.max(55, visualL * .10) * S, visualW * S * .76, palletBaseH * S * .18]} color="#69472b" roughness={.9} outline />)}
       </group>
       <MemoBox size={[visualL * S, visualW * S, bodyH * S]} position={[0, 0, palletBaseH * S / 2]} color={mainColor} roughness={.68} eventProps={eventProps} outline />
     </> : crate ? <>
       <MemoBox size={[visualL * S, visualW * S, bodyH * S]} color="#9a6638" roughness={.82} eventProps={eventProps} outline />
-      {[-.42, -.14, .14, .42].map((t, i) => <MemoBox key={`sx${i}`} position={[0, t * visualW * S, 0]} size={[visualL * S * .98, Math.max(18, visualW * .055) * S, bodyH * S * 1.02]} color="#c08a52" roughness={.84} />)}
-      {[-.44, 0, .44].map((t, i) => <MemoBox key={`sz${i}`} position={[t * visualL * S, 0, 0]} size={[Math.max(18, visualL * .055) * S, visualW * S * 1.01, bodyH * S * 1.02]} color="#b97d46" roughness={.84} />)}
-    </> : <MemoBox size={[visualL * S, visualW * S, bodyH * S]} color={mainColor} roughness={.62} eventProps={eventProps} />}
+      {[-.42, -.14, .14, .42].map((t, i) => <MemoBox key={`sx${i}`} position={[0, t * visualW * S, 0]} size={[visualL * S * .98, Math.max(18, visualW * .055) * S, bodyH * S * 1.02]} color="#c08a52" roughness={.84} outline />)}
+      {[-.44, 0, .44].map((t, i) => <MemoBox key={`sz${i}`} position={[t * visualL * S, 0, 0]} size={[Math.max(18, visualL * .055) * S, visualW * S * 1.01, bodyH * S * 1.02]} color="#b97d46" roughness={.84} outline />)}
+    </> : <MemoBox size={[visualL * S, visualW * S, bodyH * S]} color={mainColor} roughness={.62} eventProps={eventProps} outline />}
     {showName && <Html position={[0, 0, p.height * S / 2 + .02]} center><div className="cargo-name-label">{p.cargoId}</div></Html>}
   </group>
 }
