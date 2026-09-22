@@ -23,25 +23,19 @@ function orientations(c: Cargo): Orientation[] {
   return [a, { length: c.width, width: c.length, height: c.height, rotation: 90 }]
 }
 
-// Stacking is based ONLY on the usable INTERNAL container height and the
-// remaining height of the current support space. doorHeight is an opening
-// dimension, not a stacking limit.
+// Vertical capacity is always based on the usable INTERNAL container height.
+// doorHeight describes the opening and must never cap normal stacking.
 function maxLayers(c: Cargo, o: Orientation, remainingHeight: number) {
   if (remainingHeight + EPS < o.height) return 0
   let n = Math.floor((remainingHeight + EPS) / o.height)
 
-  // A cargo can use additional layers only when the user explicitly marks it
-  // as both stackable and load-bearing.
+  // Only stackable + load-bearing cargo may use more than one layer.
   if (!c.stackable || !c.loadBearing) n = Math.min(n, 1)
 
-  // 0 means "no user limit". Never silently interpret an empty/default value
-  // as one layer.
+  // 0 / blank means unlimited by user setting.
   const configured = Number.isFinite(c.maxStackLayers) ? Math.floor(c.maxStackLayers) : 0
   if (configured > 0) n = Math.min(n, configured)
 
-  // Likewise, a top-load limit is applied only when the user explicitly gives
-  // a positive value. It must never reduce a normal stackable cargo to one
-  // layer merely because the field is empty/default.
   const topLoad = Number.isFinite(c.maxLoadOnTop) ? c.maxLoadOnTop : 0
   if (c.stackable && c.loadBearing && topLoad > 0 && c.weight > 0) {
     n = Math.min(n, Math.floor(topLoad / c.weight) + 1)
@@ -67,8 +61,6 @@ function splitCenteredSpace(s: FreeSpace, used: { x: number; y: number; length: 
   push(ux2, s.y, s.z, sx2 - ux2, s.width, used.height)
   push(used.x, s.y, s.z, used.length, used.y - s.y, used.height)
   push(used.x, uy2, s.z, used.length, sy2 - uy2, used.height)
-  // Only the occupied footprint creates a support space above it. Its height
-  // is the remaining INTERNAL height, so another layer is always considered.
   push(used.x, used.y, s.z + used.height, used.length, used.width, s.height - used.height)
   return out
 }
@@ -86,8 +78,6 @@ function scoreSpace(s: FreeSpace, o: Orientation, c: Container) {
   const remW = s.width - o.width * Math.floor((s.width + EPS) / o.width)
   const waste = remL * s.width + remW * s.length
   const heightWaste = Math.max(0, s.height - o.height * Math.floor((s.height + EPS) / o.height))
-  // Prefer lower support surfaces when scores are otherwise close; this keeps
-  // the load physically grounded and leaves clean vertical columns for later.
   const zPenalty = s.z * 0.05
   return centerPenalty + waste * 0.08 + heightWaste * 0.03 + zPenalty
 }
@@ -147,8 +137,6 @@ export async function packLaff(cargo: Cargo[], container: Container, progress?: 
   let result: PlacedCargo[] = []
   if (!total) { progress?.(100); return result }
 
-  // Internal height is the sole vertical limit. For a 40HQ this is 2698 mm;
-  // its 2585 mm door height must not silently remove the upper 113 mm of space.
   const usableInnerHeight = Math.max(0, container.height)
   let completed = 0
   let spaces: FreeSpace[] = [{ x: 0, y: 0, z: 0, length: container.length, width: container.width, height: usableInnerHeight }]
