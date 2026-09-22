@@ -1,12 +1,15 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { useLayoutEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js'
 import type { Container, PlacedCargo } from '../types'
 import { dims } from '../packing/geometry'
-import { UNIT_BOX, materialFor } from './CargoModel'
+import { materialFor } from './CargoModel'
 
 const S = .001
 const GAP_XY = 8
-const GAP_Z = 2
+const GAP_Z = 1
+
+const CARTON_GEOMETRY = new RoundedBoxGeometry(1, 1, 1, 2, .035)
 
 type Props = {
   items: PlacedCargo[]
@@ -14,15 +17,11 @@ type Props = {
   onSelect: (id: string) => void
 }
 
-/**
- * GPU-batched renderer for ordinary cartons. Selected/named/special cargo should
- * stay on CargoModel so their editing and detailed visuals remain interactive.
- * Each instance keeps its own cargo color through InstancedMesh vertex colors.
- */
+/** GPU-batched renderer for ordinary cartons. */
 export default function InstancedCartons({ items, container, onSelect }: Props) {
   const meshRef = useRef<THREE.InstancedMesh>(null)
   const material = useMemo(() => {
-    const m = materialFor('#c7c7c7', .62)
+    const m = materialFor('#ffffff', .62)
     m.vertexColors = true
     m.needsUpdate = true
     return m
@@ -34,7 +33,7 @@ export default function InstancedCartons({ items, container, onSelect }: Props) 
   const axisZ = useMemo(() => new THREE.Vector3(0, 0, 1), [])
   const instanceColor = useMemo(() => new THREE.Color(), [])
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const mesh = meshRef.current
     if (!mesh) return
 
@@ -42,15 +41,15 @@ export default function InstancedCartons({ items, container, onSelect }: Props) 
       const d = dims(p)
       const l = Math.max(40, p.length - GAP_XY * 2) * S
       const w = Math.max(40, p.width - GAP_XY * 2) * S
-      const zg = p.z > 0 ? Math.min(GAP_Z, Math.max(0, p.height - 20)) : 0
-      const h = Math.max(40, p.height - zg) * S
+      const visualH = Math.max(40, p.height - (p.z > 0 ? GAP_Z : 0))
       const x = (p.x + d.length / 2 - container.length / 2) * S
       const y = (p.y + d.width / 2 - container.width / 2) * S
-      const z = (p.z + (p.height - zg) / 2 + zg) * S
+      const z = (p.z + visualH / 2) * S
 
       position.set(x, y, z)
       quaternion.setFromAxisAngle(axisZ, p.rotation * Math.PI / 180)
-      scale.set(l, w, h)
+      // Keep the unrotated dimensions here. Rotation is applied exactly once by the quaternion.
+      scale.set(l, w, visualH * S)
       matrix.compose(position, quaternion, scale)
       mesh.setMatrixAt(i, matrix)
 
@@ -68,7 +67,7 @@ export default function InstancedCartons({ items, container, onSelect }: Props) 
   return (
     <instancedMesh
       ref={meshRef}
-      args={[UNIT_BOX, material, items.length]}
+      args={[CARTON_GEOMETRY, material, items.length]}
       onClick={(e) => {
         e.stopPropagation()
         const index = e.instanceId
