@@ -1,0 +1,52 @@
+/* UI consistency pass: keep controls visually aligned without touching packing logic. */
+.top-actions button,
+.top-actions select,
+.top-actions label,
+.tool-row button,
+.sidebar-head > button,
+.view-toolbar button,
+.tabs button,
+.material-toolbar button,
+.placement-toggle,
+.custom-bar button,
+.cargo-title .delete {
+  font-family:"Segoe UI","Microsoft YaHei","Noto Sans SC",Arial,sans-serif !important;
+  font-size:11px !important;
+  line-height:1.2 !important;
+  min-height:30px;
+  box-sizing:border-box;
+}
+
+.top-actions button,
+.top-actions select,
+.top-actions label,
+.tool-row button,
+.sidebar-head > button,
+.view-toolbar button,
+.tabs button,
+.placement-toggle,
+.custom-bar button {
+  padding:6px 10px !important;
+}
+
+.material-toolbar button { padding:6px 8px !important; }
+
+/* Mode controls share one visual baseline. */
+.placement-toggle { min-width:76px; text-align:center; }
+
+/* Keep the 3D viewport toolbar anchored visually; camera interaction remains owned by R3F. */
+.scene-toolbar,
+.scene-toolbox,
+.viewer-scene-toolbar {
+  position:absolute !important;
+  top:8px !important;
+  left:8px !important;
+  right:auto !important;
+  z-index:30 !important;
+  transform:none !important;
+}
+
+/* Do not let the toolbar itself consume pointer events outside its controls. */
+.scene-toolbar button,
+.scene-toolbox button,
+.viewer-scene-toolbar button { pointer-events:auto; }
