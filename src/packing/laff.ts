@@ -23,17 +23,30 @@ function orientations(c: Cargo): Orientation[] {
   return [a, { length: c.width, width: c.length, height: c.height, rotation: 90 }]
 }
 
-// IMPORTANT: stacking capacity is governed by the container's INTERNAL HEIGHT.
-// doorHeight is only the door opening reference and must never cap the usable
-// stacking height inside the container. Oversize cargo that exceeds the door
-// opening may require a real-world loading maneuver check, but that is a
-// separate planning warning and not an internal stacking constraint.
-function maxLayers(c: Cargo, o: Orientation, innerHeight: number) {
-  let n = Math.floor((innerHeight + EPS) / o.height)
+// Stacking is based ONLY on the usable INTERNAL container height and the
+// remaining height of the current support space. doorHeight is an opening
+// dimension, not a stacking limit.
+function maxLayers(c: Cargo, o: Orientation, remainingHeight: number) {
+  if (remainingHeight + EPS < o.height) return 0
+  let n = Math.floor((remainingHeight + EPS) / o.height)
+
+  // A cargo can use additional layers only when the user explicitly marks it
+  // as both stackable and load-bearing.
   if (!c.stackable || !c.loadBearing) n = Math.min(n, 1)
-  const configured = Math.floor(c.maxStackLayers || 0)
+
+  // 0 means "no user limit". Never silently interpret an empty/default value
+  // as one layer.
+  const configured = Number.isFinite(c.maxStackLayers) ? Math.floor(c.maxStackLayers) : 0
   if (configured > 0) n = Math.min(n, configured)
-  if (c.maxLoadOnTop > 0 && Number.isFinite(c.maxLoadOnTop) && c.weight > 0) n = Math.min(n, Math.floor(c.maxLoadOnTop / c.weight) + 1)
+
+  // Likewise, a top-load limit is applied only when the user explicitly gives
+  // a positive value. It must never reduce a normal stackable cargo to one
+  // layer merely because the field is empty/default.
+  const topLoad = Number.isFinite(c.maxLoadOnTop) ? c.maxLoadOnTop : 0
+  if (c.stackable && c.loadBearing && topLoad > 0 && c.weight > 0) {
+    n = Math.min(n, Math.floor(topLoad / c.weight) + 1)
+  }
+
   return Math.max(1, n)
 }
 
@@ -54,7 +67,8 @@ function splitCenteredSpace(s: FreeSpace, used: { x: number; y: number; length: 
   push(ux2, s.y, s.z, sx2 - ux2, s.width, used.height)
   push(used.x, s.y, s.z, used.length, used.y - s.y, used.height)
   push(used.x, uy2, s.z, used.length, sy2 - uy2, used.height)
-  // Only the occupied footprint may create a support space above it.
+  // Only the occupied footprint creates a support space above it. Its height
+  // is the remaining INTERNAL height, so another layer is always considered.
   push(used.x, used.y, s.z + used.height, used.length, used.width, s.height - used.height)
   return out
 }
@@ -72,7 +86,10 @@ function scoreSpace(s: FreeSpace, o: Orientation, c: Container) {
   const remW = s.width - o.width * Math.floor((s.width + EPS) / o.width)
   const waste = remL * s.width + remW * s.length
   const heightWaste = Math.max(0, s.height - o.height * Math.floor((s.height + EPS) / o.height))
-  return centerPenalty + waste * 0.08 + heightWaste * 0.03
+  // Prefer lower support surfaces when scores are otherwise close; this keeps
+  // the load physically grounded and leaves clean vertical columns for later.
+  const zPenalty = s.z * 0.05
+  return centerPenalty + waste * 0.08 + heightWaste * 0.03 + zPenalty
 }
 
 function choosePlacement(spaces: FreeSpace[], cargo: Cargo, c: Container) {
@@ -105,7 +122,6 @@ function makePlaced(c: Cargo, index: number, o: Orientation, x: number, y: numbe
   return { id: `${c.id}-${index + 1}`, cargoId: c.id, cargoType: c.type, x, y, z, length: c.length, width: c.width, height: o.height, weight: c.weight, color: c.color, rotation: o.rotation, placementMode: 'automatic', locked: false }
 }
 
-// Once all batches are packed, center the occupied footprint as a whole.
 function centerPackedFootprint(items: PlacedCargo[], container: Container) {
   if (!items.length) return items
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity
@@ -131,9 +147,9 @@ export async function packLaff(cargo: Cargo[], container: Container, progress?: 
   let result: PlacedCargo[] = []
   if (!total) { progress?.(100); return result }
 
-  // The packing volume uses the internal container dimensions only. In
-  // particular, do NOT substitute container.doorHeight for this height.
-  const usableInnerHeight = container.height
+  // Internal height is the sole vertical limit. For a 40HQ this is 2698 mm;
+  // its 2585 mm door height must not silently remove the upper 113 mm of space.
+  const usableInnerHeight = Math.max(0, container.height)
   let completed = 0
   let spaces: FreeSpace[] = [{ x: 0, y: 0, z: 0, length: container.length, width: container.width, height: usableInnerHeight }]
   let sequence = 0
@@ -150,7 +166,8 @@ export async function packLaff(cargo: Cargo[], container: Container, progress?: 
       const { space, orientation } = choice
       const cols = Math.floor((space.length + EPS) / orientation.length)
       const rows = Math.floor((space.width + EPS) / orientation.width)
-      const layers = maxLayers(c, orientation, usableInnerHeight >= space.z ? usableInnerHeight - space.z : 0)
+      const remainingHeight = Math.max(0, usableInnerHeight - space.z)
+      const layers = maxLayers(c, orientation, Math.min(space.height, remainingHeight))
       if (layers <= 0) break
       const capacity = cols * rows * layers
       if (capacity <= 0) break
