@@ -1,5 +1,6 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Canvas, useThree } from '@react-three/fiber'
+import { createRoot, type Root } from 'react-dom/client'
 import { Html, Line, OrbitControls, Sky, TransformControls } from '@react-three/drei'
 import * as THREE from 'three'
 import type { Cargo, Container, PlacedCargo, SecuringItem, SecuringMaterialType } from '../types'
@@ -48,6 +49,7 @@ type Props = {
   selectedMaterialId?: string | null
   onSelectMaterial?: (id: string | null) => void
   onDeleteMaterial?: (id: string) => void
+  toolbarHost?: HTMLElement | null
 }
 
 function CameraRig({ view, container, dragging, transformActive, focusPoint, focusNonce }: { view: View; container: Container; dragging: boolean; transformActive: boolean; focusPoint: [number, number, number] | null; focusNonce: number }) {
@@ -118,8 +120,15 @@ function CoordinateAxes({ container }: { container: Container }) {
 function CargoObject({ p, container, selected, onSelect, registerRef, showName }: { p: PlacedCargo; container: Container; selected: boolean; onSelect: () => void; registerRef: (id: string, o: THREE.Group | null) => void; showName: boolean }) {
   const ref = useRef<THREE.Group>(null)
   useEffect(() => { registerRef(p.id, ref.current); return () => registerRef(p.id, null) }, [p.id, registerRef])
-  const pos: [number, number, number] = [(p.x + p.length / 2 - container.length / 2) * S, (p.y + p.width / 2 - container.width / 2) * S, (p.z + p.height / 2) * S]
-  return <group ref={ref} position={pos} rotation={[0, 0, p.rotation * Math.PI / 180]} onPointerDown={e => { e.stopPropagation(); onSelect() }} onClick={e => { e.stopPropagation(); onSelect() }}>
+  // TransformControls owns the live Three.js transform. React selection re-renders must not overwrite it.
+  useLayoutEffect(() => {
+    const o = ref.current
+    if (!o) return
+    const d = dims(p)
+    o.position.set((p.x + d.length / 2 - container.length / 2) * S, (p.y + d.width / 2 - container.width / 2) * S, (p.z + p.height / 2) * S)
+    o.rotation.set(0, 0, p.rotation * Math.PI / 180)
+  }, [p.x, p.y, p.z, p.rotation, p.length, p.width, p.height, container.length, container.width])
+  return <group ref={ref} onPointerDown={e => { e.stopPropagation(); onSelect() }} onClick={e => { e.stopPropagation(); onSelect() }}>
     <CargoModel p={{ ...p, x: 0, y: 0, z: 0 }} container={container} selected={selected} hovered={false} showName={showName} local onPointerDown={e => e.stopPropagation()} onPointerUp={e => e.stopPropagation()} onPointerMove={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); onSelect() }} />
   </group>
 }
@@ -321,15 +330,24 @@ function SceneContent({ props }: { props: Props }) {
       onChange={() => { applyMulti(); previewCargo() }}
     />}
     <CameraRig view={view} container={container} dragging={dragging} transformActive={!!activeObject && !!(activeMaterial || freePlacementEnabled)} focusPoint={focusPoint} focusNonce={focusNonce} />
-    <Html fullscreen zIndexRange={[10000, 0]} style={{ pointerEvents: 'none' }}><div className="scene-toolbar-portal" style={{ pointerEvents: 'auto', position: 'absolute', top: 12, left: 12 }}>{toolbar}</div></Html>
+    const toolbarRoot = useRef<Root | null>(null)
+  useEffect(() => {
+    const host = props.toolbarHost
+    if (!host) return
+    if (!toolbarRoot.current) toolbarRoot.current = createRoot(host)
+    toolbarRoot.current.render(toolbar)
+    return () => { toolbarRoot.current?.unmount(); toolbarRoot.current = null }
+  }, [props.toolbarHost, tool, activeMaterial?.id, props.selectedMaterialId, freePlacementEnabled])
   </>
 }
 
 export default function ContainerScene(props: Props) {
   const [selectedMaterialId, setSelectedMaterialId] = useState<string | null>(null)
+  const [toolbarHost, setToolbarHost] = useState<HTMLDivElement | null>(null)
   return <div className="scene-shell" style={{ position: 'relative', width: '100%', height: '100%' }}>
     <Canvas shadows dpr={[1, 1.4]} gl={{ antialias: true, powerPreference: 'high-performance' }} camera={{ position: [10, 8, 6], fov: 42, near: .01, far: 120, up: [0, 0, 1] }} onPointerMissed={() => { props.onSelect(null); props.onSelectMany([]); setSelectedMaterialId(null) }}>
-      <SceneContent props={{ ...props, selectedMaterialId, onSelectMaterial: setSelectedMaterialId }} />
+      <SceneContent props={{ ...props, selectedMaterialId, onSelectMaterial: setSelectedMaterialId, toolbarHost }} />
     </Canvas>
+    <div ref={setToolbarHost} className="scene-toolbar-host" style={{ position: 'absolute', top: 12, left: 12, zIndex: 50, pointerEvents: 'none' }} />
   </div>
 }
