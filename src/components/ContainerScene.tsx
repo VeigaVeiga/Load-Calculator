@@ -89,18 +89,12 @@ function CameraRig({ view, container, dragging, transformActive, focusPoint, foc
     camera.lookAt(nextTarget)
     c.update()
   }, [focusNonce, focusPoint, camera])
-
   useEffect(() => {
     const c = controls.current
     if (!c) return
-    // Single source of truth: after a transform ends, deselection, or Free Placement
-    // being switched off, OrbitControls must be explicitly enabled again.
     c.enabled = !(dragging && transformActive)
     if (c.enabled) c.update()
   }, [dragging, transformActive])
-
-  // Orbit is disabled only while a transform is actively being dragged.
-  // Merely enabling Free Placement must never lock the camera.
   return <OrbitControls ref={controls} makeDefault enableDamping dampingFactor={.08} rotateSpeed={.7} panSpeed={.65} zoomSpeed={.8} minDistance={1.2} maxDistance={45} />
 }
 
@@ -120,7 +114,6 @@ function CoordinateAxes({ container }: { container: Container }) {
 function CargoObject({ p, container, selected, onSelect, registerRef, showName }: { p: PlacedCargo; container: Container; selected: boolean; onSelect: () => void; registerRef: (id: string, o: THREE.Group | null) => void; showName: boolean }) {
   const ref = useRef<THREE.Group>(null)
   useEffect(() => { registerRef(p.id, ref.current); return () => registerRef(p.id, null) }, [p.id, registerRef])
-  // TransformControls owns the live Three.js transform. React selection re-renders must not overwrite it.
   useLayoutEffect(() => {
     const o = ref.current
     if (!o) return
@@ -147,9 +140,10 @@ function MaterialObject({ item, container, selected, onSelect, registerRef, onDe
 }
 
 function SceneContent({ props }: { props: Props }) {
-  const { container, items, materials, selectedId, selectedIds, onSelect, onSelectMany, onMove, onMoveMany, onRotate, onRotateMaterial, onMaterialMove, onMaterialScale, onAddMaterial, view, dragging, onDragState, cargo, lang, showDimensions } = props
+  const { container, items, materials, selectedId, selectedIds, onSelect, onSelectMany, onMove, onMoveMany, onRotate, onRotateMaterial, onMaterialMove, onMaterialScale, onAddMaterial, view, dragging, onDragState, cargo, showDimensions } = props
   const refs = useRef<Record<string, THREE.Group>>({})
   const snapshots = useRef<Record<string, { position: THREE.Vector3; rotation: number; scale: THREE.Vector3 }>>({})
+  const pendingTransforms = useRef<Record<string, { x: number; y: number; z: number; rotation: number }>>({})
   const [tool, setTool] = useState<SceneTool>('translate')
   const [sceneSelectionMode, setSceneSelectionMode] = useState<'single' | 'multi'>(props.selectionMode === 'box' ? 'multi' : 'single')
   const [freePlacementEnabled, setFreePlacementEnabled] = useState(!!props.freePlacement)
@@ -179,9 +173,19 @@ function SceneContent({ props }: { props: Props }) {
 
   const capture = () => {
     snapshots.current = {}
+    pendingTransforms.current = {}
     const ids = selectedIds.length ? selectedIds : (selectedId ? [selectedId] : [])
-    for (const id of ids) { const o = refs.current[id]; if (o) snapshots.current[id] = { position: o.position.clone(), rotation: o.rotation.z, scale: o.scale.clone() } }
-    if (activeMaterial) { const o = refs.current[activeMaterial.id]; if (o) snapshots.current[activeMaterial.id] = { position: o.position.clone(), rotation: o.rotation.z, scale: o.scale.clone() } }
+    for (const id of ids) {
+      const o = refs.current[id]
+      if (o) {
+        snapshots.current[id] = { position: o.position.clone(), rotation: o.rotation.z, scale: o.scale.clone() }
+        pendingTransforms.current[id] = { x: o.position.x, y: o.position.y, z: o.position.z, rotation: o.rotation.z }
+      }
+    }
+    if (activeMaterial) {
+      const o = refs.current[activeMaterial.id]
+      if (o) snapshots.current[activeMaterial.id] = { position: o.position.clone(), rotation: o.rotation.z, scale: o.scale.clone() }
+    }
   }
 
   const candidateFor = (p: PlacedCargo, o: THREE.Group) => {
@@ -193,18 +197,15 @@ function SceneContent({ props }: { props: Props }) {
     return { candidate: { ...p, x, y, z, rotation: r }, x, y, z, r }
   }
 
-  const previewCargo = () => {
-    if (!selectedId) return
-    const p = items.find(q => q.id === selectedId), o = refs.current[selectedId]
-    if (!p || !o) return
-    const { candidate } = candidateFor(p, o)
-    const validation = validatePlacement(candidate, container, items.filter(q => q.id !== selectedId))
-    if (!validation.ok) {
-      const last = snapshots.current[selectedId]
-      if (last) { o.position.copy(last.position); o.rotation.z = last.rotation; o.scale.copy(last.scale) }
-      return
+  const rememberPending = () => {
+    const ids = selectedIds.length ? selectedIds : (selectedId ? [selectedId] : [])
+    for (const id of ids) {
+      const o = refs.current[id]
+      const p = items.find(q => q.id === id)
+      if (!o || !p) continue
+      const { x, y, z, r } = candidateFor(p, o)
+      pendingTransforms.current[id] = { x, y, z, rotation: r }
     }
-    snapshots.current[selectedId] = { position: o.position.clone(), rotation: o.rotation.z, scale: o.scale.clone() }
   }
 
   const commit = () => {
@@ -227,15 +228,18 @@ function SceneContent({ props }: { props: Props }) {
     for (const id of ids) {
       const p = items.find(q => q.id === id), o = refs.current[id]
       if (!p || !o) continue
-      const { candidate, x, y, z, r } = candidateFor(p, o)
-      const validation = validatePlacement(candidate, container, items.filter(q => q.id !== id))
-      if (validation.ok) updates.push({ id, x, y, z, rotation: r })
+      const pending = pendingTransforms.current[id]
+      const result = pending ?? candidateFor(p, o)
+      const candidate = { ...p, x: result.x, y: result.y, z: result.z, rotation: result.rotation }
+      const validation = validatePlacement(candidate, container, items.filter(q => q.id !== id && !ids.includes(q.id)))
+      if (validation.ok) updates.push({ id, x: result.x, y: result.y, z: result.z, rotation: result.rotation })
       else if (snapshots.current[id]) { o.position.copy(snapshots.current[id].position); o.rotation.z = snapshots.current[id].rotation }
     }
     if (updates.length) {
       if (onMoveMany) onMoveMany(updates)
       else updates.forEach(u => { onMove(u.id, u.x, u.y, u.z); if (u.rotation != null) onRotate(u.id, u.rotation) })
     }
+    pendingTransforms.current = {}
   }
 
   const applyMulti = () => {
@@ -247,8 +251,6 @@ function SceneContent({ props }: { props: Props }) {
   }
 
   useEffect(() => {
-    // CAMERA_LOCK_FIX_V2: release the transform state even when the pointerup
-    // happens outside the canvas and TransformControls misses its mouseup.
     const releaseTransform = () => onDragState(false)
     window.addEventListener('pointerup', releaseTransform, true)
     window.addEventListener('mouseup', releaseTransform, true)
@@ -336,7 +338,7 @@ function SceneContent({ props }: { props: Props }) {
       showX={tool === 'rotate' ? true : true} showY={tool === 'rotate' ? false : true} showZ
       onMouseDown={(event: any) => { event.stopPropagation(); capture(); onDragState(true) }}
       onMouseUp={(event: any) => { event.stopPropagation(); commit(); requestAnimationFrame(() => onDragState(false)) }}
-      onChange={() => { applyMulti(); previewCargo() }}
+      onChange={() => { applyMulti(); rememberPending() }}
     />}
     <CameraRig view={view} container={container} dragging={dragging} transformActive={!!activeObject && !!(activeMaterial || freePlacementEnabled)} focusPoint={focusPoint} focusNonce={focusNonce} />
   </>
