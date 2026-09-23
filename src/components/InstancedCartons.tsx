@@ -2,13 +2,11 @@ import { useLayoutEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js'
 import type { Container, PlacedCargo } from '../types'
-import { dims } from '../packing/geometry'
 
 const S = .001
-// Keep real collision dimensions untouched; these values only shrink the
-// rendered mesh so adjacent cartons remain visually distinguishable.
-const GAP_XY = 8
-const GAP_Z = 3
+
+// The mesh is the exact physical carton size. Do not shrink or inflate it here:
+// visual separation is provided by the bevel + outline only.
 const CARTON_GEOMETRY = new RoundedBoxGeometry(1, 1, 1, 2, .035)
 const baseColors = new Float32Array(CARTON_GEOMETRY.getAttribute('position').count * 3)
 baseColors.fill(1)
@@ -24,8 +22,6 @@ type Props = {
 function safeCartonColor(value?: string) {
   if (!value) return '#c7c7c7'
   const color = new THREE.Color(value)
-  // Prevent a bad/legacy black cargo color from turning every carton into a
-  // black silhouette. Very dark colors are still rendered as cardboard grey.
   if (color.r + color.g + color.b < 0.18) return '#c7c7c7'
   return value
 }
@@ -54,12 +50,14 @@ export default function InstancedCartons({ items, container, onSelect }: Props) 
     const outline = new Float32Array(items.length * verticesPerBox * 3)
 
     items.forEach((p, i) => {
-      const d = dims(p)
-      const visualL = Math.max(40, d.length - GAP_XY * 2)
-      const visualW = Math.max(40, d.width - GAP_XY * 2)
-      const visualH = Math.max(40, p.height - (p.z > 0 ? GAP_Z : 0))
-      const x = (p.x + d.length / 2 - container.length / 2) * S
-      const y = (p.y + d.width / 2 - container.width / 2) * S
+      // IMPORTANT: the instance is rotated by its quaternion, so its scale
+      // must use the unrotated physical dimensions. Using dims(p) here and
+      // rotating again caused a 90° cargo to be visually rotated twice.
+      const visualL = Math.max(1, p.length)
+      const visualW = Math.max(1, p.width)
+      const visualH = Math.max(1, p.height)
+      const x = (p.x + (p.rotation % 180 === 0 ? p.length : p.width) / 2 - container.length / 2) * S
+      const y = (p.y + (p.rotation % 180 === 0 ? p.width : p.length) / 2 - container.width / 2) * S
       const z = (p.z + visualH / 2) * S
       position.set(x, y, z)
       quaternion.setFromAxisAngle(axisZ, p.rotation * Math.PI / 180)
@@ -86,7 +84,13 @@ export default function InstancedCartons({ items, container, onSelect }: Props) 
     mesh.instanceMatrix.needsUpdate = true
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true
     mesh.computeBoundingSphere()
-  }, [items, container, matrix, position, quaternion, scale, axisZ, instanceColor, lineGeometry])
+  }, [items, container.length, container.width, matrix, position, quaternion, scale, axisZ, instanceColor, lineGeometry])
+
+  useMemo(() => () => {
+    material.dispose()
+    lineMaterial.dispose()
+    lineGeometry.dispose()
+  }, [material, lineMaterial, lineGeometry])
 
   if (!items.length) return null
 
