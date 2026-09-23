@@ -1,0 +1,24 @@
+name: fix-interaction-v3
+on: push
+permissions:
+  contents: write
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm ci
+      - run: python3 scripts/fix-interaction-v3.py
+      - run: npm run build
+      - name: Commit patched files
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          rm -f scripts/fix-interaction-v3.py .github/workflows/fix-interaction-v3.yml
+          git add src/components/ContainerScene.tsx src/App.tsx src/App.css scripts/fix-interaction-v3.py .github/workflows/fix-interaction-v3.yml
+          git commit -m 'Fix cargo transform persistence units and fixed toolbar'
+          git push
