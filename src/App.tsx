@@ -301,6 +301,7 @@ function App() {
   const [showDimensions, setShowDimensions] = useState(false)
   const [airBagStretch] = useState(false)
   const [packingProgress, setPackingProgress] = useState<number | null>(null)
+  const packingControllerRef = useRef<AbortController | null>(null)
 
 
   const [materials, setMaterials] = useState<SecuringItem[]>([])
@@ -604,6 +605,8 @@ function App() {
   const runPacking = async (nextContainer = container) => {
     if (packingProgress !== null) return
     const locked = placed.filter((p) => p.locked)
+    const controller = new AbortController()
+    packingControllerRef.current = controller
     setPackingProgress(0)
     setMessage('')
     let lastProgress = -1
@@ -614,14 +617,27 @@ function App() {
           lastProgress = safePercent
           setPackingProgress(safePercent)
         }
-      })
+      }, { signal: controller.signal })
+      if (controller.signal.aborted) return
       setPlaced(result)
       setSelectedId(null)
       setSelectedIds([])
       setMessage(lang === 'zh' ? '自动装柜完成' : 'Auto packing complete')
+    } catch (error) {
+      if (!controller.signal.aborted) {
+        console.error(error)
+        setMessage(lang === 'zh' ? '装柜计算失败，请重试' : 'Packing calculation failed')
+      }
     } finally {
+      if (packingControllerRef.current === controller) packingControllerRef.current = null
       setPackingProgress(null)
     }
+  }
+
+  const cancelPacking = () => {
+    packingControllerRef.current?.abort()
+    setPackingProgress(null)
+    setMessage(lang === 'zh' ? '已取消装柜计算' : 'Packing cancelled')
   }
 
 
@@ -737,7 +753,9 @@ function App() {
   const exportThree=async()=>{
     const top=await svgToPng(makeTopViewSvg(1000,420),1000,420),sf=await svgToPng(makeSideFrontSvg(1000,430),1000,430)
     const canvas=document.createElement('canvas');canvas.width=1600;canvas.height=950;const ctx=canvas.getContext('2d');if(!ctx)throw new Error('Canvas unavailable');ctx.fillStyle='#fff';ctx.fillRect(0,0,1600,950)
-    const a1=await createImageBitmap(new Blob([top],{type:'image/png'})),a2=await createImageBitmap(new Blob([sf],{type:'image/png'}));ctx.drawImage(a1,40,30,1520,420);ctx.drawImage(a2,40,480,1520,440);a1.close();a2.close()
+    const a1=await createImageBitmap(new Blob([top],{type:'image/png'})),a2=await createImageBitmap(new Blob([sf],{type:'image/png'}));
+    const fit=(bmp:ImageBitmap,x:number,y:number,w:number,h:number)=>{const r=Math.min(w/bmp.width,h/bmp.height);const dw=bmp.width*r,dh=bmp.height*r;ctx.drawImage(bmp,x+(w-dw)/2,y+(h-dh)/2,dw,dh)}
+    fit(a1,40,30,1520,420);fit(a2,40,480,1520,440);a1.close();a2.close()
     const blob=await new Promise<Blob|null>(r=>canvas.toBlob(r,'image/png'));if(!blob)throw new Error('PNG export failed');const u=URL.createObjectURL(blob);const a=document.createElement('a');a.href=u;a.download=`${container.name}-three-views.png`;a.click();setTimeout(()=>URL.revokeObjectURL(u),1000)
   }
 
@@ -1319,6 +1337,19 @@ function App() {
                     </label>
                   </div>
 
+                  <div className="fields stack-limit-fields">
+                    <label>
+                      {lang === 'zh' ? '最大堆叠层数' : 'Max Stack Layers'}
+                      <input type="number" min="0" value={c.maxStackLayers || 0} onChange={(e) => update(c.id, 'maxStackLayers', Math.max(0, Math.floor(Number(e.target.value) || 0)))} />
+                      <small>{lang === 'zh' ? '0 = 不限制，按集装箱实际内高' : '0 = unlimited; use actual internal height'}</small>
+                    </label>
+                    <label>
+                      {lang === 'zh' ? '最大顶部承重 (kg)' : 'Max Top Load (kg)'}
+                      <input type="number" min="0" value={c.maxLoadOnTop || 0} onChange={(e) => update(c.id, 'maxLoadOnTop', Math.max(0, Number(e.target.value) || 0))} />
+                      <small>{lang === 'zh' ? '0 = 不限制' : '0 = unlimited'}</small>
+                    </label>
+                  </div>
+
                   <div
                     className={`cargo-volume ${
                       volume >
@@ -1382,6 +1413,7 @@ function App() {
                   <strong>{packingProgress}%</strong>
                   <div className="packing-track"><i style={{ width: `${packingProgress}%` }} /></div>
                   <span>{lang === 'zh' ? '正在搜索摆放位置与旋转组合，请稍候…' : 'Searching placement and rotation combinations…'}</span>
+                  <button className="packing-cancel" onClick={cancelPacking}>{lang === 'zh' ? '取消计算' : 'Cancel'}</button>
                 </div>
               </div>
             )}
