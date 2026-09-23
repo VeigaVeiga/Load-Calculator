@@ -26,10 +26,10 @@ export default function CargoProperties({
     </div>
     <div className="cargo-data">
       <div>{lang === 'zh' ? '数量' : 'Quantity'} <b>1 / {cargo.quantity}</b></div>
-      <div>{lang === 'zh' ? '单件重量' : 'Unit Weight'} <b>{placed.weight.toFixed(1)} kg</b></div>
-      <div>{lang === 'zh' ? '原始尺寸' : 'Original Size'} <b>{cargo.length} × {cargo.width} × {cargo.height} mm</b></div>
-      <div>{lang === 'zh' ? '实际占地' : 'Placed Footprint'} <b>{d.length} × {d.width} × {placed.height} mm</b></div>
-      <div>{lang === 'zh' ? '位置' : 'Position'} <b>{placed.x} × {placed.y} × {placed.z} mm</b></div>
+      <div>{lang === 'zh' ? '单件重量 (KG)' : 'Unit Weight (KG)'} <b>{placed.weight.toFixed(1)} kg</b></div>
+      <div>{lang === 'zh' ? '原始尺寸 (mm)' : 'Original Size (mm)'} <b>{cargo.length} × {cargo.width} × {cargo.height} mm</b></div>
+      <div>{lang === 'zh' ? '实际尺寸 (mm)' : 'Placed Size (mm)'} <b>{d.length} × {d.width} × {placed.height} mm</b></div>
+      <div>{lang === 'zh' ? '位置 (mm)' : 'Position (mm)'} <b>{placed.x} × {placed.y} × {placed.z} mm</b></div>
       <div>{lang === 'zh' ? '旋转' : 'Rotation'} <b>{placed.rotation}°</b></div>
     </div>
     <label className="check">

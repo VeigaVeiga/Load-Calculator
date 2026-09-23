@@ -312,13 +312,13 @@ function SceneContent({ props }: { props: Props }) {
     {activeObject && (activeMaterial || freePlacementEnabled) && <TransformControls
       object={activeObject}
       mode={activeMaterial && tool === 'scale' ? 'scale' : tool}
-      axis={tool === 'rotate' ? 'Z' : undefined}
+      axis={undefined}
       translationSnap={.01}
       rotationSnap={Math.PI / 2}
       scaleSnap={.05}
-      showX={tool !== 'rotate'} showY={tool !== 'rotate'} showZ
+      showX={tool === 'rotate' ? true : true} showY={tool === 'rotate' ? false : true} showZ
       onMouseDown={(event: any) => { event.stopPropagation(); capture(); onDragState(true) }}
-      onMouseUp={(event: any) => { event.stopPropagation(); onDragState(false); commit() }}
+      onMouseUp={(event: any) => { event.stopPropagation(); commit(); onDragState(false) }}
       onChange={() => { applyMulti(); previewCargo() }}
     />}
     <CameraRig view={view} container={container} dragging={dragging} transformActive={!!activeObject && !!(activeMaterial || freePlacementEnabled)} focusPoint={focusPoint} focusNonce={focusNonce} />
