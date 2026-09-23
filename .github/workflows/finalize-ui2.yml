@@ -12,7 +12,6 @@ jobs:
           node-version: 24
       - run: npm ci
       - run: python3 scripts/finalize_ui2.py
-      - run: printf '\n.stack-limit-fields small{display:block;font-size:10px;opacity:.65;margin-top:2px}.packing-cancel{margin-top:10px;padding:7px 14px;border:1px solid #c44;border-radius:6px;background:#fff;color:#b33;font-weight:700;cursor:pointer}\n' >> src/App.css
       - run: npm run build
       - name: Commit
         run: git config user.name 'github-actions[bot]' && git config user.email '41898282+github-actions[bot]@users.noreply.github.com' && rm -f .github/workflows/finalize-ui2.yml scripts/finalize_ui2.py && git add src/App.tsx src/App.css .github/workflows/finalize-ui2.yml scripts/finalize_ui2.py && git commit -m 'Finalize interaction export and packing controls' && git push
