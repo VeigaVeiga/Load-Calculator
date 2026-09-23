@@ -71,3 +71,5 @@ jobs:
           git add src/components/ContainerScene.tsx
           git commit -m "Fix camera unlock after transform operations"
           git push
+
+# trigger
