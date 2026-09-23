@@ -1,0 +1,46 @@
+name: fix-syntax
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/fix-syntax.yml'
+permissions:
+  contents: write
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fix ContainerScene syntax and validate
+        shell: python
+        run: |
+          from pathlib import Path
+          p=Path('src/components/ContainerScene.tsx')
+          s=p.read_text(encoding='utf-8')
+          bad="""    <CameraRig view={view} container={container} dragging={dragging} transformActive={!!activeObject && !!(activeMaterial || freePlacementEnabled)} focusPoint={focusPoint} focusNonce={focusNonce} />\n    const toolbarRoot = useRef<Root | null>(null)\n  useEffect(() => {\n    const host = props.toolbarHost\n    if (!host) return\n    if (!toolbarRoot.current) toolbarRoot.current = createRoot(host)\n    toolbarRoot.current.render(toolbar)\n    return () => { toolbarRoot.current?.unmount(); toolbarRoot.current = null }\n  }, [props.toolbarHost, tool, activeMaterial?.id, props.selectedMaterialId, freePlacementEnabled])\n  </>\n}"""
+          good="""    <CameraRig view={view} container={container} dragging={dragging} transformActive={!!activeObject && !!(activeMaterial || freePlacementEnabled)} focusPoint={focusPoint} focusNonce={focusNonce} />\n  </>\n}"""
+          if bad not in s: raise SystemExit('bad JSX block not found')
+          s=s.replace(bad,good)
+          # Insert toolbar React root hook before the SceneContent return. The hook is inside SceneContent, so it remains valid React code.
+          marker="""  const instancedCartons = useMemo(() => items.filter(p => p.cargoType === 'carton' && !selectedIds.includes(p.id) && p.id !== selectedId && !cargo.find(c => c.id === p.cargoId)?.showName), [items, selectedIds, selectedId, cargo])\n"""
+          hook="""  const toolbarRoot = useRef<Root | null>(null)\n  useEffect(() => {\n    const host = props.toolbarHost\n    if (!host) return\n    if (!toolbarRoot.current) toolbarRoot.current = createRoot(host)\n    toolbarRoot.current.render(toolbar)\n    return () => { toolbarRoot.current?.unmount(); toolbarRoot.current = null }\n  }, [props.toolbarHost, tool, activeMaterial?.id, props.selectedMaterialId, freePlacementEnabled, selectedId])\n\n"""
+          if marker not in s: raise SystemExit('insertion marker not found')
+          s=s.replace(marker,hook+marker,1)
+          p.write_text(s,encoding='utf-8')
+      - name: Install and build
+        run: npm ci && npm run build
+      - name: Commit fixed source
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/components/ContainerScene.tsx
+          git commit -m 'Fix ContainerScene toolbar hook placement' || exit 0
+          git push
+      - name: Remove temporary workflow
+        if: success()
+        run: |
+          git rm -f .github/workflows/fix-syntax.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'Remove temporary syntax fix workflow'
+          git push
