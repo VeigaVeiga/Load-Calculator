@@ -306,6 +306,15 @@ function SceneContent({ props }: { props: Props }) {
     <button onClick={() => addMaterial('triangleWood')}>三角木</button><button onClick={() => addMaterial('lashingBelt')}>紧固带</button><button onClick={() => addMaterial('airBag')}>充气袋</button><button onClick={() => addMaterial('doorNet')}>柜门网</button>
   </div>
 
+  const toolbarRoot = useRef<Root | null>(null)
+  useEffect(() => {
+    const host = props.toolbarHost
+    if (!host) return
+    if (!toolbarRoot.current) toolbarRoot.current = createRoot(host)
+    toolbarRoot.current.render(toolbar)
+    return () => { toolbarRoot.current?.unmount(); toolbarRoot.current = null }
+  }, [props.toolbarHost, tool, activeMaterial?.id, props.selectedMaterialId, freePlacementEnabled, selectedId])
+
   const instancedCartons = useMemo(() => items.filter(p => p.cargoType === 'carton' && !selectedIds.includes(p.id) && p.id !== selectedId && !cargo.find(c => c.id === p.cargoId)?.showName), [items, selectedIds, selectedId, cargo])
   const instancedIds = useMemo(() => new Set(instancedCartons.map(p => p.id)), [instancedCartons])
   const individualItems = useMemo(() => items.filter(p => !instancedIds.has(p.id)), [items, instancedIds])
@@ -330,14 +339,6 @@ function SceneContent({ props }: { props: Props }) {
       onChange={() => { applyMulti(); previewCargo() }}
     />}
     <CameraRig view={view} container={container} dragging={dragging} transformActive={!!activeObject && !!(activeMaterial || freePlacementEnabled)} focusPoint={focusPoint} focusNonce={focusNonce} />
-    const toolbarRoot = useRef<Root | null>(null)
-  useEffect(() => {
-    const host = props.toolbarHost
-    if (!host) return
-    if (!toolbarRoot.current) toolbarRoot.current = createRoot(host)
-    toolbarRoot.current.render(toolbar)
-    return () => { toolbarRoot.current?.unmount(); toolbarRoot.current = null }
-  }, [props.toolbarHost, tool, activeMaterial?.id, props.selectedMaterialId, freePlacementEnabled])
   </>
 }
 
