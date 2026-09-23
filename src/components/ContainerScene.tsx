@@ -1,5 +1,4 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
 import { Canvas, useThree } from '@react-three/fiber'
 import { Html, Line, OrbitControls, Sky, TransformControls } from '@react-three/drei'
 import * as THREE from 'three'
@@ -322,7 +321,7 @@ function SceneContent({ props }: { props: Props }) {
       onChange={() => { applyMulti(); previewCargo() }}
     />}
     <CameraRig view={view} container={container} dragging={dragging} transformActive={!!activeObject && !!(activeMaterial || freePlacementEnabled)} focusPoint={focusPoint} focusNonce={focusNonce} />
-    {typeof document !== 'undefined' ? createPortal(<div className="scene-toolbar-portal">{toolbar}</div>, document.body) : null}
+    <Html fullscreen zIndexRange={[10000, 0]} style={{ pointerEvents: 'none' }}><div className="scene-toolbar-portal" style={{ pointerEvents: 'auto', position: 'absolute', top: 12, left: 12 }}>{toolbar}</div></Html>
   </>
 }
 
