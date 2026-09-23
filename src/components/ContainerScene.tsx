@@ -284,7 +284,6 @@ function SceneContent({ props }: { props: Props }) {
       showX showY showZ
       onMouseDown={(event: any) => { event.stopPropagation(); onDragState(true) }}
       onMouseUp={(event: any) => { event.stopPropagation(); onDragState(false); commit() }}
-      onDraggingChanged={(event: any) => { onDragState(Boolean(event.value)) }}
       onChange={() => { applyMulti(); previewCargo() }}
     />}
     <CameraRig view={view} container={container} dragging={dragging} />
