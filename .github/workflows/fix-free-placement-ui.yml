@@ -1,0 +1,126 @@
+name: Fix free placement and UI
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    if: ${{ !contains(github.event.head_commit.message, '[auto-fix]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Apply focused fixes
+        shell: python
+        run: |
+          from pathlib import Path
+          import re
+
+          scene = Path('src/components/ContainerScene.tsx')
+          s = scene.read_text(encoding='utf-8')
+
+          # 1) Cargo transforms must be owned by the Three.js group, not by
+          # React JSX position/rotation props. This prevents a re-render caused
+          # by deselection from restoring stale PlacedCargo coordinates.
+          s = s.replace(
+              "import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'",
+              "import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'",
+              1,
+          )
+
+          cargo_re = re.compile(r"function CargoObject\(.*?\n\}\n\nfunction MaterialObject", re.S)
+          cargo_fn = '''function CargoObject({ p, container, selected, onSelect, registerRef, showName }: { p: PlacedCargo; container: Container; selected: boolean; onSelect: () => void; registerRef: (id: string, o: THREE.Group | null) => void; showName: boolean }) {
+            const ref = useRef<THREE.Group>(null)
+
+            useEffect(() => {
+              registerRef(p.id, ref.current)
+              return () => registerRef(p.id, null)
+            }, [p.id, registerRef])
+
+            // Do not bind position/rotation through JSX props. TransformControls
+            // mutates the group directly; JSX props would overwrite that transform
+            // whenever selection state changes and cause the cargo to snap back.
+            useLayoutEffect(() => {
+              const o = ref.current
+              if (!o) return
+              o.position.set(
+                (p.x + p.length / 2 - container.length / 2) * S,
+                (p.y + p.width / 2 - container.width / 2) * S,
+                (p.z + p.height / 2) * S,
+              )
+              o.rotation.set(0, 0, p.rotation * Math.PI / 180)
+            }, [p.x, p.y, p.z, p.length, p.width, p.height, p.rotation, container.length, container.width])
+
+            return <group ref={ref} onPointerDown={e => { e.stopPropagation(); onSelect() }} onClick={e => { e.stopPropagation(); onSelect() }}>
+              <CargoModel p={{ ...p, x: 0, y: 0, z: 0 }} container={container} selected={selected} hovered={false} showName={showName} local onPointerDown={e => e.stopPropagation()} onPointerUp={e => e.stopPropagation()} onPointerMove={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); onSelect() }} />
+            </group>
+          }
+
+          function MaterialObject'''
+          s2, n = cargo_re.subn(cargo_fn, s, count=1)
+          if n != 1:
+              raise SystemExit('CargoObject replacement failed')
+          s = s2
+
+          # 3) Keep the toolbar as DOM UI in the canvas container, not in the
+          # Three.js scene graph. Drei Html's portal preserves DOM semantics while
+          # keeping the toolbar independent of the camera transform.
+          marker = "const [focusNonce, setFocusNonce] = useState(0)"
+          portal_line = "const toolbarPortal = useMemo(() => ({ current: (document.querySelector('canvas')?.parentElement ?? document.body) as HTMLElement }), [])"
+          if portal_line not in s:
+              if marker not in s:
+                  raise SystemExit('SceneContent insertion marker not found')
+              s = s.replace(marker, marker + "\n  " + portal_line, 1)
+
+          # Only the toolbar uses the fullscreen Html wrapper at this point.
+          if '<Html fullscreen>' in s:
+              s = s.replace('<Html fullscreen>', '<Html fullscreen portal={toolbarPortal}>', 1)
+          elif '<Html fullscreen' not in s:
+              raise SystemExit('Toolbar Html marker not found')
+
+          scene.write_text(s, encoding='utf-8')
+
+          # 2) Make the input units visually explicit even if stylesheet rules
+          # accidentally suppress the small field-unit class.
+          app = Path('src/App.tsx')
+          a = app.read_text(encoding='utf-8')
+          a = a.replace(
+              '<small className="field-unit">',
+              '<span style={{ marginLeft: 4, opacity: 0.78, fontSize: \'0.78em\', fontWeight: 600 }}>',
+          )
+          a = a.replace('</small>', '</span>')
+          # Keep top-load unit consistently uppercase.
+          a = a.replace('最大顶部承重 (kg)', '最大顶部承重 (KG)')
+          a = a.replace('Max Top Load (kg)', 'Max Top Load (KG)')
+          app.write_text(a, encoding='utf-8')
+
+      - name: Build
+        run: npm ci --ignore-scripts && npm run build
+
+      - name: Commit fixes
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/components/ContainerScene.tsx src/App.tsx
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          git commit -m "Fix cargo transform persistence and scene UI [auto-fix]"
+          git push
+
+      - name: Remove temporary workflow
+        if: ${{ success() }}
+        shell: bash
+        run: |
+          git rm .github/workflows/fix-free-placement-ui.yml || true
+          git commit -m "Remove temporary fix workflow [auto-fix]" || true
+          git push || true
