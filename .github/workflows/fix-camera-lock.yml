@@ -1,0 +1,73 @@
+name: Fix transform camera lock
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  patch-camera-lock:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Patch TransformControls drag state
+        shell: python
+        run: |
+          from pathlib import Path
+
+          path = Path('src/components/ContainerScene.tsx')
+          text = path.read_text(encoding='utf-8')
+
+          marker = "// CAMERA_LOCK_FIX_V2"
+          if marker in text:
+              print('Camera lock patch already present; nothing to do.')
+              raise SystemExit(0)
+
+          old = "  useEffect(() => {\n    const key = (e: KeyboardEvent) => {"
+          new = """  useEffect(() => {
+    // CAMERA_LOCK_FIX_V2: never leave OrbitControls disabled if the pointerup
+    // happens outside the canvas or TransformControls misses its mouseup event.
+    const releaseTransform = () => onDragState(false)
+    window.addEventListener('pointerup', releaseTransform, true)
+    window.addEventListener('mouseup', releaseTransform, true)
+    window.addEventListener('blur', releaseTransform)
+    return () => {
+      window.removeEventListener('pointerup', releaseTransform, true)
+      window.removeEventListener('mouseup', releaseTransform, true)
+      window.removeEventListener('blur', releaseTransform)
+    }
+  }, [onDragState])
+
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => {"""
+          if old not in text:
+              raise SystemExit('Could not locate keyboard effect anchor')
+          text = text.replace(old, new, 1)
+
+          old_tc = "      onMouseUp={(event: any) => { event.stopPropagation(); onDragState(false); commit() }}\n      onChange={() => { applyMulti(); previewCargo() }}"
+          new_tc = """      onMouseUp={(event: any) => { event.stopPropagation(); onDragState(false); commit() }}
+      onDraggingChanged={(event: any) => { onDragState(Boolean(event.value)) }}
+      onChange={() => { applyMulti(); previewCargo() }}"""
+          if old_tc not in text:
+              raise SystemExit('Could not locate TransformControls handlers')
+          text = text.replace(old_tc, new_tc, 1)
+
+          path.write_text(text, encoding='utf-8')
+          print('Patched', path)
+
+      - name: Commit patch
+        shell: bash
+        run: |
+          if git diff --quiet -- src/components/ContainerScene.tsx; then
+            echo "No patch needed."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/components/ContainerScene.tsx
+          git commit -m "Fix camera unlock after transform operations"
+          git push
