@@ -204,6 +204,20 @@ function SceneContent({ props }: { props: Props }) {
   }
 
   useEffect(() => {
+    // CAMERA_LOCK_FIX_V2: release the transform state even when the pointerup
+    // happens outside the canvas and TransformControls misses its mouseup.
+    const releaseTransform = () => onDragState(false)
+    window.addEventListener('pointerup', releaseTransform, true)
+    window.addEventListener('mouseup', releaseTransform, true)
+    window.addEventListener('blur', releaseTransform)
+    return () => {
+      window.removeEventListener('pointerup', releaseTransform, true)
+      window.removeEventListener('mouseup', releaseTransform, true)
+      window.removeEventListener('blur', releaseTransform)
+    }
+  }, [onDragState])
+
+  useEffect(() => {
     const key = (e: KeyboardEvent) => {
       if (e.key === 'Escape') { onSelect(null); onSelectMany([]); props.onSelectMaterial?.(null) }
       if (e.key === 'Delete' && props.selectedMaterialId) { props.onDeleteMaterial?.(props.selectedMaterialId); props.onSelectMaterial?.(null) }
@@ -270,6 +284,7 @@ function SceneContent({ props }: { props: Props }) {
       showX showY showZ
       onMouseDown={(event: any) => { event.stopPropagation(); onDragState(true) }}
       onMouseUp={(event: any) => { event.stopPropagation(); onDragState(false); commit() }}
+      onDraggingChanged={(event: any) => { onDragState(Boolean(event.value)) }}
       onChange={() => { applyMulti(); previewCargo() }}
     />}
     <CameraRig view={view} container={container} dragging={dragging} />
