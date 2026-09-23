@@ -50,7 +50,7 @@ type Props = {
   onDeleteMaterial?: (id: string) => void
 }
 
-function CameraRig({ view, container, dragging, transformActive }: { view: View; container: Container; dragging: boolean; transformActive: boolean }) {
+function CameraRig({ view, container, dragging, transformActive, focusPoint, focusNonce }: { view: View; container: Container; dragging: boolean; transformActive: boolean; focusPoint: [number, number, number] | null; focusNonce: number }) {
   const { camera, size } = useThree()
   const controls = useRef<any>(null)
   useEffect(() => {
@@ -77,6 +77,17 @@ function CameraRig({ view, container, dragging, transformActive }: { view: View;
     controls.current?.target.copy(target)
     controls.current?.update()
   }, [view, container.length, container.width, container.height, size.width, size.height, camera])
+  useEffect(() => {
+    const c = controls.current
+    if (!c || !focusPoint || focusNonce === 0) return
+    const nextTarget = new THREE.Vector3(...focusPoint)
+    const offset = camera.position.clone().sub(c.target)
+    c.target.copy(nextTarget)
+    camera.position.copy(nextTarget).add(offset)
+    camera.lookAt(nextTarget)
+    c.update()
+  }, [focusNonce, focusPoint, camera])
+
   useEffect(() => {
     const c = controls.current
     if (!c) return
@@ -134,6 +145,8 @@ function SceneContent({ props }: { props: Props }) {
   const [tool, setTool] = useState<SceneTool>('translate')
   const [sceneSelectionMode, setSceneSelectionMode] = useState<'single' | 'multi'>(props.selectionMode === 'box' ? 'multi' : 'single')
   const [freePlacementEnabled, setFreePlacementEnabled] = useState(!!props.freePlacement)
+  const [focusPoint, setFocusPoint] = useState<[number, number, number] | null>(null)
+  const [focusNonce, setFocusNonce] = useState(0)
   const activeMaterial = props.selectedMaterialId ? materials.find(m => m.id === props.selectedMaterialId) ?? null : null
   const activeId = activeMaterial?.id ?? (freePlacementEnabled ? selectedId : null)
   const activeObject = activeId ? refs.current[activeId] ?? null : null
@@ -142,6 +155,14 @@ function SceneContent({ props }: { props: Props }) {
 
   const selectCargo = (id: string) => {
     props.onSelectMaterial?.(null)
+    if (freePlacementEnabled) {
+      const p = items.find(q => q.id === id)
+      if (p) {
+        const d = dims(p)
+        setFocusPoint([(p.x + d.length / 2 - container.length / 2) * S, (p.y + d.width / 2 - container.width / 2) * S, (p.z + p.height / 2) * S])
+        setFocusNonce(n => n + 1)
+      }
+    }
     if (multi) {
       const next = selectedIds.includes(id) ? selectedIds.filter(x => x !== id) : [...selectedIds, id]
       onSelectMany(next)
@@ -170,7 +191,12 @@ function SceneContent({ props }: { props: Props }) {
     if (!p || !o) return
     const { candidate } = candidateFor(p, o)
     const validation = validatePlacement(candidate, container, items.filter(q => q.id !== selectedId))
-    if (!validation.ok && snapshots.current[selectedId]) { o.position.copy(snapshots.current[selectedId].position); o.rotation.z = snapshots.current[selectedId].rotation }
+    if (!validation.ok) {
+      const last = snapshots.current[selectedId]
+      if (last) { o.position.copy(last.position); o.rotation.z = last.rotation; o.scale.copy(last.scale) }
+      return
+    }
+    snapshots.current[selectedId] = { position: o.position.clone(), rotation: o.rotation.z, scale: o.scale.clone() }
   }
 
   const commit = () => {
@@ -290,12 +316,12 @@ function SceneContent({ props }: { props: Props }) {
       translationSnap={.01}
       rotationSnap={Math.PI / 2}
       scaleSnap={.05}
-      showX showY showZ
-      onMouseDown={(event: any) => { event.stopPropagation(); onDragState(true) }}
+      showX={tool !== 'rotate'} showY={tool !== 'rotate'} showZ
+      onMouseDown={(event: any) => { event.stopPropagation(); capture(); onDragState(true) }}
       onMouseUp={(event: any) => { event.stopPropagation(); onDragState(false); commit() }}
       onChange={() => { applyMulti(); previewCargo() }}
     />}
-    <CameraRig view={view} container={container} dragging={dragging} transformActive={!!activeObject && !!(activeMaterial || freePlacementEnabled)} />
+    <CameraRig view={view} container={container} dragging={dragging} transformActive={!!activeObject && !!(activeMaterial || freePlacementEnabled)} focusPoint={focusPoint} focusNonce={focusNonce} />
     <Html fullscreen style={{ pointerEvents: 'none' }}><div style={{ pointerEvents: 'none' }}>{toolbar}</div></Html>
   </>
 }
