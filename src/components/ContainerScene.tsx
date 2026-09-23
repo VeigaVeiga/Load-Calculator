@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Canvas, useThree } from '@react-three/fiber'
 import { Html, Line, OrbitControls, Sky, TransformControls } from '@react-three/drei'
 import * as THREE from 'three'
@@ -118,8 +119,7 @@ function CoordinateAxes({ container }: { container: Container }) {
 function CargoObject({ p, container, selected, onSelect, registerRef, showName }: { p: PlacedCargo; container: Container; selected: boolean; onSelect: () => void; registerRef: (id: string, o: THREE.Group | null) => void; showName: boolean }) {
   const ref = useRef<THREE.Group>(null)
   useEffect(() => { registerRef(p.id, ref.current); return () => registerRef(p.id, null) }, [p.id, registerRef])
-  const d = dims(p)
-  const pos: [number, number, number] = [(p.x + d.length / 2 - container.length / 2) * S, (p.y + d.width / 2 - container.width / 2) * S, (p.z + p.height / 2) * S]
+  const pos: [number, number, number] = [(p.x + p.length / 2 - container.length / 2) * S, (p.y + p.width / 2 - container.width / 2) * S, (p.z + p.height / 2) * S]
   return <group ref={ref} position={pos} rotation={[0, 0, p.rotation * Math.PI / 180]} onPointerDown={e => { e.stopPropagation(); onSelect() }} onClick={e => { e.stopPropagation(); onSelect() }}>
     <CargoModel p={{ ...p, x: 0, y: 0, z: 0 }} container={container} selected={selected} hovered={false} showName={showName} local onPointerDown={e => e.stopPropagation()} onPointerUp={e => e.stopPropagation()} onPointerMove={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); onSelect() }} />
   </group>
@@ -318,11 +318,11 @@ function SceneContent({ props }: { props: Props }) {
       scaleSnap={.05}
       showX={tool === 'rotate' ? true : true} showY={tool === 'rotate' ? false : true} showZ
       onMouseDown={(event: any) => { event.stopPropagation(); capture(); onDragState(true) }}
-      onMouseUp={(event: any) => { event.stopPropagation(); commit(); onDragState(false) }}
+      onMouseUp={(event: any) => { event.stopPropagation(); commit(); requestAnimationFrame(() => onDragState(false)) }}
       onChange={() => { applyMulti(); previewCargo() }}
     />}
     <CameraRig view={view} container={container} dragging={dragging} transformActive={!!activeObject && !!(activeMaterial || freePlacementEnabled)} focusPoint={focusPoint} focusNonce={focusNonce} />
-    <Html fullscreen style={{ pointerEvents: 'none' }}><div style={{ pointerEvents: 'none' }}>{toolbar}</div></Html>
+    {typeof document !== 'undefined' ? createPortal(<div className="scene-toolbar-portal">{toolbar}</div>, document.body) : null}
   </>
 }
 

@@ -198,3 +198,28 @@ body,.app{font-size:14px;}
 
 /* V31 cleanup */
 .beta-badge{display:inline-block;margin-left:7px;padding:2px 6px;border:1px solid #9a5c2d;border-radius:3px;font-size:.42em;letter-spacing:.08em;vertical-align:middle;color:#9a5c2d;background:#eee4d5;text-transform:none}.scene-toolbox{background:rgba(36,40,40,.94)!important;border:1px solid #777!important;box-shadow:4px 4px 0 rgba(0,0,0,.18)!important;border-radius:4px!important;padding:7px!important;gap:5px!important}.scene-toolbox button{background:#eee9de!important;color:#24292a!important;border:1px solid #767872!important}.scene-toolbox button.active{background:#3b403f!important;color:#fff!important}.scene-toolbox .disabled{opacity:.38!important;cursor:not-allowed!important}.viewer-foot span:last-child{margin-left:auto}
+
+
+/* INTERACTION_V3: the 3D toolbar is a document-level overlay, never part of the R3F scene. */
+.scene-toolbar-portal {
+  position: fixed;
+  left: 24px;
+  top: 148px;
+  z-index: 100000;
+  pointer-events: none;
+}
+.scene-toolbar-portal .scene-toolbox {
+  position: relative !important;
+  left: auto !important;
+  top: auto !important;
+  right: auto !important;
+  bottom: auto !important;
+  transform: none !important;
+  pointer-events: auto !important;
+}
+.field-unit {
+  font-size: 10px;
+  opacity: .72;
+  font-weight: 600;
+  margin-left: 3px;
+}

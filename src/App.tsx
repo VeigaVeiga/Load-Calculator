@@ -1157,7 +1157,7 @@ function App() {
 
                   <div className="fields">
                     <label>
-                      {tr.quantity}
+                      {tr.quantity} <small className="field-unit">(件)</small>
 
                       <input
                         className={inputInvalid(c,'quantity')?'input-limit-error':''}
@@ -1177,7 +1177,7 @@ function App() {
                     </label>
 
                     <label>
-                      {tr.unitWeight}
+                      {tr.unitWeight} <small className="field-unit">(KG)</small>
 
                       <input
                         type="number"
@@ -1198,7 +1198,7 @@ function App() {
 
                   <div className="fields">
                     <label>
-                      {tr.length}
+                      {tr.length} <small className="field-unit">(mm)</small>
 
                       <input
                         className={inputInvalid(c,'length')?'input-limit-error':''}
@@ -1218,7 +1218,7 @@ function App() {
                     </label>
 
                     <label>
-                      {tr.width}
+                      {tr.width} <small className="field-unit">(mm)</small>
 
                       <input
                         className={inputInvalid(c,'width')?'input-limit-error':''}
@@ -1238,7 +1238,7 @@ function App() {
                     </label>
 
                     <label>
-                      {tr.height}
+                      {tr.height} <small className="field-unit">(mm)</small>
 
                       <input
                         className={inputInvalid(c,'height')?'input-limit-error':''}
