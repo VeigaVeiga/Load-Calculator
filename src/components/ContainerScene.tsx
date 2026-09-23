@@ -79,7 +79,7 @@ function CameraRig({ view, container, dragging }: { view: View; container: Conta
   }, [view, container.length, container.width, container.height, size.width, size.height, camera])
   // Orbit is disabled only while a transform is actively being dragged.
   // Merely enabling Free Placement must never lock the camera.
-  return <OrbitControls ref={controls} enabled={!dragging} makeDefault enableDamping dampingFactor={.08} rotateSpeed={.7} panSpeed={.65} zoomSpeed={.8} minDistance={1.2} maxDistance={45} />
+  return <OrbitControls ref={controls} makeDefault enableDamping dampingFactor={.08} rotateSpeed={.7} panSpeed={.65} zoomSpeed={.8} minDistance={1.2} maxDistance={45} />
 }
 
 function CoordinateAxes({ container }: { container: Container }) {
