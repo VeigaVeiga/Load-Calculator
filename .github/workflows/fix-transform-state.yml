@@ -1,0 +1,131 @@
+name: Fix transform state and UI isolation
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+permissions:
+  contents: write
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch transform state and UI
+        shell: python
+        run: |
+          from pathlib import Path
+
+          scene = Path('src/components/ContainerScene.tsx')
+          s = scene.read_text(encoding='utf-8')
+
+          old_props = "  onMoveMany?: (u: Array<{ id: string; x: number; y: number; z: number; rotation?: number }>) => void\n"
+          if old_props not in s:
+              raise SystemExit('Props anchor not found')
+          if 'toolbarPortal?: HTMLElement | null' not in s:
+              s = s.replace(old_props, old_props + "  toolbarPortal?: HTMLElement | null\n")
+
+          start = s.index('function CargoObject(')
+          end = s.index('\nfunction MaterialObject(', start)
+          new_cargo = r'''function CargoObject({ p, container, selected, onSelect, registerRef, showName }: { p: PlacedCargo; container: Container; selected: boolean; onSelect: () => void; registerRef: (id: string, o: THREE.Group | null) => void; showName: boolean }) {
+  const ref = useRef<THREE.Group>(null)
+  const initialPosition = useRef<[number, number, number]>([(p.x + p.length / 2 - container.length / 2) * S, (p.y + p.width / 2 - container.width / 2) * S, (p.z + p.height / 2) * S])
+  const initialRotation = useRef<[number, number, number]>([0, 0, p.rotation * Math.PI / 180])
+  const syncedKey = useRef('')
+  const propsKey = `${p.x}|${p.y}|${p.z}|${p.rotation}|${p.length}|${p.width}|${p.height}|${container.length}|${container.width}`
+
+  useEffect(() => {
+    registerRef(p.id, ref.current)
+    return () => registerRef(p.id, null)
+  }, [p.id, registerRef])
+
+  useEffect(() => {
+    const o = ref.current
+    if (!o || syncedKey.current === propsKey) return
+    o.position.set(
+      (p.x + p.length / 2 - container.length / 2) * S,
+      (p.y + p.width / 2 - container.width / 2) * S,
+      (p.z + p.height / 2) * S,
+    )
+    o.rotation.set(0, 0, p.rotation * Math.PI / 180)
+    syncedKey.current = propsKey
+  }, [propsKey, p.x, p.y, p.z, p.rotation, p.length, p.width, p.height, container.length, container.width])
+
+  return <group ref={ref} position={initialPosition.current} rotation={initialRotation.current} onPointerDown={e => { e.stopPropagation(); onSelect() }} onClick={e => { e.stopPropagation(); onSelect() }}>
+    <CargoModel p={{ ...p, x: 0, y: 0, z: 0 }} container={container} selected={selected} hovered={false} showName={showName} local onPointerDown={e => e.stopPropagation()} onPointerUp={e => e.stopPropagation()} onPointerMove={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); onSelect() }} />
+  </group>
+}'''
+          s = s[:start] + new_cargo + s[end:]
+
+          # Put the HTML toolbar into a real DOM host outside the R3F canvas.
+          old_html = '<Html fullscreen zIndexRange={[10000, 0]} style={{ pointerEvents: \'none\' }}><div className="scene-toolbar-portal" style={{ pointerEvents: \'auto\', position: \'absolute\', top: 12, left: 12 }}>{toolbar}</div></Html>'
+          new_html = "<Html portal={props.toolbarPortal ? { current: props.toolbarPortal } : undefined} fullscreen zIndexRange={[10000, 0]} style={{ pointerEvents: 'none' }}><div className=\"scene-toolbar-portal\" style={{ pointerEvents: 'auto', position: 'absolute', top: 0, left: 0 }}>{toolbar}</div></Html>"
+          if old_html not in s:
+              raise SystemExit('toolbar HTML anchor not found')
+          s = s.replace(old_html, new_html)
+
+          old_export = "export default function ContainerScene(props: Props) {\n  const [selectedMaterialId, setSelectedMaterialId] = useState<string | null>(null)\n  return <div className=\"scene-shell\" style={{ position: 'relative', width: '100%', height: '100%' }}>\n    <Canvas"
+          new_export = "export default function ContainerScene(props: Props) {\n  const [selectedMaterialId, setSelectedMaterialId] = useState<string | null>(null)\n  const [toolbarPortal, setToolbarPortal] = useState<HTMLDivElement | null>(null)\n  return <div className=\"scene-shell\" style={{ position: 'relative', width: '100%', height: '100%' }}>\n    <div ref={setToolbarPortal} className=\"scene-toolbar-host\" style={{ position: 'absolute', top: 12, left: 12, zIndex: 10000, pointerEvents: 'auto' }} />\n    <Canvas"
+          if old_export not in s:
+              raise SystemExit('ContainerScene export anchor not found')
+          s = s.replace(old_export, new_export)
+          s = s.replace('<SceneContent props={{ ...props, selectedMaterialId, onSelectMaterial: setSelectedMaterialId }} />', '<SceneContent props={{ ...props, selectedMaterialId, onSelectMaterial: setSelectedMaterialId, toolbarPortal }} />')
+          scene.write_text(s, encoding='utf-8')
+
+          app = Path('src/App.tsx')
+          a = app.read_text(encoding='utf-8')
+          if 'const moveMany = (' not in a:
+              anchor = "  const rotateCargo = (id: string, rotation: number) => {\n    setP(id, { rotation: ((Math.round(rotation / 90) * 90) % 360 + 360) % 360 })\n  }\n"
+              if anchor not in a:
+                  raise SystemExit('rotateCargo anchor not found')
+              addition = anchor + r'''
+
+  const moveMany = (updates: Array<{ id: string; x: number; y: number; z: number; rotation?: number }>) => {
+    setPlaced((items) => {
+      let nextItems = items
+      for (const u of updates) {
+        const current = nextItems.find((p) => p.id === u.id)
+        if (!current || current.locked) continue
+        const next = { ...current, x: u.x, y: u.y, z: u.z, rotation: u.rotation == null ? current.rotation : u.rotation, placementMode: 'manual' as const }
+        const validation = validatePlacement(next, container, nextItems.filter((p) => p.id !== u.id))
+        if (validation.ok) nextItems = nextItems.map((p) => p.id === u.id ? next : p)
+      }
+      return nextItems
+    })
+  }
+'''
+              a = a.replace(anchor, addition)
+
+          # Make units impossible to hide behind generic small-text CSS.
+          a = a.replace('<small className="field-unit">(件)</small>', '<span className="field-unit" style={{ display: \'inline-block\', marginLeft: 4, fontSize: 12, fontWeight: 600 }}>(件)</span>')
+          a = a.replace('<small className="field-unit">(KG)</small>', '<span className="field-unit" style={{ display: \'inline-block\', marginLeft: 4, fontSize: 12, fontWeight: 600 }}>(KG)</span>')
+          a = a.replace('<small className="field-unit">(mm)</small>', '<span className="field-unit" style={{ display: \'inline-block\', marginLeft: 4, fontSize: 12, fontWeight: 600 }}>(mm)</span>')
+          # App may render the same label more than once; the replace above is intentionally global.
+
+          # Wire the atomic move handler into the scene. Only add if not already present.
+          if 'onMoveMany={moveMany}' not in a:
+              anchor = 'onMove={move}'
+              if anchor not in a:
+                  raise SystemExit('ContainerScene prop anchor not found')
+              a = a.replace(anchor, anchor + ' onMoveMany={moveMany}', 1)
+          app.write_text(a, encoding='utf-8')
+
+          print('Patched ContainerScene.tsx and App.tsx')
+      - name: Build
+        run: npm ci && npm run build
+      - name: Commit fixes
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/App.tsx src/components/ContainerScene.tsx
+          git diff --cached --quiet && exit 0
+          git commit -m "Fix cargo transform persistence and isolate scene toolbar"
+          git push
+      - name: Remove temporary workflow
+        if: success()
+        shell: bash
+        run: |
+          rm -f .github/workflows/fix-transform-state.yml
+          git add .github/workflows/fix-transform-state.yml
+          git commit -m "Remove temporary transform fix workflow" || true
+          git push || true
