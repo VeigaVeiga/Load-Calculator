@@ -140,7 +140,7 @@ function MaterialObject({ item, container, selected, onSelect, registerRef, onDe
 }
 
 function SceneContent({ props }: { props: Props }) {
-  const { container, items, materials, selectedId, selectedIds, onSelect, onSelectMany, onMove, onMoveMany, onRotate, onRotateMaterial, onMaterialMove, onMaterialScale, onAddMaterial, view, dragging, onDragState, cargo, showDimensions } = props
+  const { container, items, materials, selectedId, selectedIds, onSelect, onSelectMany, onMove, onMoveMany, onRotate, onRotateMaterial, onMaterialMove, onMaterialScale, onAddMaterial, view, dragging, onDragState, cargo, lang, showDimensions } = props
   const refs = useRef<Record<string, THREE.Group>>({})
   const snapshots = useRef<Record<string, { position: THREE.Vector3; rotation: number; scale: THREE.Vector3 }>>({})
   const pendingTransforms = useRef<Record<string, { x: number; y: number; z: number; rotation: number }>>({})
