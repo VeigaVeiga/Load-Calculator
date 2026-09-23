@@ -50,7 +50,7 @@ type Props = {
   onDeleteMaterial?: (id: string) => void
 }
 
-function CameraRig({ view, container, dragging }: { view: View; container: Container; dragging: boolean }) {
+function CameraRig({ view, container, dragging, transformActive }: { view: View; container: Container; dragging: boolean; transformActive: boolean }) {
   const { camera, size } = useThree()
   const controls = useRef<any>(null)
   useEffect(() => {
@@ -77,6 +77,15 @@ function CameraRig({ view, container, dragging }: { view: View; container: Conta
     controls.current?.target.copy(target)
     controls.current?.update()
   }, [view, container.length, container.width, container.height, size.width, size.height, camera])
+  useEffect(() => {
+    const c = controls.current
+    if (!c) return
+    // Single source of truth: after a transform ends, deselection, or Free Placement
+    // being switched off, OrbitControls must be explicitly enabled again.
+    c.enabled = !(dragging && transformActive)
+    if (c.enabled) c.update()
+  }, [dragging, transformActive])
+
   // Orbit is disabled only while a transform is actively being dragged.
   // Merely enabling Free Placement must never lock the camera.
   return <OrbitControls ref={controls} makeDefault enableDamping dampingFactor={.08} rotateSpeed={.7} panSpeed={.65} zoomSpeed={.8} minDistance={1.2} maxDistance={45} />
@@ -286,7 +295,7 @@ function SceneContent({ props }: { props: Props }) {
       onMouseUp={(event: any) => { event.stopPropagation(); onDragState(false); commit() }}
       onChange={() => { applyMulti(); previewCargo() }}
     />}
-    <CameraRig view={view} container={container} dragging={dragging} />
+    <CameraRig view={view} container={container} dragging={dragging} transformActive={!!activeObject && !!(activeMaterial || freePlacementEnabled)} />
     <Html fullscreen style={{ pointerEvents: 'none' }}><div style={{ pointerEvents: 'none' }}>{toolbar}</div></Html>
   </>
 }
