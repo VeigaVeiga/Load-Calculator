@@ -1,0 +1,98 @@
+name: fix-interaction-ui
+on: push
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm ci
+      - name: Apply fixes
+        run: python3 - <<'PY'
+import re
+from pathlib import Path
+p=Path('src/components/ContainerScene.tsx')
+s=p.read_text()
+s=s.replace("import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'", "import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'\nimport { createPortal } from 'react-dom'")
+# Add fixed toolbar positioning state after focus state.
+s=s.replace("const [focusNonce, setFocusNonce] = useState(0)", "const [focusNonce, setFocusNonce] = useState(0)\n  const [toolbarPos, setToolbarPos] = useState({ left: 16, top: 16 })")
+# Track the actual viewer rectangle; toolbar is rendered into document.body, not the R3F scene.
+needle="  const activeMaterial = props.selectedMaterialId ? materials.find(m => m.id === props.selectedMaterialId) ?? null : null"
+insert="""  useEffect(() => {
+    const updateToolbarPos = () => {
+      const el = document.querySelector('.canvas-wrap') as HTMLElement | null
+      if (!el) return
+      const r = el.getBoundingClientRect()
+      setToolbarPos({ left: Math.round(r.left + 12), top: Math.round(r.top + 12) })
+    }
+    updateToolbarPos()
+    window.addEventListener('resize', updateToolbarPos)
+    window.addEventListener('scroll', updateToolbarPos, true)
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(updateToolbarPos) : null
+    const el = document.querySelector('.canvas-wrap') as HTMLElement | null
+    if (el && ro) ro.observe(el)
+    return () => {
+      window.removeEventListener('resize', updateToolbarPos)
+      window.removeEventListener('scroll', updateToolbarPos, true)
+      ro?.disconnect()
+    }
+  }, [])
+
+"""
+s=s.replace(needle, insert+needle)
+# Make cargo commit robust: validate and immediately synchronize the transformed group before parent reconciliation.
+old="""    if (updates.length) {
+      if (onMoveMany) onMoveMany(updates)
+      else updates.forEach(u => { onMove(u.id, u.x, u.y, u.z); if (u.rotation != null) onRotate(u.id, u.rotation) })
+    }
+  }
+"""
+new="""    if (updates.length) {
+      if (onMoveMany) onMoveMany(updates)
+      else updates.forEach(u => { onMove(u.id, u.x, u.y, u.z); if (u.rotation != null) onRotate(u.id, u.rotation) })
+      // Keep the visual transform at the committed state until React finishes its
+      // parent update. This prevents deselection/unmount from snapping cargo back.
+      for (const u of updates) {
+        const o = refs.current[u.id]
+        if (!o) continue
+        const p = items.find(q => q.id === u.id)
+        if (!p) continue
+        const d = dims({ ...p, rotation: u.rotation ?? p.rotation })
+        o.position.set((u.x + d.length / 2 - container.length / 2) * S, (u.y + d.width / 2 - container.width / 2) * S, (u.z + p.height / 2) * S)
+        o.rotation.z = (u.rotation ?? p.rotation) * Math.PI / 180
+      }
+    }
+  }
+"""
+if old not in s: raise SystemExit('commit block not found')
+s=s.replace(old,new)
+# Ensure commit wins before global release; defer only the state flag, not the commit itself.
+s=s.replace("onMouseUp={(event: any) => { event.stopPropagation(); commit(); onDragState(false) }}", "onMouseUp={(event: any) => { event.stopPropagation(); commit(); requestAnimationFrame(() => onDragState(false)) }}")
+# Remove R3F Html toolbar and portal it to document.body as a normal DOM overlay.
+old2="    <Html fullscreen style={{ pointerEvents: 'none' }}><div style={{ pointerEvents: 'none' }}>{toolbar}</div></Html>"
+new2="    {typeof document !== 'undefined' && createPortal(<div className=\"scene-toolbar-overlay\" style={{ position: 'fixed', left: toolbarPos.left, top: toolbarPos.top, zIndex: 10000, pointerEvents: 'auto' }}>{toolbar}</div>, document.body)}"
+if old2 not in s: raise SystemExit('toolbar render not found')
+s=s.replace(old2,new2)
+p.write_text(s)
+
+p=Path('src/App.tsx')
+s=p.read_text()
+s=s.replace("{tr.unitWeight}\n\n                      <input", "{tr.unitWeight} (KG)\n\n                      <input")
+s=s.replace("{tr.length}\n\n                      <input", "{tr.length} (mm)\n\n                      <input")
+s=s.replace("{tr.width}\n\n                      <input", "{tr.width} (mm)\n\n                      <input")
+s=s.replace("{tr.height}\n\n                      <input", "{tr.height} (mm)\n\n                      <input")
+p.write_text(s)
+PY
+      - run: npm run build
+      - name: Commit and clean
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          rm -f .github/workflows/fix-interaction-ui.yml
+          git add src/components/ContainerScene.tsx src/App.tsx .github/workflows/fix-interaction-ui.yml
+          git commit -m 'Fix cargo transform persistence and detach 3D toolbar'
+          git push
