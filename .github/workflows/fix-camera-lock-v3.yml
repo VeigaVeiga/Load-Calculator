@@ -1,0 +1,47 @@
+name: fix-camera-lock-v3
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor == 'VeigaVeiga'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch camera control lifecycle
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('src/components/ContainerScene.tsx')
+          s = p.read_text(encoding='utf-8')
+          old = "function CameraRig({ view, container, dragging }: { view: View; container: Container; dragging: boolean }) {"
+          new = "function CameraRig({ view, container, dragging, transformActive }: { view: View; container: Container; dragging: boolean; transformActive: boolean }) {"
+          if old not in s: raise SystemExit('CameraRig signature not found')
+          s = s.replace(old, new, 1)
+          marker = "  // Orbit is disabled only while a transform is actively being dragged.\n  // Merely enabling Free Placement must never lock the camera.\n"
+          replacement = "  useEffect(() => {\n    const c = controls.current\n    if (!c) return\n    // Single source of truth: after a transform ends, deselection, or Free Placement\n    // being switched off, OrbitControls must be explicitly enabled again.\n    c.enabled = !(dragging && transformActive)\n    if (c.enabled) c.update()\n  }, [dragging, transformActive])\n\n  // Orbit is disabled only while a transform is actively being dragged.\n  // Merely enabling Free Placement must never lock the camera.\n"
+          if marker not in s: raise SystemExit('CameraRig marker not found')
+          s = s.replace(marker, replacement, 1)
+          old_call = "<CameraRig view={view} container={container} dragging={dragging} />"
+          new_call = "<CameraRig view={view} container={container} dragging={dragging} transformActive={!!activeObject && !!(activeMaterial || freePlacementEnabled)} />"
+          if old_call not in s: raise SystemExit('CameraRig call not found')
+          s = s.replace(old_call, new_call, 1)
+          p.write_text(s, encoding='utf-8')
+          PY
+      - name: Verify build
+        run: |
+          npm ci
+          npm run build
+      - name: Commit patch and remove workflow
+        run: |
+          git config user.name 'Veiga'
+          git config user.email '50994187+VeigaVeiga@users.noreply.github.com'
+          rm -f .github/workflows/fix-camera-lock-v3.yml
+          git add src/components/ContainerScene.tsx .github/workflows/fix-camera-lock-v3.yml
+          git commit -m 'Force OrbitControls unlock after transform lifecycle'
+          git push
