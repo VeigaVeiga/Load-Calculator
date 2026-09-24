@@ -106,28 +106,22 @@ function IndustrialCargo({ p, eventProps, selected, hovered }: { p: PlacedCargo;
   const dark = '#687075'
   const seam = '#7c8588'
   const corner = Math.max(26, Math.min(l, w, h) * .055)
-  const rail = Math.max(10, Math.min(l, w) * .025)
   const companion = /companion|partner|伙伴/i.test(p.cargoId || '')
   const plate = Math.max(9, Math.min(l, w) * .028)
   return <>
     <MemoBox size={[l * S, w * S, h * S]} color={body} roughness={.58} eventProps={eventProps} outline />
-
-    <Panel size={[l * .90 * S, rail * S, h * .86 * S]} position={[0, -w * .5 * S - rail * .12 * S, 0]} color={dark} roughness={.56} />
-    <Panel size={[rail * S, w * .90 * S, h * .86 * S]} position={[-l * .5 * S - rail * .12 * S, 0, 0]} color={dark} roughness={.56} />
-
+    <Panel size={[l * .90 * S, plate * S, h * .86 * S]} position={[0, -w * .5 * S - plate * .12 * S, 0]} color={dark} roughness={.56} />
+    <Panel size={[plate * S, w * .90 * S, h * .86 * S]} position={[-l * .5 * S - plate * .12 * S, 0, 0]} color={dark} roughness={.56} />
     {[[-1, -1], [-1, 1], [1, -1], [1, 1]].map(([sx, sy], i) => (
       <MemoBox key={`corner-${i}`} size={[corner * S, corner * S, h * .90 * S]} position={[sx * (l * .5 - corner * .5) * S, sy * (w * .5 - corner * .5) * S, 0]} color="#555e62" roughness={.5} outline />
     ))}
-
     <CargoInterface l={l} w={w} h={h} accent={accent} companion={companion} />
-
     <MemoBox size={[l * .74 * S, plate * S, plate * .7 * S]} position={[0, w * .5 * S + plate * .35 * S, h * .22 * S]} color={seam} roughness={.5} />
     <MemoBox size={[l * .74 * S, plate * S, plate * .7 * S]} position={[0, w * .5 * S + plate * .35 * S, -h * .22 * S]} color={seam} roughness={.5} />
     {[-.25, 0, .25].map((t, i) => <mesh key={`light-${i}`} position={[t * l * S, w * .5 * S + plate * .75 * S, h * .28 * S]}>
       <sphereGeometry args={[Math.max(4, plate * .42), 10, 10]} />
       <meshStandardMaterial color={i === 1 ? accent : '#657276'} emissive={i === 1 ? accent : '#000000'} emissiveIntensity={i === 1 ? .8 : 0} roughness={.32} />
     </mesh>)}
-
     {companion && <>
       <MemoBox size={[l * .58 * S, plate * S, plate * .75 * S]} position={[0, -w * .5 * S - plate * .38 * S, 0]} color="#3f484c" roughness={.44} />
       <MemoBox size={[plate * S, w * .58 * S, plate * .75 * S]} position={[l * .5 * S + plate * .38 * S, 0, 0]} color="#3f484c" roughness={.44} />
