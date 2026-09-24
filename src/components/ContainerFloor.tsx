@@ -1,7 +1,6 @@
 import { Line } from '@react-three/drei'
 import type { ReactElement } from 'react'
 import type { Container } from '../types'
-import ApertureLogisticsScene from './ApertureLogisticsScene'
 const S=.001
 export default function ContainerFloor({container}:{container:Container}){
  const L=container.length*S,W=container.width*S
@@ -25,7 +24,6 @@ export default function ContainerFloor({container}:{container:Container}){
  }
  addAxisLines('x'); addAxisLines('y')
  return <group>
-  <ApertureLogisticsScene />
   <mesh position={[0,0,-container.floorThickness*S/2]} receiveShadow><boxGeometry args={[L,W,container.floorThickness*S]}/><meshStandardMaterial color="#aeb5b6" roughness={.9} /></mesh>
   {lines}
  </group>
