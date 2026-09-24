@@ -21,3 +21,9 @@
 .right-panel .bias-card,.right-panel .balance-meter-track{background:rgba(255,255,255,.58)!important;border-color:#d0d8d5!important}.status-message{background:#eaf0ee!important;border-color:#b8c7c2!important;color:#4d615d!important;border-radius:9px!important}
 /* keep the actual live container/cargo interactive above the illustration cutout */
 .scene-shell canvas{filter:saturate(.84) contrast(.96)!important}
+
+.scene-25d .stage-25d-background{position:absolute;inset:0;z-index:0;overflow:hidden;background:#cfd5d7}
+.scene-25d .stage-25d-background img{position:absolute;inset:-1%;width:102%;height:102%;display:block;object-fit:cover;object-position:center;user-select:none;pointer-events:none;image-rendering:auto}
+.scene-25d .stage-25d-vignette{position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse at center,transparent 46%,rgba(48,56,58,.14) 100%)}
+.scene-25d canvas{z-index:2!important}
+.scene-25d .scene-toolbar-host{z-index:20!important}
