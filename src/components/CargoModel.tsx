@@ -21,14 +21,14 @@ export const materialFor = (color: string, roughness: number) => {
   return material
 }
 
-const edgeMaterialFor = (color: string) => {
-  const key = `edge:${color}`
+const edgeMaterialFor = (_color: string) => {
+  const key = 'edge:industrial'
   let material = EDGE_MATERIAL_CACHE.get(key)
   if (!material) {
     material = new THREE.LineBasicMaterial({ color: '#30373b', transparent: true, opacity: .82 })
     EDGE_MATERIAL_CACHE.set(key, material)
   }
-  return edgeMaterial
+  return material
 }
 
 type BoxProps = {
@@ -58,12 +58,11 @@ const MemoBox = memo(Box, (a, b) =>
   a.eventProps === b.eventProps,
 )
 
-function Panel({ size, position, color = '#d9dddc', roughness = .56, rotation = [0, 0, 0] as [number, number, number] }: {
+function Panel({ size, position, color = '#d9dddc', roughness = .56 }: {
   size: [number, number, number]
   position: [number, number, number]
   color?: string
   roughness?: number
-  rotation?: [number, number, number]
 }) {
   return <MemoBox size={size} position={position} color={color} roughness={roughness} outline />
 }
@@ -113,19 +112,15 @@ function IndustrialCargo({ p, eventProps, selected, hovered }: { p: PlacedCargo;
   return <>
     <MemoBox size={[l * S, w * S, h * S]} color={body} roughness={.58} eventProps={eventProps} outline />
 
-    {/* recessed structural bands */}
     <Panel size={[l * .90 * S, rail * S, h * .86 * S]} position={[0, -w * .5 * S - rail * .12 * S, 0]} color={dark} roughness={.56} />
     <Panel size={[rail * S, w * .90 * S, h * .86 * S]} position={[-l * .5 * S - rail * .12 * S, 0, 0]} color={dark} roughness={.56} />
 
-    {/* four mechanical corner caps */}
     {[[-1, -1], [-1, 1], [1, -1], [1, 1]].map(([sx, sy], i) => (
       <MemoBox key={`corner-${i}`} size={[corner * S, corner * S, h * .90 * S]} position={[sx * (l * .5 - corner * .5) * S, sy * (w * .5 - corner * .5) * S, 0]} color="#555e62" roughness={.5} outline />
     ))}
 
-    {/* top test/service interface */}
     <CargoInterface l={l} w={w} h={h} accent={accent} companion={companion} />
 
-    {/* side service rails and indicator lights */}
     <MemoBox size={[l * .74 * S, plate * S, plate * .7 * S]} position={[0, w * .5 * S + plate * .35 * S, h * .22 * S]} color={seam} roughness={.5} />
     <MemoBox size={[l * .74 * S, plate * S, plate * .7 * S]} position={[0, w * .5 * S + plate * .35 * S, -h * .22 * S]} color={seam} roughness={.5} />
     {[-.25, 0, .25].map((t, i) => <mesh key={`light-${i}`} position={[t * l * S, w * .5 * S + plate * .75 * S, h * .28 * S]}>
@@ -133,11 +128,10 @@ function IndustrialCargo({ p, eventProps, selected, hovered }: { p: PlacedCargo;
       <meshStandardMaterial color={i === 1 ? accent : '#657276'} emissive={i === 1 ? accent : '#000000'} emissiveIntensity={i === 1 ? .8 : 0} roughness={.32} />
     </mesh>)}
 
-    {/* companion-style cross plate, deliberately generic rather than using game logos */}
     {companion && <>
       <MemoBox size={[l * .58 * S, plate * S, plate * .75 * S]} position={[0, -w * .5 * S - plate * .38 * S, 0]} color="#3f484c" roughness={.44} />
       <MemoBox size={[plate * S, w * .58 * S, plate * .75 * S]} position={[l * .5 * S + plate * .38 * S, 0, 0]} color="#3f484c" roughness={.44} />
-      <Port position={[0, -w * .5 * S - plate * .75 * S, 0]} radius=Math.max(18, Math.min(l, w) * .16) * S depth={plate * .7 * S} color="#7fa8ad" ring="#31383b" rotation={[Math.PI / 2, 0, 0]} />
+      <Port position={[0, -w * .5 * S - plate * .75 * S, 0]} radius={Math.max(18, Math.min(l, w) * .16) * S} depth={plate * .7 * S} color="#7fa8ad" ring="#31383b" rotation={[Math.PI / 2, 0, 0]} />
     </>}
   </>
 }
