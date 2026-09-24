@@ -1,0 +1,84 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" preserveAspectRatio="xMidYMid slice">
+<defs>
+ <linearGradient id="wall" x2="0" y2="1"><stop stop-color="#f3f5f4"/><stop offset="1" stop-color="#cbd1d0"/></linearGradient>
+ <linearGradient id="floor" x2="0" y2="1"><stop stop-color="#cbd1d1"/><stop offset="1" stop-color="#9fa7a7"/></linearGradient>
+ <linearGradient id="steel" x2="1" y2="1"><stop stop-color="#eef1ef"/><stop offset=".45" stop-color="#aeb5b4"/><stop offset="1" stop-color="#666e6e"/></linearGradient>
+ <linearGradient id="glass" x2="0" y2="1"><stop stop-color="#ffffff" stop-opacity=".5"/><stop offset="1" stop-color="#b7c0bf" stop-opacity=".2"/></linearGradient>
+ <filter id="shadow"><feGaussianBlur stdDeviation="9"/></filter>
+ <filter id="soft"><feGaussianBlur stdDeviation="2"/></filter>
+ <pattern id="grid" width="80" height="80" patternUnits="userSpaceOnUse"><path d="M80 0H0V80" fill="none" stroke="#7d8787" stroke-opacity=".17"/></pattern>
+ <mask id="stageMask"><rect width="1920" height="1080" fill="white"/><path d="M390 165 L1530 165 L1640 900 L280 900 Z" fill="black"/></mask>
+</defs>
+<!-- lightweight illustrated environment; the center is transparent so the live 3D container can sit inside the scene -->
+<g mask="url(#stageMask)">
+ <rect width="1920" height="1080" fill="url(#wall)"/>
+ <path d="M0 650L1920 540V1080H0Z" fill="url(#floor)"/>
+ <path d="M0 650L1920 540" stroke="#747d7d" stroke-width="5" opacity=".45"/>
+ <path d="M0 720L1920 610M0 800L1920 700M0 900L1920 810" stroke="#ffffff" stroke-opacity=".32" stroke-width="2"/>
+ <path d="M0 650L960 1080M260 620L1130 1080M650 600L1320 1080M1050 575L1530 1080M1420 555L1780 1080" stroke="#7f8888" stroke-opacity=".22" stroke-width="2"/>
+ <rect y="0" width="1920" height="650" fill="url(#grid)" opacity=".8"/>
+ <!-- modular wall -->
+ <g fill="none" stroke="#9ba3a2" stroke-width="3" opacity=".9">
+  <path d="M60 110H1860M60 260H1860M60 410H1860M60 560H1860"/>
+  <path d="M180 60V590M420 60V590M660 60V590M900 60V590M1140 60V590M1380 60V590M1620 60V590"/>
+ </g>
+ <g fill="url(#glass)" stroke="#aab2b1">
+  <rect x="95" y="145" width="280" height="180" rx="8"/><rect x="465" y="145" width="280" height="180" rx="8"/><rect x="835" y="145" width="280" height="180" rx="8"/><rect x="1205" y="145" width="280" height="180" rx="8"/><rect x="1575" y="145" width="250" height="180" rx="8"/>
+ </g>
+ <!-- ceiling beams and lamps -->
+ <g fill="#687170" opacity=".82">
+  <path d="M0 70L1920 15V42L0 98Z"/><path d="M0 330L1920 275V301L0 358Z"/>
+ </g>
+ <g fill="#f8faf8" stroke="#9ca4a3" stroke-width="2">
+  <rect x="160" y="78" width="230" height="18" rx="8"/><rect x="590" y="66" width="230" height="18" rx="8"/><rect x="1020" y="53" width="230" height="18" rx="8"/><rect x="1450" y="41" width="230" height="18" rx="8"/>
+ </g>
+ <!-- left storage racks -->
+ <g transform="translate(70 455)">
+  <g fill="none" stroke="#515b5b" stroke-width="12"><path d="M0 0V270M270 0V270M540 0V270"/><path d="M0 25H540M0 120H540M0 215H540"/></g>
+  <g fill="#d7d0c3" stroke="#7d8583" stroke-width="3">
+   <rect x="18" y="35" width="92" height="72"/><rect x="128" y="35" width="92" height="72"/><rect x="288" y="35" width="92" height="72"/><rect x="398" y="35" width="92" height="72"/>
+   <rect x="18" y="130" width="92" height="72"/><rect x="128" y="130" width="92" height="72"/><rect x="288" y="130" width="92" height="72"/><rect x="398" y="130" width="92" height="72"/>
+  </g>
+  <g fill="#a8afb0"><path d="M35 55h55v8H35zM145 55h55v8h-55zM305 55h55v8h-55zM415 55h55v8h-55z"/></g>
+ </g>
+ <!-- right storage racks -->
+ <g transform="translate(1360 430)">
+  <g fill="none" stroke="#515b5b" stroke-width="12"><path d="M0 0V285M250 0V285M500 0V285"/><path d="M0 25H500M0 120H500M0 215H500"/></g>
+  <g fill="#c9d0ce" stroke="#7d8583" stroke-width="3"><rect x="18" y="35" width="82" height="72"/><rect x="115" y="35" width="82" height="72"/><rect x="268" y="35" width="82" height="72"/><rect x="365" y="35" width="82" height="72"/><rect x="18" y="130" width="82" height="72"/><rect x="115" y="130" width="82" height="72"/><rect x="268" y="130" width="82" height="72"/><rect x="365" y="130" width="82" height="72"/></g>
+ </g>
+ <!-- conveyor system -->
+ <g fill="#3e4747" stroke="#232929" stroke-width="3">
+  <path d="M40 780L580 650L760 690L215 845Z"/><path d="M1110 710L1830 805L1830 875L1090 780Z"/><path d="M620 930L1140 775L1260 810L740 990Z"/>
+ </g>
+ <g fill="#bfc6c5" stroke="#596261" stroke-width="2">
+  <g>
+   <ellipse cx="115" cy="783" rx="24" ry="9"/><ellipse cx="205" cy="761" rx="24" ry="9"/><ellipse cx="295" cy="739" rx="24" ry="9"/><ellipse cx="385" cy="717" rx="24" ry="9"/><ellipse cx="475" cy="695" rx="24" ry="9"/><ellipse cx="565" cy="676" rx="24" ry="9"/>
+  </g>
+  <g>
+   <ellipse cx="1190" cy="723" rx="24" ry="9"/><ellipse cx="1290" cy="736" rx="24" ry="9"/><ellipse cx="1390" cy="750" rx="24" ry="9"/><ellipse cx="1490" cy="763" rx="24" ry="9"/><ellipse cx="1590" cy="777" rx="24" ry="9"/><ellipse cx="1690" cy="790" rx="24" ry="9"/>
+  </g>
+ </g>
+ <!-- moving cargo on belts -->
+ <g>
+  <g fill="#d9d0c0" stroke="#606967" stroke-width="3"><rect x="260" y="731" width="58" height="42" rx="4"/><rect x="410" y="690" width="52" height="39" rx="4"/><rect x="1370" y="744" width="62" height="44" rx="4"/></g>
+  <g fill="#879eaa" opacity=".9"><rect x="275" y="744" width="28" height="7"/><rect x="425" y="702" width="23" height="7"/><rect x="1387" y="757" width="30" height="7"/></g>
+  <animateTransform attributeName="transform" type="translate" values="0 0;90 -22;180 -43;0 0" dur="9s" repeatCount="indefinite"/>
+ </g>
+ <!-- forklifts -->
+ <g transform="translate(350 855)" stroke="#454d4c" stroke-width="5" stroke-linejoin="round">
+  <path d="M0 70V0H65L100 70Z" fill="#d2a33e"/><rect x="38" y="-20" width="45" height="22" fill="#e0b54d"/><path d="M100 25H185V33H100M176 33V105" fill="none"/><circle cx="28" cy="82" r="20" fill="#252b2b"/><circle cx="88" cy="82" r="20" fill="#252b2b"/>
+ </g>
+ <g transform="translate(1480 860) scale(.85)" stroke="#454d4c" stroke-width="5" stroke-linejoin="round">
+  <path d="M0 70V0H65L100 70Z" fill="#d2a33e"/><rect x="38" y="-20" width="45" height="22" fill="#e0b54d"/><path d="M100 25H185V33H100M176 33V105" fill="none"/><circle cx="28" cy="82" r="20" fill="#252b2b"/><circle cx="88" cy="82" r="20" fill="#252b2b"/>
+ </g>
+ <!-- black paper workers -->
+ <g fill="#15191a" stroke="#15191a" stroke-linecap="round">
+  <g transform="translate(980 690)"><circle cx="0" cy="-38" r="12"/><path d="M-10 -25Q0 -30 10 -25L15 18L5 18L4 53H-5L-7 18L-17 18Z"/><path d="M-8 2L-31 25M8 2L27 20" fill="none" stroke-width="8"/><path d="M-4 53L-20 82M4 53L18 82" fill="none" stroke-width="8"/></g>
+  <g transform="translate(1160 625) scale(.9)"><circle cx="0" cy="-38" r="12"/><path d="M-10 -25Q0 -30 10 -25L15 18L5 18L4 53H-5L-7 18L-17 18Z"/><path d="M-8 2L-30 -5M8 2L29 -12" fill="none" stroke-width="8"/><path d="M-4 53L-20 82M4 53L18 82" fill="none" stroke-width="8"/></g>
+  <g transform="translate(740 780) scale(.78)"><circle cx="0" cy="-38" r="12"/><path d="M-10 -25Q0 -30 10 -25L15 18L5 18L4 53H-5L-7 18L-17 18Z"/><path d="M-8 2L-28 27M8 2L30 26" fill="none" stroke-width="8"/><path d="M-4 53L-20 82M4 53L18 82" fill="none" stroke-width="8"/></g>
+ </g>
+ <!-- floor markings -->
+ <g fill="none" stroke="#d2a33e" stroke-width="7" opacity=".8"><path d="M40 970H510"/><path d="M1380 965H1880"/><path d="M1020 980L1240 930"/></g>
+ <g fill="#525b5a" font-family="Arial,sans-serif"><text x="70" y="1020" font-size="22" letter-spacing="5">LOGISTICS TEST FACILITY</text><text x="1570" y="1020" font-size="16" letter-spacing="4">LOADING BAY 04</text></g>
+</g>
+</svg>
