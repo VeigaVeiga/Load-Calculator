@@ -1,144 +1,46 @@
 import { useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
+import { RoundedBox } from '@react-three/drei'
 import * as THREE from 'three'
+import './ApertureInterface.css'
+import './ApertureLogisticsScene.css'
 
-const ink = '#15191a'
-const white = '#e5e8e8'
-const white2 = '#cfd4d4'
-const steel = '#737a7c'
-const steel2 = '#9aa1a2'
-const floor = '#b7bdbe'
-const warning = '#c59a55'
+const steel = '#c5cbcc'
+const steel2 = '#e1e4e3'
+const dark = '#30383b'
+const dark2 = '#4d585c'
+const floor = '#aeb7b9'
+const warning = '#d2a85c'
 
-function PaperWorker({ position, scale = 1, phase = 0, flip = false }: { position: [number, number, number]; scale?: number; phase?: number; flip?: boolean }) {
-  const root = useRef<THREE.Group>(null)
-  const armL = useRef<THREE.Group>(null)
-  const armR = useRef<THREE.Group>(null)
-  const legL = useRef<THREE.Group>(null)
-  const legR = useRef<THREE.Group>(null)
-  const head = useMemo(() => new THREE.Shape().absarc(0, 0, 0.14, 0, Math.PI * 2, false), [])
-  const torso = useMemo(() => { const s = new THREE.Shape(); s.moveTo(-.17,0); s.lineTo(.17,0); s.lineTo(.13,.45); s.lineTo(-.13,.45); s.closePath(); return s }, [])
-  const limb = useMemo(() => { const s = new THREE.Shape(); s.moveTo(-.035,0); s.lineTo(.035,0); s.lineTo(.045,.32); s.lineTo(-.045,.32); s.closePath(); return s }, [])
-  useFrame(({ clock }) => {
-    const t = clock.elapsedTime + phase
-    const walk = Math.sin(t * 2.15) * .28
-    const idle = Math.sin(t * .9 + phase) * .08
-    if (root.current) {
-      root.current.position.z = position[2] + Math.abs(Math.sin(t * 2.15)) * .018
-      root.current.rotation.z = idle * .35
-    }
-    if (armL.current) armL.current.rotation.y = walk * .7
-    if (armR.current) armR.current.rotation.y = -walk * .55
-    if (legL.current) legL.current.rotation.y = walk
-    if (legR.current) legR.current.rotation.y = -walk
-  })
-  const Paper = ({ shape, pos, rot = [Math.PI / 2, 0, 0] as [number,number,number] }: { shape: THREE.Shape; pos: [number,number,number]; rot?: [number,number,number] }) => (
-    <mesh position={pos} rotation={rot}><shapeGeometry args={[shape]} /><meshBasicMaterial color={ink} side={THREE.DoubleSide} /></mesh>
-  )
-  return <group ref={root} position={position} scale={scale} rotation={[0, flip ? Math.PI : 0, 0]}>
-    <Paper shape={head} pos={[0,0,.73]} />
-    <Paper shape={torso} pos={[0,0,.29]} />
-    <group ref={armL}><Paper shape={limb} pos={[.18,0,.43]} rot={[Math.PI/2,0,-.3]} /></group>
-    <group ref={armR}><Paper shape={limb} pos={[-.18,0,.43]} rot={[Math.PI/2,0,.3]} /></group>
-    <group ref={legL}><Paper shape={limb} pos={[.07,0,.02]} /></group>
-    <group ref={legR}><Paper shape={limb} pos={[-.07,0,.02]} /></group>
-  </group>
+function Panel({ position, size, color = steel2, bevel = .04 }: { position:[number,number,number]; size:[number,number,number]; color?:string; bevel?:number }) {
+  return <RoundedBox position={position} args={size} radius={bevel} smoothness={2} castShadow receiveShadow><meshStandardMaterial color={color} roughness={.72} metalness={.08}/></RoundedBox>
 }
-
-function Panel({ position, size, color = white, metalness = .08 }: { position: [number,number,number]; size: [number,number,number]; color?: string; metalness?: number }) {
-  return <mesh position={position} castShadow receiveShadow><boxGeometry args={size} /><meshStandardMaterial color={color} metalness={metalness} roughness={.72} /></mesh>
+function Beam({ position, size, color = dark2 }: { position:[number,number,number]; size:[number,number,number]; color?:string }) {
+  return <mesh position={position} castShadow receiveShadow><boxGeometry args={size}/><meshStandardMaterial color={color} roughness={.68} metalness={.28}/></mesh>
 }
-
-function FloorMark({ position, length, width = .055, rotation = 0, color = warning }: { position: [number,number,number]; length: number; width?: number; rotation?: number; color?: string }) {
-  return <mesh position={position} rotation={[-Math.PI/2,0,rotation]}><planeGeometry args={[length,width]} /><meshBasicMaterial color={color} transparent opacity={.82} /></mesh>
+function WallModule({ x, y, z=2.1, horizontal=false }: { x:number; y:number; z?:number; horizontal?:boolean }) {
+  const panelSize:[number,number,number]=horizontal?[2.25,.16,1.55]:[.16,2.25,1.55]
+  return <group position={[x,y,z]}><Panel position={[0,0,0]} size={panelSize} color="#dfe3e3" bevel={.035}/>{horizontal?<><Beam position={[0,-.92,0]} size={[2.02,.035,.06]} color="#8c979a"/><Beam position={[0,.92,0]} size={[2.02,.035,.06]} color="#8c979a"/><Beam position={[-.72,0,0]} size={[.035,2.0,1.36]} color="#b7bec0"/><Beam position={[.72,0,0]} size={[.035,2.0,1.36]} color="#b7bec0"/></>:<><Beam position={[0,0,-.92]} size={[.035,2.02,.06]} color="#8c979a"/><Beam position={[0,0,.92]} size={[.035,2.02,.06]} color="#8c979a"/><Beam position={[0,-.72,0]} size={[.035,1.36,1.36]} color="#b7bec0"/><Beam position={[0,.72,0]} size={[.035,1.36,1.36]} color="#b7bec0"/></>}</group>
 }
-
-function Conveyor({ position = [0,0,0] as [number,number,number], length = 6.5, width = 1.1, height = .88, phase = 0 }: { position?: [number,number,number]; length?: number; width?: number; height?: number; phase?: number }) {
-  const rollers = useMemo(() => Array.from({ length: Math.max(6, Math.floor(length / .38)) }, (_, i) => -length/2 + .2 + i*.38), [length])
-  const refs = useRef<THREE.Mesh[]>([])
-  useFrame(({ clock }) => {
-    const t = clock.elapsedTime + phase
-    refs.current.forEach((r,i) => { if (r) r.rotation.x = t * 3.2 + i * .05 })
-  })
-  return <group position={position}>
-    <Panel position={[0,0,height-.09]} size={[length,width,.18]} color="#555c5e" metalness={.4} />
-    {rollers.map((x,i)=><mesh key={i} ref={el=>{if(el) refs.current[i]=el}} position={[x,0,height+.025]} rotation={[0,Math.PI/2,0]}><cylinderGeometry args={[.085,.085,width*.91,12]} /><meshStandardMaterial color={steel2} metalness={.65} roughness={.4}/></mesh>)}
-    {[-width/2,width/2].map((y,i)=><Panel key={i} position={[0,y,height+.12]} size={[length,.055,.28]} color="#e0e3e2" metalness={.25} />)}
-    {[-length/2+.16,length/2-.16].map((x,i)=><Panel key={i} position={[x,0,height/2]} size={[.13,width+.06,height]} color={steel} metalness={.3} />)}
-    <Panel position={[-length/2+.42,0,height-.31]} size={[.55,width+.2,.12]} color="#34393a" metalness={.5}/>
-  </group>
-}
-
-function CargoUnit({ position, size = [.55,.42,.42], tint = '#c6c0b3' }: { position: [number,number,number]; size?: [number,number,number]; tint?: string }) {
-  return <group position={position}>
-    <Panel position={[0,0,size[2]/2+.02]} size={size} color={tint} metalness={.02} />
-    <Panel position={[0,0,size[2]+.035]} size={[size[0]*.72,size[1]*.08,.018]} color="#8c9292" />
-    <Panel position={[0,-size[1]/2-.01,size[2]/2]} size={[size[0]*.72,.018,size[2]*.72]} color="#9da3a3" />
-  </group>
-}
-
-function Forklift({ position = [0,0,0] as [number,number,number] }) {
-  const root = useRef<THREE.Group>(null)
-  useFrame(({clock}) => {
-    if (!root.current) return
-    root.current.position.x = position[0] + Math.sin(clock.elapsedTime*.22)*1.35
-  })
-  return <group ref={root} position={position}>
-    <Panel position={[0,0,.33]} size={[1.12,.72,.48]} color="#b39b61" />
-    <Panel position={[-.22,0,.78]} size={[.48,.58,.76]} color="#3a4041" />
-    <Panel position={[.08,0,.93]} size={[.58,.46,.07]} color="#d6d8d6" />
-    <Panel position={[.66,0,.58]} size={[.82,.075,.075]} color="#4f5657" metalness={.6}/>
-    <Panel position={[.66,0,.39]} size={[.82,.075,.075]} color="#4f5657" metalness={.6}/>
-    {[-.31,.31].map((y,i)=><mesh key={i} position={[.31,y,.17]} rotation={[Math.PI/2,0,0]}><cylinderGeometry args={[.18,.18,.15,14]}/><meshStandardMaterial color="#292d2e" roughness={.95}/></mesh>)}
-  </group>
-}
-
-function Shelf({ position }: { position: [number,number,number] }) {
-  return <group position={position}>
-    {[.7,1.5,2.3].map((z,i)=><Panel key={i} position={[0,0,z]} size={[2.1,.72,.08]} color="#8a9091" metalness={.3}/>) }
-    {[-1,1].map((x,i)=><Panel key={i} position={[x,0,1.5]} size={[.08,.78,3.05]} color="#6e7576" metalness={.45}/>) }
-    <CargoUnit position={[-.48,-.05,.74]} size={[.62,.45,.42]} tint="#c7c1b5" />
-    <CargoUnit position={[.35,.04,1.54]} size={[.54,.42,.52]} tint="#bfc6c5" />
-    <CargoUnit position={[-.35,.02,2.34]} size={[.7,.46,.38]} tint="#d1c8b8" />
-  </group>
-}
-
-function CeilingLight({ position }: { position: [number,number,number] }) {
-  return <group position={position}>
-    <Panel position={[0,0,0]} size={[1.55,.25,.05]} color="#f1f2ef" />
-    <mesh position={[0,0,-.035]}><boxGeometry args={[1.15,.18,.018]} /><meshBasicMaterial color="#fffaf0" /></mesh>
-  </group>
-}
-
-export default function ApertureLogisticsScene(){
-  return <group>
-    <Panel position={[0,0,-.08]} size={[18,9,.16]} color={floor} />
-    <Panel position={[0,4.22,2.85]} size={[18,.18,5.8]} color="#dfe2e1" />
-    {[-7.2,7.2].map(x=><group key={x}><Panel position={[x,0,2.15]} size={[.22,8.35,4.3]} color="#8a9091" metalness={.25}/><Panel position={[x + (x>0 ? -.14:.14),0,3.65]} size={[.5,8.05,.08]} color="#cfd3d2" metalness={.25}/></group>)}
-    {[-3.5,0,3.5].map(y=><Panel key={y} position={[0,y,4.85]} size={[17.5,.12,.12]} color="#707778" metalness={.5}/>)}
-    {[-5,0,5].map(x=><CeilingLight key={x} position={[x,2.9,4.73]}/>)}
-
-    <FloorMark position={[-1.8,0,.01]} length={7.4} rotation={0} />
-    <FloorMark position={[4.7,-1.25,.01]} length={4.8} rotation={Math.PI/2} />
-    <FloorMark position={[-5.3,-2.2,.01]} length={2.2} width={.12} rotation={0} color="#777d7e" />
-    <FloorMark position={[-5.3,-2.2,.012]} length={1.5} width={.12} rotation={Math.PI/2} color="#777d7e" />
-
-    <Conveyor position={[-2.15,2.2,0]} length={7.4} phase={.2}/>
-    <Conveyor position={[2.55,-2.0,0]} length={5.4} width={1.05} phase={1.4}/>
-    <Conveyor position={[4.9,.35,0]} length={3.4} width={.9} phase={2.4}/>
-
-    <CargoUnit position={[-4.05,2.2,1.03]} size={[.55,.42,.52]} tint="#c7c0b2" />
-    <CargoUnit position={[-2.1,2.2,1.03]} size={[.62,.48,.46]} tint="#bfc7c7" />
-    <CargoUnit position={[-.15,2.2,1.03]} size={[.5,.4,.58]} tint="#d1c7b6" />
-    <CargoUnit position={[2.2,-2,1.03]} size={[.56,.44,.48]} tint="#c4c9c8" />
-
-    <Shelf position={[-5.1,-1.15,0]} />
-    <Shelf position={[5.45,2.05,0]} />
-    <Forklift position={[3.7,1.15,0]} />
-
-    <PaperWorker position={[-4.5,1.1,0]} scale={1.12} phase={.2}/>
-    <PaperWorker position={[4.45,-.7,0]} scale={.95} phase={2.1} flip/>
-    <PaperWorker position={[-2.8,-3.15,0]} scale={.82} phase={4.2}/>
-    <PaperWorker position={[1.2,2.95,0]} scale={.76} phase={5.1} flip/>
-  </group>
-}
+function CeilingRig(){return <group>{[-5.6,-2.8,0,2.8,5.6].map(x=><group key={x}><Beam position={[x,-2.95,4.35]} size={[.12,.12,1.1]}/><Beam position={[x,2.95,4.35]} size={[.12,.12,1.1]}/></group>)}{[-2.9,0,2.9].map(y=><Beam key={y} position={[0,y,4.88]} size={[13.4,.12,.12]}/>)}</group>}
+function CeilingLight({position}:{position:[number,number,number]}){return <group position={position}><mesh castShadow><boxGeometry args={[1.35,.26,.08]}/><meshStandardMaterial color="#d9dddd" roughness={.5}/></mesh><mesh position={[0,0,-.055]}><boxGeometry args={[1.12,.18,.025]}/><meshStandardMaterial color="#f4f5f2" emissive="#dfe9eb" emissiveIntensity={1.4} roughness={.2}/></mesh></group>}
+function SafetyStrip({position,length,rotation=0}:{position:[number,number,number];length:number;rotation?:number}){return <group position={position} rotation={[0,0,rotation]}>{Array.from({length:Math.max(2,Math.floor(length/.28))},(_,i)=><mesh key={i} position={[-length/2+.14+i*.28,0,.012]} rotation={[0,0,-Math.PI/4]}><boxGeometry args={[.075,.38,.025]}/><meshStandardMaterial color={warning} roughness={.8}/></mesh>)}</group>}
+function Conveyor({position,length=5.6,width=1,direction=1}:{position:[number,number,number];length?:number;width?:number;direction?:number}){const rollers=useMemo(()=>Array.from({length:Math.max(8,Math.floor(length/.3))},(_,i)=>-length/2+.18+i*.3),[length]);const refs=useRef<THREE.Mesh[]>([]);useFrame((_,dt)=>refs.current.forEach(m=>{if(m)m.rotation.x+=dt*direction*2.7}));return <group position={position}><Beam position={[0,0,.92]} size={[length,width,.16]} color="#3e474a"/><Beam position={[0,-width/2-.045,1.03]} size={[length,.08,.18]} color="#d4d8d8"/><Beam position={[0,width/2+.045,1.03]} size={[length,.08,.18]} color="#d4d8d8"/>{rollers.map((x,i)=><mesh key={i} ref={m=>{if(m)refs.current[i]=m}} position={[x,0,1.02]} rotation={[0,Math.PI/2,0]} castShadow><cylinderGeometry args={[.075,.075,width*.92,12]}/><meshStandardMaterial color="#899295" metalness={.55} roughness={.45}/></mesh>)}{[-length/2+.22,length/2-.22].map((x,i)=><group key={i} position={[x,0,.48]}><Beam position={[0,0,0]} size={[.14,width+.08,.92]} color="#555f63"/><mesh position={[0,0,.52]} rotation={[Math.PI/2,0,0]}><cylinderGeometry args={[.19,.19,.08,16]}/><meshStandardMaterial color="#242a2c" roughness={.9}/></mesh></group>)}</group>}
+function PipeRack(){return <group position={[0,2.85,2.9]}><Beam position={[0,0,0]} size={[12.6,.16,.16]} color="#69767a"/>{[-5.5,-3.3,-1.1,1.1,3.3,5.5].map(x=><group key={x}><Beam position={[x,0,-1.35]} size={[.11,.11,2.7]} color="#69767a"/><mesh position={[x,-.05,-.1]} rotation={[Math.PI/2,0,0]}><torusGeometry args={[.16,.035,8,20,Math.PI*1.7]}/><meshStandardMaterial color="#9aa3a5" roughness={.65}/></mesh></group>)}<mesh position={[-3.7,.02,.35]} rotation={[Math.PI/2,0,0]}><cylinderGeometry args={[.12,.12,5.4,16]}/><meshStandardMaterial color="#8d989b" metalness={.25} roughness={.55}/></mesh></group>}
+function StorageRack({position,width=2.6,height=2.8}:{position:[number,number,number];width?:number;height?:number}){return <group position={position}>{[0,width].map((x,i)=><Beam key={i} position={[x-width/2,0,height/2]} size={[.1,.62,height]} color="#5b666a"/>)}{[0,1,2].map(i=><Beam key={i} position={[0,0,.25+i*(height-.45)/2]} size={[width,.62,.09]} color="#6f7b7f"/>)}{[0,1].map(row=>[0,1,2].map(layer=><Panel key={`${row}-${layer}`} position={[-width/2+.42+row*.82,0,.48+layer*(height-.7)/2]} size={[.66,.48,.48]} color={layer===2?'#d7dad9':row===0?'#b7a78d':'#9eaeb3'} bevel={.025}/>))}</group>}
+function Forklift({position:[px,py,pz]}:{position:[number,number,number]}){const root=useRef<THREE.Group>(null);useFrame(({clock})=>{if(root.current){const t=clock.elapsedTime*.18;root.current.position.x=px+Math.sin(t)*1.15;root.current.rotation.z=Math.sin(t*1.7)*.025}});return <group ref={root} position={[px,py,pz]}><RoundedBox position={[0,0,.43]} args={[1.2,.78,.55]} radius={.09} smoothness={2} castShadow><meshStandardMaterial color="#c2c8c7" roughness={.55}/></RoundedBox><RoundedBox position={[-.22,0,.94]} args={[.58,.66,.9]} radius={.06} smoothness={2} castShadow><meshStandardMaterial color="#353e41" roughness={.82}/></RoundedBox><Beam position={[.52,0,.66]} size={[.85,.08,.08]} color="#707b7f"/><Beam position={[.52,0,.42]} size={[.85,.08,.08]} color="#707b7f"/>{[-.32,.32].map((y,i)=><mesh key={i} position={[.34,y,.2]} rotation={[Math.PI/2,0,0]}><cylinderGeometry args={[.2,.2,.15,16]}/><meshStandardMaterial color="#252b2d" roughness={.94}/></mesh>)}</group>}
+function PaperWorker({position,scale=1,phase=0,action='walk'}:{position:[number,number,number];scale?:number;phase?:number;action?:'walk'|'carry'|'inspect'}){const root=useRef<THREE.Group>(null),armL=useRef<THREE.Group>(null),armR=useRef<THREE.Group>(null),legL=useRef<THREE.Group>(null),legR=useRef<THREE.Group>(null);const head=useMemo(()=>new THREE.Shape().absarc(0,0,.14,0,Math.PI*2,false),[]);const torso=useMemo(()=>{const s=new THREE.Shape();s.moveTo(-.16,0);s.lineTo(.16,0);s.lineTo(.13,.44);s.lineTo(-.13,.44);s.closePath();return s},[]);const limb=useMemo(()=>{const s=new THREE.Shape();s.moveTo(-.035,0);s.lineTo(.035,0);s.lineTo(.045,.34);s.lineTo(-.045,.34);s.closePath();return s},[]);useFrame(({clock})=>{const t=clock.elapsedTime+phase;if(root.current){root.current.position.z=position[2]+Math.abs(Math.sin(t*2.1))*.018;if(action==='inspect')root.current.rotation.y=Math.sin(t*.65)*.18;if(action==='walk')root.current.position.x=position[0]+Math.sin(t*.25)*.65}const swing=action==='carry'?.06:Math.sin(t*2.1)*.22;if(armL.current)armL.current.rotation.y=swing;if(armR.current)armR.current.rotation.y=-swing;if(legL.current)legL.current.rotation.y=swing;if(legR.current)legR.current.rotation.y=-swing});const P=({shape,pos,rot=[Math.PI/2,0,0] as [number,number,number]}:{shape:THREE.Shape;pos:[number,number,number];rot?:[number,number,number]})=><mesh position={pos} rotation={rot} castShadow><shapeGeometry args={[shape]}/><meshBasicMaterial color="#171b1c" side={THREE.DoubleSide}/></mesh>;return <group ref={root} position={position} scale={scale}><P shape={head} pos={[0,0,.83]}/><P shape={torso} pos={[0,0,.38]}/><group ref={armL}><P shape={limb} pos={[-.19,0,.49]} rot={[Math.PI/2,0,.22]}/></group><group ref={armR}><P shape={limb} pos={[.19,0,.49]} rot={[Math.PI/2,0,-.22]}/></group><group ref={legL}><P shape={limb} pos={[-.07,0,.02]}/></group><group ref={legR}><P shape={limb} pos={[.07,0,.02]}/></group>{action==='carry'&&<Panel position={[0,.01,.46]} size={[.38,.06,.32]} color="#9da8aa" bevel={.025}/>}</group>}
+function CrateCluster({position,tint='#b6aa92'}:{position:[number,number,number];tint?:string}){return <group position={position}>{[[-.36,0,.25],[.36,0,.25],[-.36,0,.73],[.36,0,.73],[0,0,1.21]].map((p,i)=><Panel key={i} position={p as [number,number,number]} size={[.62,.72,.42]} color={i===4?'#c6c0af':tint} bevel={.035}/>)}</group>}
+export default function ApertureLogisticsScene(){return <group>
+  <mesh position={[0,0,-.075]} receiveShadow><boxGeometry args={[14.2,7.1,.15]}/><meshStandardMaterial color={floor} roughness={.9}/></mesh>
+  <mesh position={[0,3.42,2.85]} receiveShadow><boxGeometry args={[14.2,.18,5.75]}/><meshStandardMaterial color="#d5dada" roughness={.84}/></mesh>
+  {[-6.6,6.6].map(x=><group key={x}>{Array.from({length:5},(_,i)=><WallModule key={i} x={x} y={-2.35+i*1.18} z={2.1}/>)}</group>)}
+  {[-5.2,-2.6,0,2.6,5.2].map(x=><WallModule key={x} x={x} y={3.25} z={2.1} horizontal/>)}
+  {[-5.9,5.9].map(x=><Beam key={x} position={[x,0,2.7]} size={[.16,6.8,5.4]} color="#697579"/>)}
+  <CeilingRig/>{[-4.2,-1.4,1.4,4.2].map(x=><CeilingLight key={x} position={[x,0,4.72]}/>)}<PipeRack/>
+  <SafetyStrip position={[-1.4,-2.95,.02]} length={5.5}/><SafetyStrip position={[3.6,2.35,.02]} length={3.2} rotation={Math.PI/2}/>
+  <Conveyor position={[-2.65,2.0,0]} length={5.8} width={1.0}/><Conveyor position={[2.75,-2.0,0]} length={5.2} width={.92} direction={-1}/><Conveyor position={[.25,.15,0]} length={4.0} width={.88}/>
+  <StorageRack position={[-4.7,-1.45,0]} width={2.5} height={2.65}/><StorageRack position={[4.75,1.1,0]} width={2.35} height={2.55}/>
+  <CrateCluster position={[-3.95,1.75,1.05]}/><CrateCluster position={[4.25,-1.7,1.03]} tint="#a9b4b5"/><Forklift position={[3.1,1.95,0]}/>
+  <PaperWorker position={[-4.9,2.65,0]} scale={1.05} phase={.2} action="walk"/><PaperWorker position={[4.5,-.75,0]} scale={.9} phase={2} action="carry"/><PaperWorker position={[-1,-2.75,0]} scale={.88} phase={3.4} action="inspect"/><PaperWorker position={[1.6,2.55,0]} scale={.78} phase={4.5} action="walk"/>
+</group>}
