@@ -1,0 +1,108 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" preserveAspectRatio="xMidYMid slice">
+<defs>
+  <linearGradient id="bg" x2="0" y2="1"><stop stop-color="#dfe4e5"/><stop offset=".52" stop-color="#b7bec0"/><stop offset="1" stop-color="#7d8586"/></linearGradient>
+  <linearGradient id="floor" x2="0" y2="1"><stop stop-color="#aeb5b6"/><stop offset="1" stop-color="#5f6869"/></linearGradient>
+  <linearGradient id="metal" x2="1" y2="1"><stop stop-color="#f0f2f1"/><stop offset=".45" stop-color="#aeb5b4"/><stop offset="1" stop-color="#5d6565"/></linearGradient>
+  <linearGradient id="glass" x2="0" y2="1"><stop stop-color="#f8faf9" stop-opacity=".58"/><stop offset="1" stop-color="#9fa8a8" stop-opacity=".2"/></linearGradient>
+  <linearGradient id="belt" x2="0" y2="1"><stop stop-color="#444b4b"/><stop offset="1" stop-color="#252b2b"/></linearGradient>
+  <filter id="shadow"><feGaussianBlur stdDeviation="10"/></filter>
+  <filter id="soft"><feGaussianBlur stdDeviation="2"/></filter>
+  <pattern id="wallGrid" width="120" height="100" patternUnits="userSpaceOnUse"><path d="M120 0H0V100" fill="none" stroke="#687273" stroke-opacity=".18" stroke-width="2"/></pattern>
+  <pattern id="floorGrid" width="90" height="45" patternUnits="userSpaceOnUse"><path d="M0 0H90M0 0V45" fill="none" stroke="#e7e9e8" stroke-opacity=".18" stroke-width="2"/></pattern>
+</defs>
+<!-- distant Aperture-style industrial test hall -->
+<rect width="1920" height="1080" fill="url(#bg)"/>
+<rect width="1920" height="590" fill="url(#wallGrid)"/>
+<path d="M0 590L1920 515V1080H0Z" fill="url(#floor)"/>
+<path d="M0 590L1920 515" stroke="#566061" stroke-width="7" opacity=".65"/>
+<path d="M0 610L1920 535V1080H0Z" fill="url(#floorGrid)" opacity=".75"/>
+<!-- huge wall modules -->
+<g fill="none" stroke="#737d7d" stroke-width="7" opacity=".72">
+  <path d="M65 80H1855M65 225H1855M65 370H1855M65 515H1855"/>
+  <path d="M180 40V545M430 40V535M680 40V525M930 40V520M1180 40V515M1430 40V510M1680 40V505"/>
+</g>
+<g fill="url(#glass)" stroke="#a5adac" stroke-width="4">
+  <rect x="90" y="120" width="285" height="145" rx="8"/><rect x="465" y="110" width="285" height="145" rx="8"/><rect x="840" y="100" width="285" height="145" rx="8"/><rect x="1215" y="90" width="285" height="145" rx="8"/><rect x="1590" y="80" width="245" height="145" rx="8"/>
+</g>
+<!-- ceiling trusses -->
+<g fill="#626b6b" opacity=".9">
+ <path d="M0 45L1920 0V28L0 74Z"/><path d="M0 300L1920 255V281L0 328Z"/><path d="M0 555L1920 510V534L0 580Z"/>
+</g>
+<g fill="#f5f7f6" stroke="#899292" stroke-width="3">
+ <rect x="150" y="76" width="250" height="20" rx="9"/><rect x="575" y="66" width="250" height="20" rx="9"/><rect x="1000" y="56" width="250" height="20" rx="9"/><rect x="1425" y="46" width="250" height="20" rx="9"/>
+</g>
+<!-- suspended pipes -->
+<g fill="none" stroke-linecap="round">
+ <path d="M40 400C250 360 410 430 600 390S950 320 1160 365S1510 420 1880 350" stroke="#4d5656" stroke-width="24"/>
+ <path d="M40 400C250 360 410 430 600 390S950 320 1160 365S1510 420 1880 350" stroke="#aeb5b4" stroke-width="10"/>
+ <path d="M80 470C300 420 450 490 700 445S1120 390 1330 430S1650 475 1880 420" stroke="#6b7474" stroke-width="12"/>
+</g>
+<!-- left mezzanine -->
+<g transform="translate(60 465)">
+ <path d="M0 20H520L600 170H0Z" fill="#777f80" opacity=".9"/>
+ <path d="M0 20H520" stroke="#d7dbda" stroke-width="12"/>
+ <g fill="none" stroke="#454d4d" stroke-width="13"><path d="M20 20V315M260 20V315M500 20V315"/><path d="M0 75H520M0 165H520M0 255H520"/></g>
+ <g fill="#d5d0c6" stroke="#737c7b" stroke-width="4">
+  <rect x="25" y="85" width="95" height="62"/><rect x="135" y="85" width="95" height="62"/><rect x="285" y="85" width="95" height="62"/><rect x="395" y="85" width="95" height="62"/>
+  <rect x="25" y="175" width="95" height="62"/><rect x="135" y="175" width="95" height="62"/><rect x="285" y="175" width="95" height="62"/><rect x="395" y="175" width="95" height="62"/>
+ </g>
+</g>
+<!-- right mezzanine -->
+<g transform="translate(1360 435)">
+ <path d="M0 30H500L560 175H0Z" fill="#727b7b" opacity=".9"/>
+ <path d="M0 30H500" stroke="#d7dbda" stroke-width="12"/>
+ <g fill="none" stroke="#454d4d" stroke-width="13"><path d="M20 30V320M250 30V320M480 30V320"/><path d="M0 85H500M0 175H500M0 265H500"/></g>
+ <g fill="#cbd2d0" stroke="#737c7b" stroke-width="4"><rect x="25" y="95" width="80" height="62"/><rect x="120" y="95" width="80" height="62"/><rect x="300" y="95" width="80" height="62"/><rect x="395" y="95" width="80" height="62"/><rect x="25" y="185" width="80" height="62"/><rect x="120" y="185" width="80" height="62"/><rect x="300" y="185" width="80" height="62"/><rect x="395" y="185" width="80" height="62"/></g>
+</g>
+<!-- distant central machinery -->
+<g transform="translate(810 485)">
+ <ellipse cx="150" cy="180" rx="250" ry="45" fill="#343b3b" opacity=".3" filter="url(#shadow)"/>
+ <path d="M0 165V30H300V165" fill="url(#metal)" stroke="#555e5e" stroke-width="8"/>
+ <path d="M38 40V150M150 40V150M262 40V150" stroke="#626b6b" stroke-width="7"/>
+ <circle cx="150" cy="82" r="45" fill="#303737" stroke="#9ea5a4" stroke-width="8"/>
+ <path d="M150 42L164 82L150 122L136 82Z" fill="#d4a43d"/>
+</g>
+<!-- conveyor network, designed as layered 2.5D art -->
+<g>
+ <path d="M35 790L550 650L780 705L260 875Z" fill="#1f2525" stroke="#454e4e" stroke-width="8"/>
+ <path d="M1080 690L1880 790L1880 890L1060 780Z" fill="#1f2525" stroke="#454e4e" stroke-width="8"/>
+ <path d="M620 965L1110 770L1270 820L760 1015Z" fill="#202626" stroke="#454e4e" stroke-width="8"/>
+ <g fill="#b9c0bf" stroke="#555e5e" stroke-width="3">
+  <ellipse cx="110" cy="782" rx="27" ry="10"/><ellipse cx="205" cy="756" rx="27" ry="10"/><ellipse cx="300" cy="731" rx="27" ry="10"/><ellipse cx="395" cy="705" rx="27" ry="10"/><ellipse cx="490" cy="680" rx="27" ry="10"/><ellipse cx="585" cy="677" rx="27" ry="10"/>
+  <ellipse cx="1160" cy="700" rx="27" ry="10"/><ellipse cx="1270" cy="714" rx="27" ry="10"/><ellipse cx="1380" cy="728" rx="27" ry="10"/><ellipse cx="1490" cy="742" rx="27" ry="10"/><ellipse cx="1600" cy="756" rx="27" ry="10"/><ellipse cx="1710" cy="770" rx="27" ry="10"/><ellipse cx="1820" cy="784" rx="27" ry="10"/>
+ </g>
+ <g fill="#d7d0c1" stroke="#555e5e" stroke-width="4">
+   <g><rect x="250" y="721" width="62" height="45"/><rect x="405" y="684" width="62" height="45"/><rect x="570" y="651" width="62" height="45"/></g>
+   <g><rect x="1340" y="721" width="64" height="46"/><rect x="1600" y="752" width="64" height="46"/></g>
+ </g>
+ <g fill="#8099a4"><rect x="266" y="734" width="30" height="7"/><rect x="421" y="697" width="30" height="7"/><rect x="586" y="664" width="30" height="7"/><rect x="1357" y="734" width="30" height="7"/><rect x="1617" y="765" width="30" height="7"/></g>
+ <g>
+  <rect x="180" y="744" width="48" height="36" fill="#d6a53e" stroke="#4d5555" stroke-width="3"/>
+  <animateTransform attributeName="transform" type="translate" values="0 0;280 -76;520 -142;0 0" dur="11s" repeatCount="indefinite"/>
+ </g>
+</g>
+<!-- foreground loading platforms -->
+<g opacity=".95">
+ <path d="M0 900H1920V1080H0Z" fill="#535c5c" opacity=".48"/>
+ <path d="M0 910H1920" stroke="#d4a33e" stroke-width="8"/>
+ <path d="M70 990H430M1490 990H1850" stroke="#e0b04b" stroke-width="10"/>
+</g>
+<!-- forklifts -->
+<g stroke="#454d4d" stroke-width="7" stroke-linejoin="round">
+ <g transform="translate(305 805)"><path d="M0 85V10H78L112 85Z" fill="#d1a13a"/><rect x="45" y="-18" width="52" height="30" fill="#e0b54d"/><path d="M112 35H205V45H112M196 45V125" fill="none"/><circle cx="30" cy="105" r="24" fill="#252b2b"/><circle cx="99" cy="105" r="24" fill="#252b2b"/><rect x="12" y="22" width="48" height="38" fill="#303838"/></g>
+ <g transform="translate(1510 820) scale(.85)"><path d="M0 85V10H78L112 85Z" fill="#d1a13a"/><rect x="45" y="-18" width="52" height="30" fill="#e0b54d"/><path d="M112 35H205V45H112M196 45V125" fill="none"/><circle cx="30" cy="105" r="24" fill="#252b2b"/><circle cx="99" cy="105" r="24" fill="#252b2b"/><rect x="12" y="22" width="48" height="38" fill="#303838"/></g>
+</g>
+<!-- black paper workers: deliberately flat silhouettes -->
+<g fill="#121617" stroke="#121617" stroke-linecap="round">
+ <g transform="translate(865 675)"><circle cy="-43" r="14"/><path d="M-12 -29Q0 -35 12 -29L18 24L7 24L5 62H-6L-8 24L-18 24Z"/><path d="M-8 4L-38 30M8 4L35 23" fill="none" stroke-width="9"/><path d="M-4 62L-22 92M5 62L23 91" fill="none" stroke-width="9"/><animateTransform attributeName="transform" type="translate" values="865 675;900 665;865 675" dur="4.8s" repeatCount="indefinite"/></g>
+ <g transform="translate(1160 610)"><circle cy="-43" r="14"/><path d="M-12 -29Q0 -35 12 -29L18 24L7 24L5 62H-6L-8 24L-18 24Z"/><path d="M-8 4L-36 -7M8 4L37 -16" fill="none" stroke-width="9"/><path d="M-4 62L-22 92M5 62L23 91" fill="none" stroke-width="9"/><animateTransform attributeName="transform" type="rotate" values="-2 1160 672;2 1160 672;-2 1160 672" dur="3.7s" repeatCount="indefinite"/></g>
+ <g transform="translate(700 800) scale(.78)"><circle cy="-43" r="14"/><path d="M-12 -29Q0 -35 12 -29L18 24L7 24L5 62H-6L-8 24L-18 24Z"/><path d="M-8 4L-37 32M8 4L38 31" fill="none" stroke-width="9"/><path d="M-4 62L-22 92M5 62L23 91" fill="none" stroke-width="9"/></g>
+ <g transform="translate(1300 830) scale(.72)"><circle cy="-43" r="14"/><path d="M-12 -29Q0 -35 12 -29L18 24L7 24L5 62H-6L-8 24L-18 24Z"/><path d="M-8 4L-40 2M8 4L39 12" fill="none" stroke-width="9"/><path d="M-4 62L-22 92M5 62L23 91" fill="none" stroke-width="9"/></g>
+</g>
+<!-- foreground signage and small props -->
+<g font-family="Arial,sans-serif" fill="#303838">
+ <text x="75" y="1030" font-size="25" letter-spacing="6">LOGISTICS TEST FACILITY</text>
+ <text x="1640" y="1030" font-size="17" letter-spacing="4">LOADING BAY 04</text>
+</g>
+<g fill="#e0b04b" opacity=".9"><path d="M560 1000h90l-30 15h-90zM700 965h90l-30 15h-90zM840 930h90l-30 15h-90z"/></g>
+</svg>
