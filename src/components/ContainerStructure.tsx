@@ -116,19 +116,19 @@ function DoorLeaf({ container, side }: { container: Container; side: -1 | 1 }) {
 
 function EndTick({ p, axis }: { p: [number, number, number]; axis: 'x' | 'y' }) {
   const d = .025
-  return axis === 'y' ? <Line points={[[p[0] - d, p[1], p[2]], [p[0] + d, p[1], p[2]]]} color="#465260" lineWidth={.8} /> : <Line points={[[p[0], p[1] - d, p[2]], [p[0], p[1] + d, p[2]]]} color="#465260" lineWidth={.8} />
+  return axis === 'y' ? <Line points={[[p[0] - d, p[1], p[2]], [p[0] + d, p[1], p[2]]]} color="#858580" lineWidth={.8} /> : <Line points={[[p[0], p[1] - d, p[2]], [p[0], p[1] + d, p[2]]]} color="#858580" lineWidth={.8} />
 }
 
 function DimensionLine({ points, label, position, axis, vertical = false }: { points: [[number, number, number], [number, number, number]]; label: string; position: [number, number, number]; axis: 'x' | 'y'; vertical?: boolean }) {
-  return <group><Line points={points} color="#465260" lineWidth={1.05} /><EndTick p={points[0]} axis={axis} /><EndTick p={points[1]} axis={axis} /><Html position={position} center><div className={`cad-dimension ${vertical ? 'cad-vertical' : ''}`}>{label}</div></Html></group>
+  return <group><Line points={points} color="#858580" lineWidth={1.05} /><EndTick p={points[0]} axis={axis} /><EndTick p={points[1]} axis={axis} /><Html position={position} center><div className={`cad-dimension ${vertical ? 'cad-vertical' : ''}`}>{label}</div></Html></group>
 }
 
 function LengthRuler({ container }: { container: Container }) {
   const L = container.length * S, y = -container.outerWidth * S / 2 - .40, z = .035
   const marks: ReactNode[] = []
-  for (let x = 0; x <= container.length; x += 1000) { const xx = (x - container.length / 2) * S; marks.push(<Line key={`t-${x}`} points={[[xx, y, z - .04], [xx, y, z + .04]]} color="#465260" lineWidth={.8} />, <Html key={`l-${x}`} position={[xx, y - .02, z + .075]} center><div className="cad-tick-label">{x.toLocaleString()}</div></Html>) }
-  if (container.length % 1000) { const xx = container.length / 2 * S; marks.push(<Line key="end" points={[[xx, y, z - .04], [xx, y, z + .04]]} color="#465260" lineWidth={.8} />, <Html key="endl" position={[xx, y - .02, z + .075]} center><div className="cad-tick-label">{container.length.toLocaleString()}</div></Html>) }
-  return <group><Line points={[[-L / 2, y, z], [L / 2, y, z]]} color="#465260" lineWidth={1.1} />{marks}</group>
+  for (let x = 0; x <= container.length; x += 1000) { const xx = (x - container.length / 2) * S; marks.push(<Line key={`t-${x}`} points={[[xx, y, z - .04], [xx, y, z + .04]]} color="#858580" lineWidth={.8} />, <Html key={`l-${x}`} position={[xx, y - .02, z + .075]} center><div className="cad-tick-label">{x.toLocaleString()}</div></Html>) }
+  if (container.length % 1000) { const xx = container.length / 2 * S; marks.push(<Line key="end" points={[[xx, y, z - .04], [xx, y, z + .04]]} color="#858580" lineWidth={.8} />, <Html key="endl" position={[xx, y - .02, z + .075]} center><div className="cad-tick-label">{container.length.toLocaleString()}</div></Html>) }
+  return <group><Line points={[[-L / 2, y, z], [L / 2, y, z]]} color="#858580" lineWidth={1.1} />{marks}</group>
 }
 
 export default function ContainerStructure({ container, lang = 'zh', showDimensions = true }: { container: Container; lang?: 'zh' | 'en'; showDimensions?: boolean }) {
