@@ -3,12 +3,12 @@ import type { Container } from '../types'
 
 const S = .001
 
-// TorusGeometry is created in the XY plane and its open side is centred at
-// about -58.5 degrees.  Rotate the ring inside that plane first, then rotate
-// the whole ring plane upright.  This keeps the U opening exactly vertical.
+// TorusGeometry is created in the XY plane. After the ring plane is stood
+// upright, the U opening must point DOWN on a top ring and UP on a bottom ring.
+// The previous version had these two directions reversed.
 function Ring({ top }: { top: boolean }) {
   const localMissing = -58.5 * Math.PI / 180
-  const opening = top ? -Math.PI / 2 : Math.PI / 2
+  const opening = top ? Math.PI / 2 : -Math.PI / 2
   const inPlane = opening - localMissing
   return (
     <group rotation={[Math.PI / 2, 0, 0]}>
