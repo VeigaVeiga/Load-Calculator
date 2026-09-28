@@ -1400,6 +1400,7 @@ function App() {
               <label className="dimension-toggle"><input type="checkbox" checked={showDimensions} onChange={e=>setShowDimensions(e.target.checked)}/>{lang==='zh'?'容器尺寸标注':'Container Dimensions'}</label>
             </div>
             <div className="toolbar-group"><b>{lang==='zh'?'模式':'MODE'}</b>
+              <button className={selectionMode==='single'?'active':''} onClick={()=>{setSelectionMode('single');setSelectedIds([])}}>{tr.singleSelect}</button>
               <button className={selectionMode==='box'?'active':''} onClick={()=>setSelectionMode('box')}>{lang==='zh'?'多选':'MULTI SELECT'}</button>
               <button className={freePlacement?'active':''} onClick={()=>setFreePlacement(v=>!v)}>{tr.freePlacement}</button>
             </div>
