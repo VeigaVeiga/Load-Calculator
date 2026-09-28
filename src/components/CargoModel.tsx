@@ -28,7 +28,7 @@ const edgeMaterialFor = (_color: string) => {
     material = new THREE.LineBasicMaterial({ color: '#30373b', transparent: true, opacity: .82 })
     EDGE_MATERIAL_CACHE.set(key, material)
   }
-  return material
+  return edgeMaterial
 }
 
 type BoxProps = {
@@ -119,7 +119,7 @@ function IndustrialCargo({ p, eventProps, selected, hovered }: { p: PlacedCargo;
     <MemoBox size={[l * .74 * S, plate * S, plate * .7 * S]} position={[0, w * .5 * S + plate * .35 * S, h * .22 * S]} color={seam} roughness={.5} />
     <MemoBox size={[l * .74 * S, plate * S, plate * .7 * S]} position={[0, w * .5 * S + plate * .35 * S, -h * .22 * S]} color={seam} roughness={.5} />
     {[-.25, 0, .25].map((t, i) => <mesh key={`light-${i}`} position={[t * l * S, w * .5 * S + plate * .75 * S, h * .28 * S]}>
-      <sphereGeometry args={[Math.max(4, plate * .42), 10, 10]} />
+      <sphereGeometry args={[Math.max(4, plate * .42) * S, 10, 10]} />
       <meshStandardMaterial color={i === 1 ? accent : '#657276'} emissive={i === 1 ? accent : '#000000'} emissiveIntensity={i === 1 ? .8 : 0} roughness={.32} />
     </mesh>)}
     {companion && <>
