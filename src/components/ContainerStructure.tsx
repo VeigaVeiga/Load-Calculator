@@ -27,13 +27,17 @@ function HeadWall({ container, x, sideRailY, bottomZ, topZ, rail }: { container:
   const W = container.width * S, H = container.height * S
   return <group>
     <Panel position={[x, 0, H / 2]} size={[container.wallThickness * S, container.outerWidth * S, H]} opacity={.70} />
-    {/* Extend the head-wall material inward only to visually close the structural gap.
-        This does not alter the cargo calculation envelope. */}
+    {/* Thicken the complete head-wall assembly inward to close the visual gap.
+        The wall, surrounding frame rails and corner posts remain visually unified.
+        This is visual structure only and does not alter the cargo calculation envelope. */}
     {(() => {
       const floorEdge = -(container.length * S) / 2
       const wallInnerFace = x + container.wallThickness * S / 2
-      const fill = floorEdge - wallInnerFace
-      return fill > 0 ? <Panel position={[wallInnerFace + fill / 2, 0, H / 2]} size={[fill, container.wallThickness * S, H]} opacity={.70} /> : null
+      const gap = floorEdge - wallInnerFace
+      if (gap <= 0) return null
+      const totalDepth = container.wallThickness * S + gap
+      const centerX = floorEdge - totalDepth / 2
+      return <Panel position={[centerX, 0, H / 2]} size={[totalDepth, container.outerWidth * S, H]} opacity={.70} />
     })()}
     <Beam position={[x, -sideRailY, bottomZ + rail / 2]} size={[rail, rail, rail]} />
     <Beam position={[x, sideRailY, bottomZ + rail / 2]} size={[rail, rail, rail]} />
@@ -55,11 +59,11 @@ function Roof({ container }: { container: Container }) {
 // entering the cargo calculation volume. They are structural visualization only.
 function RoofDividerLines({ container }: { container: Container }) {
   const W = container.outerWidth * S, H = visualHeight(container)
-  // Keep three roof divider lines aligned with the three central side-wall dividers.
-  // The positions are derived from the container length so every container size
-  // stays proportional and the lines never extend beyond the usable length.
-  const half = container.length / 2
-  const dividerPositions = [-half / 2, 0, half / 2]
+  // 40-foot containers: center line + the centers of the two resulting halves.
+  // 20-foot containers: center line only.
+  const dividerPositions = container.length >= 10000
+    ? [-container.length / 4, 0, container.length / 4]
+    : [0]
   return <group>
     {dividerPositions.map((x) => <Line key={x} points={[[x * S, -W / 2, H - .006], [x * S, W / 2, H - .006]]} color={EDGE} lineWidth={.42} />)}
   </group>
