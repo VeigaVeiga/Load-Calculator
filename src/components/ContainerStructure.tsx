@@ -55,10 +55,13 @@ function Roof({ container }: { container: Container }) {
 // entering the cargo calculation volume. They are structural visualization only.
 function RoofDividerLines({ container }: { container: Container }) {
   const W = container.outerWidth * S, H = visualHeight(container)
-  // Match the three central longitudinal side-wall divider lines exactly:
-  // x = -3000 / 0 / +3000 mm.
+  // Keep three roof divider lines aligned with the three central side-wall dividers.
+  // The positions are derived from the container length so every container size
+  // stays proportional and the lines never extend beyond the usable length.
+  const half = container.length / 2
+  const dividerPositions = [-half / 2, 0, half / 2]
   return <group>
-    {[-3000, 0, 3000].map((x) => <Line key={x} points={[[x * S, -W / 2, H - .006], [x * S, W / 2, H - .006]]} color={EDGE} lineWidth={.42} />)}
+    {dividerPositions.map((x) => <Line key={x} points={[[x * S, -W / 2, H - .006], [x * S, W / 2, H - .006]]} color={EDGE} lineWidth={.42} />)}
   </group>
 }
 
