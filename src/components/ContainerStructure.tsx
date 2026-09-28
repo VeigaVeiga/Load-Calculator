@@ -76,15 +76,23 @@ function DoorFrame({ container, sideRailY, bottomZ, topZ, rail }: { container: C
   const floorEdge = container.length * S / 2
   const thresholdDepth = Math.max(0, x - floorEdge)
   const thresholdCenterX = floorEdge + thresholdDepth / 2
-  // Extend the two door-side posts outward to the outer face of the side walls,
-  // while keeping their inner face exactly on the internal cargo boundary.
-  const sideWallOuterY = container.outerWidth * S / 2 + container.wallThickness * S / 2
-  const sidePostInnerY = container.width * S / 2
-  const sidePostDepthY = Math.max(rail, sideWallOuterY - sidePostInnerY)
-  const sidePostCenterOffset = (sideWallOuterY + sidePostInnerY) / 2
+  // The door posts must fill the whole side-wall thickness transition:
+  // from the internal cargo boundary to the outside face of the side wall.
+  // Keep the inner face exactly at the internal width so the post never enters
+  // the cargo calculation volume.
+  const sideInnerY = container.width * S / 2
+  const sideOuterY = container.outerWidth * S / 2
+  const sidePostDepthY = Math.max(rail, sideOuterY - sideInnerY)
+  const sidePostCenterOffset = (sideInnerY + sideOuterY) / 2
+  // Extend the post in X to meet the side-wall panel cleanly. The inner end is
+  // exactly at the outer shell face; it does not project into the container.
+  const doorPostOuterX = x + rail / 2
+  const doorPostInnerX = L / 2
+  const sidePostDepthX = Math.max(rail, doorPostOuterX - doorPostInnerX)
+  const sidePostCenterX = (doorPostInnerX + doorPostOuterX) / 2
   return <group>
-    <Beam position={[x, -sidePostCenterOffset, H / 2]} size={[rail, sidePostDepthY, H]} />
-    <Beam position={[x, sidePostCenterOffset, H / 2]} size={[rail, sidePostDepthY, H]} />
+    <Beam position={[sidePostCenterX, -sidePostCenterOffset, H / 2]} size={[sidePostDepthX, sidePostDepthY, H]} />
+    <Beam position={[sidePostCenterX, sidePostCenterOffset, H / 2]} size={[sidePostDepthX, sidePostDepthY, H]} />
     <Beam position={[x, 0, topZ]} size={[rail, W + rail, rail]} />
     {thresholdDepth > 0 && <>
       <Beam position={[thresholdCenterX, 0, topZ]} size={[thresholdDepth, W + rail, rail]} />
