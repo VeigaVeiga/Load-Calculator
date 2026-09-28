@@ -18,7 +18,7 @@ export default function ContainerFloor({container}:{container:Container}){
        lines.push(<Line key={`x-${offset}`} points={[[X,-W/2,0.008],[X,W/2,0.008]]} color={major?'#8d8d87':'#3f3f3b'} lineWidth={major?0.9:0.28}/>)
      }else{
        const Y=offset*S
-       lines.push(<Line key={`y-${offset}`} points={[[-L/2,Y,0.008],[L/2,Y,0.008]]} color={major?'#879095':'#d7dcdd'} lineWidth={major?0.9:0.28}/>)
+       lines.push(<Line key={`y-${offset}`} points={[[-L/2,Y,0.008],[L/2,Y,0.008]]} color={major?'#8d8d87':'#3f3f3b'} lineWidth={major?0.9:0.28}/>)
      }
    }
  }
