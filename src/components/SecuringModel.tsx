@@ -10,7 +10,7 @@ function Rope({ a, b, radius = .022, color = '#8b8f91' }: { a: THREE.Vector3; b:
   if (len < 0.0001) return null
   const mid = a.clone().add(b).multiplyScalar(.5)
   const quaternion = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.normalize())
-  return <mesh position={mid} quaternion={quaternion} raycast={() => null}><cylinderGeometry args={[radius, radius, len, 8]} /><meshStandardMaterial color={color} roughness={.72} /></mesh>
+  return <mesh position={mid} quaternion={quaternion}><cylinderGeometry args={[radius, radius, len, 8]} /><meshStandardMaterial color={color} roughness={.72} /></mesh>
 }
 
 // Full door net in the local Y/Z door plane. 45-degree dashed lines are
@@ -46,7 +46,7 @@ function DashedDoorNet({ width, height, selected }: { width: number; height: num
     }
   }
 
-  return <group raycast={() => null}>{segments}</group>
+  return <group>{segments}</group>
 }
 
 type Props = {
@@ -78,7 +78,7 @@ export default function SecuringModel({ item, container, selected, registerRef, 
     shape.closePath()
     body = (
       <group rotation={[Math.PI / 2, 0, 0]}>
-        <mesh raycast={() => null}>
+        <mesh>
           <extrudeGeometry args={[shape, { depth: W, bevelEnabled: true, bevelThickness: .0015, bevelSize: .0015, bevelSegments: 1 }]} />
           {material('#3979b8')}
         </mesh>
@@ -88,13 +88,13 @@ export default function SecuringModel({ item, container, selected, registerRef, 
     const L = Math.max(300, item.length) * S
     const W = Math.max(180, item.width) * S
     const H = Math.max(160, item.height) * S
-    body = <group raycast={() => null}><mesh scale={[L * .46, W * .34, H * .30]}><sphereGeometry args={[1, 16, 8]} />{material('#3fa36b')}</mesh><mesh position={[L * .27, 0, 0]} scale={[L * .25, W * .30, H * .27]}><sphereGeometry args={[1, 14, 8]} />{material('#3fa36b')}</mesh><mesh position={[-L * .27, 0, 0]} scale={[L * .25, W * .30, H * .27]}><sphereGeometry args={[1, 14, 8]} />{material('#3fa36b')}</mesh></group>
+    body = <group><mesh scale={[L * .46, W * .34, H * .30]}><sphereGeometry args={[1, 16, 8]} />{material('#3fa36b')}</mesh><mesh position={[L * .27, 0, 0]} scale={[L * .25, W * .30, H * .27]}><sphereGeometry args={[1, 14, 8]} />{material('#3fa36b')}</mesh><mesh position={[-L * .27, 0, 0]} scale={[L * .25, W * .30, H * .27]}><sphereGeometry args={[1, 14, 8]} />{material('#3fa36b')}</mesh></group>
   } else if (item.type === 'doorNet') {
     const w = Math.max(30, container.doorWidth) * S
     const h = Math.max(30, container.doorHeight) * S
     const frame = selected ? '#f4a23b' : '#626970'
     body = (
-      <group raycast={() => null}>
+      <group>
         <DashedDoorNet width={container.doorWidth} height={container.doorHeight} selected={selected} />
         <mesh position={[0, -w / 2, 0]} raycast={() => null}><boxGeometry args={[.035, .035, h]} /><meshStandardMaterial color={frame} /></mesh>
         <mesh position={[0, w / 2, 0]} raycast={() => null}><boxGeometry args={[.035, .035, h]} /><meshStandardMaterial color={frame} /></mesh>
@@ -116,7 +116,7 @@ export default function SecuringModel({ item, container, selected, registerRef, 
     const beltColor = selected ? '#f4a23b' : '#c08a2e'
     const radius = .018
     body = (
-      <group raycast={() => null}>
+      <group>
         <Rope a={new THREE.Vector3(0, yL, zT)} b={new THREE.Vector3(0, yR, zB)} radius={radius} color={beltColor} />
         <Rope a={new THREE.Vector3(0, yR, zT)} b={new THREE.Vector3(0, yL, zB)} radius={radius} color={beltColor} />
         <Rope a={new THREE.Vector3(0, yL, zB)} b={new THREE.Vector3(0, yR, zB)} radius={radius * 1.12} color={beltColor} />
@@ -129,7 +129,7 @@ export default function SecuringModel({ item, container, selected, registerRef, 
   }
 
   return (
-    <group ref={group => registerRef?.(item.id, group)} position={center} rotation={[0, 0, item.rotation * Math.PI / 180]} raycast={() => null} onPointerDown={e => { e.stopPropagation(); onSelect?.() }} onPointerUp={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); onSelect?.() }} onContextMenu={e => { e.stopPropagation(); e.nativeEvent.preventDefault(); onSelect?.() }}>
+    <group ref={group => registerRef?.(item.id, group)} position={center} rotation={[0, 0, item.rotation * Math.PI / 180]} onPointerDown={e => { e.stopPropagation(); onSelect?.() }} onPointerUp={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); onSelect?.() }} onContextMenu={e => { e.stopPropagation(); e.nativeEvent.preventDefault(); onSelect?.() }}>
       {body}
     </group>
   )
