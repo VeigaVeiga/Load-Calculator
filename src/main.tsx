@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client'
 import App from './App'
 import './index.css'
 import './beta.css'
+import './spatial-pass.css'
 
 class AppErrorBoundary extends React.Component<React.PropsWithChildren, {error: Error | null}> {
   state = { error: null as Error | null }
