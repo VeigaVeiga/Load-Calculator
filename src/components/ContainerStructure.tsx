@@ -90,7 +90,7 @@ export default function ContainerStructure({ container, lang = 'zh', showDimensi
   const bottomRailZ = -rail / 2
   const headX = -L / 2 - rail / 2
   return <group>
-    <Roof container />
+    <Roof container={container} />
     <SideWall y={-W / 2} container={container} />
     <SideWall y={W / 2} container={container} />
     <Beam position={[0, -sideRailY, topRailZ]} size={[L, rail, rail]} />
