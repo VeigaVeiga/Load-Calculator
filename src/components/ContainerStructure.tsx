@@ -3,7 +3,7 @@ import type { ReactNode } from 'react'
 import type { Container } from '../types'
 
 const S = .001
-const BEAM = '#2f6f9f'
+const BEAM = '#d6d6ce'
 const EDGE = BEAM
 
 function visualHeight(container: Container) { return container.height * S }
