@@ -1,121 +1,308 @@
 import type { Cargo, Container, PlacedCargo } from '../types'
 
-type Space = { x: number; y: number; z: number; l: number; w: number; h: number; support?: string; supportLoad: number; supportLimit: number; depth: number }
 type Ori = { l: number; w: number; h: number; r: 0 | 90 }
+type Point = { x: number; y: number; z: number }
+type Candidate = { p: PlacedCargo; score: number }
 
 const EPS = 0.5
-const dims = (p: PlacedCargo) => p.rotation === 90 ? { l: p.width, w: p.length } : { l: p.length, w: p.width }
-const oris = (c: Cargo): Ori[] => {
+
+function dims(p: PlacedCargo) {
+  return p.rotation === 90 ? { l: p.width, w: p.length } : { l: p.length, w: p.width }
+}
+
+function oris(c: Cargo): Ori[] {
   const a: Ori = { l: c.length, w: c.width, h: c.height, r: 0 }
-  return c.rotatable && Math.abs(c.length - c.width) > EPS ? [a, { l: c.width, w: c.length, h: c.height, r: 90 }] : [a]
+  if (c.rotatable && Math.abs(c.length - c.width) > EPS) {
+    return [a, { l: c.width, w: c.length, h: c.height, r: 90 }]
+  }
+  return [a]
 }
-const fits = (s: Space, o: Ori) => o.l <= s.l + EPS && o.w <= s.w + EPS && o.h <= s.h + EPS
-const overlap = (a: PlacedCargo, b: PlacedCargo) => {
-  const A = dims(a), B = dims(b)
-  return a.x < B.l + b.x - EPS && a.x + A.l > b.x + EPS && a.y < B.w + b.y - EPS && a.y + A.w > b.y + EPS && a.z < b.z + b.height - EPS && a.z + a.height > b.z + EPS
+
+function make(c: Cargo, o: Ori, x: number, y: number, z: number, seq: number): PlacedCargo {
+  return {
+    id: `${c.id}-${seq}`,
+    cargoId: c.id,
+    cargoType: c.type,
+    x,
+    y,
+    z,
+    length: c.length,
+    width: c.width,
+    height: c.height,
+    rotation: o.r,
+    weight: c.weight,
+    color: c.color,
+    placementMode: 'automatic',
+    locked: false,
+  }
 }
-const inside = (p: PlacedCargo, c: Container) => {
+
+function inside(p: PlacedCargo, c: Container) {
   const d = dims(p)
-  return p.x >= -EPS && p.y >= -EPS && p.z >= -EPS && p.x + d.l <= c.length + EPS && p.y + d.w <= c.width + EPS && p.z + p.height <= c.height + EPS
+  return p.x >= -EPS && p.y >= -EPS && p.z >= -EPS &&
+    p.x + d.l <= c.length + EPS && p.y + d.w <= c.width + EPS && p.z + p.height <= c.height + EPS
 }
-function make(c: Cargo, o: Ori, x: number, y: number, z: number, id: string): PlacedCargo {
-  return { id, cargoId: c.id, cargoType: c.type, x, y, z, length: c.length, width: c.width, height: c.height, rotation: o.r, weight: c.weight, color: c.color, placementMode: 'automatic', locked: false }
+
+function overlap3d(a: PlacedCargo, b: PlacedCargo) {
+  const A = dims(a)
+  const B = dims(b)
+  return a.x < b.x + B.l - EPS && a.x + A.l > b.x + EPS &&
+    a.y < b.y + B.w - EPS && a.y + A.w > b.y + EPS &&
+    a.z < b.z + b.height - EPS && a.z + a.height > b.z + EPS
 }
-function split(s: Space, o: Ori, x: number, y: number, z: number, id: string, c: Cargo): Space[] {
-  const out: Space[] = []
-  const add = (a: Space) => { if (a.l > EPS && a.w > EPS && a.h > EPS) out.push(a) }
-  add({ ...s, l: x - s.x })
-  add({ ...s, x: x + o.l, l: s.x + s.l - (x + o.l) })
-  add({ ...s, y, w: y - s.y })
-  add({ ...s, y: y + o.w, w: s.y + s.w - (y + o.w) })
-  if (c.stackable && c.loadBearing) {
-    add({ x, y, z: z + o.h, l: o.l, w: o.w, h: s.h - o.h, support: id, supportLoad: 0, supportLimit: Number.isFinite(c.maxLoadOnTop) ? c.maxLoadOnTop : 0, depth: s.depth + 1 })
+
+function overlapArea(a: { x: number; y: number; l: number; w: number }, b: PlacedCargo) {
+  const d = dims(b)
+  const x = Math.max(0, Math.min(a.x + a.l, b.x + d.l) - Math.max(a.x, b.x))
+  const y = Math.max(0, Math.min(a.y + a.w, b.y + d.w) - Math.max(a.y, b.y))
+  return x * y
+}
+
+function coversRectangle(x: number, y: number, l: number, w: number, supports: PlacedCargo[]) {
+  if (supports.length === 0) return false
+  const xs = new Set<number>([x, x + l])
+  for (const p of supports) {
+    const d = dims(p)
+    const x1 = Math.max(x, p.x)
+    const x2 = Math.min(x + l, p.x + d.l)
+    if (x2 > x1 + EPS) {
+      xs.add(x1)
+      xs.add(x2)
+    }
+  }
+  const sortedX = [...xs].sort((a, b) => a - b)
+  for (let i = 0; i < sortedX.length - 1; i++) {
+    const xa = sortedX[i]
+    const xb = sortedX[i + 1]
+    if (xb - xa <= EPS) continue
+    const xm = (xa + xb) / 2
+    const intervals: Array<[number, number]> = []
+    for (const p of supports) {
+      const d = dims(p)
+      if (xm > p.x + EPS && xm < p.x + d.l - EPS) {
+        const ya = Math.max(y, p.y)
+        const yb = Math.min(y + w, p.y + d.w)
+        if (yb > ya + EPS) intervals.push([ya, yb])
+      }
+    }
+    intervals.sort((a, b) => a[0] - b[0])
+    let cursor = y
+    for (const [ya, yb] of intervals) {
+      if (ya > cursor + EPS) return false
+      if (yb > cursor) cursor = yb
+      if (cursor >= y + w - EPS) break
+    }
+    if (cursor < y + w - EPS) return false
+  }
+  return true
+}
+
+function supportInfo(
+  c: Cargo,
+  o: Ori,
+  x: number,
+  y: number,
+  z: number,
+  placed: PlacedCargo[],
+  cargoById: Map<string, Cargo>,
+) {
+  if (z <= EPS) return { ok: true, depth: 0, supportArea: o.l * o.w }
+
+  const supports = placed.filter(p => {
+    const pc = cargoById.get(p.cargoId)
+    if (!pc || !pc.stackable || !pc.loadBearing) return false
+    return Math.abs(p.z + p.height - z) <= EPS && overlapArea({ x, y, l: o.l, w: o.w }, p) > EPS
+  })
+  if (!coversRectangle(x, y, o.l, o.w, supports)) return { ok: false, depth: 0, supportArea: 0 }
+
+  const area = o.l * o.w
+  let weightedDepth = 0
+  let totalSupportedArea = 0
+  for (const p of supports) {
+    const pc = cargoById.get(p.cargoId)
+    if (!pc) continue
+    const a = overlapArea({ x, y, l: o.l, w: o.w }, p)
+    totalSupportedArea += a
+    const existingLoad = placed.reduce((sum, q) => {
+      if (q.id === p.id || Math.abs(q.z - (p.z + p.height)) > EPS) return sum
+      const qArea = overlapArea({ x: q.x, y: q.y, l: dims(q).l, w: dims(q).w }, p)
+      return sum + (qArea > EPS ? q.weight * Math.min(1, qArea / Math.max(EPS, dims(q).l * dims(q).w)) : 0)
+    }, 0)
+    if (pc.maxLoadOnTop > 0 && existingLoad + c.weight * (a / area) > pc.maxLoadOnTop + EPS) {
+      return { ok: false, depth: 0, supportArea: totalSupportedArea }
+    }
+    weightedDepth = Math.max(weightedDepth, 1)
+  }
+  const layerLimit = c.maxStackLayers || 0
+  if (layerLimit > 0 && weightedDepth + 1 > layerLimit) return { ok: false, depth: weightedDepth + 1, supportArea: totalSupportedArea }
+  return { ok: true, depth: weightedDepth + 1, supportArea: totalSupportedArea }
+}
+
+function points(placed: PlacedCargo[], container: Container): Point[] {
+  const out: Point[] = [{ x: 0, y: 0, z: 0 }]
+  const add = (x: number, y: number, z: number) => {
+    if (x >= -EPS && y >= -EPS && z >= -EPS && x <= container.length + EPS && y <= container.width + EPS && z <= container.height + EPS) {
+      out.push({ x, y, z })
+    }
+  }
+  for (const p of placed) {
+    const d = dims(p)
+    const top = p.z + p.height
+    // Bottom-layer extreme points.
+    if (p.z <= EPS) {
+      add(p.x + d.l, p.y, 0)
+      add(p.x, p.y + d.w, 0)
+      add(p.x + d.l, p.y + d.w, 0)
+    }
+    // Top-layer extreme points. These are only candidates; supportInfo below
+    // decides whether the complete footprint is physically supported.
+    add(p.x, p.y, top)
+    add(p.x + d.l, p.y, top)
+    add(p.x, p.y + d.w, top)
+    add(p.x + d.l, p.y + d.w, top)
   }
   return out
 }
-function prune(spaces: Space[]) {
-  const out: Space[] = []
-  for (const s of spaces) {
-    if (s.l <= EPS || s.w <= EPS || s.h <= EPS) continue
-    if (out.some(q => Math.abs(q.x - s.x) <= EPS && Math.abs(q.y - s.y) <= EPS && Math.abs(q.z - s.z) <= EPS && Math.abs(q.l - s.l) <= EPS && Math.abs(q.w - s.w) <= EPS && Math.abs(q.h - s.h) <= EPS && q.support === s.support)) continue
-    out.push(s)
+
+function candidateAnchors(p: Point, o: Ori, container: Container): Point[] {
+  const xs = [p.x, p.x - o.l]
+  const ys = [p.y, p.y - o.w]
+  const out: Point[] = []
+  for (const x of xs) for (const y of ys) out.push({ x, y, z: p.z })
+  // Always allow the four container walls at every reachable support level.
+  out.push(
+    { x: 0, y: 0, z: p.z },
+    { x: container.length - o.l, y: 0, z: p.z },
+    { x: 0, y: container.width - o.w, z: p.z },
+    { x: container.length - o.l, y: container.width - o.w, z: p.z },
+  )
+  return out
+}
+
+function dedupePoints(pointsIn: Point[]) {
+  const seen = new Set<string>()
+  const out: Point[] = []
+  for (const p of pointsIn) {
+    const k = `${Math.round(p.x)}|${Math.round(p.y)}|${Math.round(p.z)}`
+    if (seen.has(k)) continue
+    seen.add(k)
+    out.push(p)
   }
   return out
 }
-function expand(cargo: Cargo[]) {
+
+function buildUnits(cargo: Cargo[], mode: number) {
   const units: Cargo[] = []
   for (const c of cargo) {
-    for (let i = 0, n = Math.max(0, Math.floor(c.quantity)); i < n; i++) {
+    const n = Math.max(0, Math.floor(c.quantity))
+    for (let i = 0; i < n; i++) {
       if (c.length > 0 && c.width > 0 && c.height > 0) units.push(c)
     }
   }
-  return units.sort((a, b) => {
-    const difficulty = (c: Cargo) => (c.quantity <= 3 ? 1000000 : 0) + (c.rotatable ? 0 : 100000) + (c.stackable ? 0 : 50000) + c.length * c.width
-    return difficulty(b) - difficulty(a)
-  })
-}
-function futureScore(spaces: Space[], future: Cargo[]) {
-  let n = 0
-  for (const c of future.slice(0, 6)) if (spaces.some(s => oris(c).some(o => fits(s, o)))) n++
-  return n
-}
-
-export async function smartPack(cargo: Cargo[], container: Container, locked: PlacedCargo[] = [], progress?: (n: number) => void, options: { signal?: AbortSignal } = {}) {
-  const units = expand(cargo)
-  if (!units.length) { progress?.(100); return locked.slice() }
-
-  const safe = locked.filter(p => inside(p, container))
-  let result = safe.slice()
-  let spaces: Space[] = [{ x: 0, y: 0, z: 0, l: container.length, w: container.width, h: container.height, supportLoad: 0, supportLimit: 0, depth: 0 }]
-  let totalWeight = safe.reduce((n, p) => n + p.weight, 0)
-  let seq = 0
-
-  // Locked cargo is an actual obstacle. Remove it from the initial free-space map.
-  for (const p of [...safe].sort((a, b) => a.z - b.z)) {
-    const d = dims(p)
-    const i = spaces.findIndex(s => p.x >= s.x - EPS && p.y >= s.y - EPS && p.z >= s.z - EPS && p.x + d.l <= s.x + s.l + EPS && p.y + d.w <= s.y + s.w + EPS && p.z + p.height <= s.z + s.h + EPS)
-    if (i < 0) continue
-    const s = spaces[i]
-    const obstacle: Ori = { l: d.l, w: d.w, h: p.height, r: p.rotation === 90 ? 90 : 0 }
-    const dummy = { ...({} as Cargo), stackable: false, loadBearing: false } as Cargo
-    spaces = prune([...spaces.slice(0, i), ...spaces.slice(i + 1), ...split(s, obstacle, p.x, p.y, p.z, p.id, dummy)])
+  const score = (c: Cargo) => {
+    const area = c.length * c.width
+    const volume = area * c.height
+    const difficulty = (c.rotatable ? 0 : 300000) + (c.stackable && c.loadBearing ? 0 : 150000) + (c.quantity <= 3 ? 100000 : 0)
+    if (mode === 1) return volume + difficulty
+    if (mode === 2) return area + c.height * 1000 + difficulty
+    if (mode === 3) return c.height * 100000 + area + difficulty
+    return difficulty + area
   }
+  return units.sort((a, b) => score(b) - score(a))
+}
+
+function placementScore(p: PlacedCargo, supportArea: number, container: Container, neighbors: PlacedCargo[]) {
+  const d = dims(p)
+  const footprint = d.l * d.w
+  const supportRatio = footprint > 0 ? supportArea / footprint : 0
+  let sideContact = 0
+  for (const q of neighbors) {
+    const qd = dims(q)
+    if (Math.abs(q.z - p.z) > EPS || Math.abs(q.z + q.height - p.z) <= EPS) continue
+    const xTouch = Math.abs(p.x + d.l - q.x) <= EPS || Math.abs(q.x + qd.l - p.x) <= EPS
+    const yTouch = Math.abs(p.y + d.w - q.y) <= EPS || Math.abs(q.y + qd.w - p.y) <= EPS
+    if (xTouch) sideContact += Math.min(d.w, qd.w)
+    if (yTouch) sideContact += Math.min(d.l, qd.l)
+  }
+  const wallTouch = (p.x <= EPS ? d.w : 0) + (p.y <= EPS ? d.l : 0) + (p.x + d.l >= container.length - EPS ? d.w : 0) + (p.y + d.w >= container.width - EPS ? d.l : 0)
+  // Lower z is overwhelmingly preferred. At the same level, full support,
+  // side contact and wall contact produce compact, non-floating cargo walls.
+  return p.z * 1000000 + (1 - supportRatio) * 100000 + -sideContact * 20 + -wallTouch * 5 + p.y * 0.01 + p.x * 0.001
+}
+
+async function runAttempt(
+  units: Cargo[],
+  container: Container,
+  locked: PlacedCargo[],
+  progress?: (n: number) => void,
+  options: { signal?: AbortSignal } = {},
+) {
+  const cargoById = new Map<string, Cargo>()
+  for (const c of units) cargoById.set(c.id, c)
+  const safeLocked = locked.filter(p => inside(p, container))
+  const result = safeLocked.slice()
+  let totalWeight = result.reduce((n, p) => n + p.weight, 0)
+  let seq = 0
+  let placedAuto = 0
 
   for (let i = 0; i < units.length; i++) {
     if (options.signal?.aborted) throw new Error('Packing cancelled')
     const c = units[i]
     if (container.maxPayload > 0 && totalWeight + c.weight > container.maxPayload + EPS) continue
-    const future = units.slice(i + 1)
-    let best: { p: PlacedCargo; spaces: Space[]; score: number } | undefined
 
-    for (const s of spaces) {
-      if (s.support && s.supportLimit > 0 && s.supportLoad + c.weight > s.supportLimit + EPS) continue
-      if (s.support && s.depth >= Math.max(1, Math.floor(c.maxStackLayers || 999999))) continue
-      for (const o of oris(c)) {
-        if (!fits(s, o)) continue
-        const anchors: Array<[number, number]> = [[s.x, s.y], [s.x + s.l - o.l, s.y], [s.x, s.y + s.w - o.w], [s.x + s.l - o.l, s.y + s.w - o.w]]
-        for (const [x, y] of anchors) {
-          const p = make(c, o, x, y, s.z, `${c.id}-${seq + 1}`)
-          if (!inside(p, container) || result.some(q => overlap(p, q))) continue
-          const ns = prune([...spaces.filter(q => q !== s), ...split(s, o, x, y, s.z, p.id, c)])
-          const center = Math.hypot(x + o.l / 2 - container.length / 2, y + o.w / 2 - container.width / 2)
-          const futureFit = futureScore(ns, future)
-          const leftover = Math.max(0, s.l - o.l) * Math.max(0, s.w - o.w)
-          const score = leftover * 0.02 + center * 0.5 - futureFit * 10000 - (s.support ? 500 : 0) - (s.x < 1 ? 20 : 0) - (s.y < 1 ? 20 : 0)
-          if (!best || score < best.score) best = { p, spaces: ns, score }
-        }
+    const basePoints = dedupePoints(points(result, container))
+    let best: Candidate | undefined
+    for (const o of oris(c)) {
+      const anchors: Point[] = []
+      for (const bp of basePoints) anchors.push(...candidateAnchors(bp, o, container))
+      for (const a of dedupePoints(anchors)) {
+        if (a.x < -EPS || a.y < -EPS || a.z < -EPS) continue
+        if (a.x + o.l > container.length + EPS || a.y + o.w > container.width + EPS || a.z + o.h > container.height + EPS) continue
+        const p = make(c, o, a.x, a.y, a.z, ++seq)
+        if (!inside(p, container)) continue
+        if (result.some(q => overlap3d(p, q))) continue
+        const support = supportInfo(c, o, p.x, p.y, p.z, result, cargoById)
+        if (!support.ok) continue
+        const score = placementScore(p, support.supportArea, container, result)
+        if (!best || score < best.score) best = { p, score }
       }
     }
 
     if (best) {
       result.push(best.p)
-      spaces = best.spaces
       totalWeight += c.weight
-      seq++
+      placedAuto++
     }
-    progress?.(Math.round((i + 1) / units.length * 100))
+    progress?.(Math.round(((i + 1) / Math.max(1, units.length)) * 100))
     if ((i & 15) === 15) await new Promise<void>(resolve => setTimeout(resolve, 0))
   }
+  return { result, placedAuto }
+}
 
-  return result
+export async function smartPack(
+  cargo: Cargo[],
+  container: Container,
+  locked: PlacedCargo[] = [],
+  progress?: (n: number) => void,
+  options: { signal?: AbortSignal } = {},
+) {
+  const lockedCount = locked.length
+  let best: { result: PlacedCargo[]; placedAuto: number } | undefined
+
+  // Completion comes first. Run several deterministic packing orders and keep
+  // the attempt that physically places the greatest number of cargo units.
+  // Only after the count is tied do we prefer the more compact result.
+  for (let mode = 1; mode <= 4; mode++) {
+    const units = buildUnits(cargo, mode)
+    const attempt = await runAttempt(units, container, locked, p => {
+      progress?.(Math.round(((mode - 1) * 100 + p) / 4))
+    }, options)
+    if (!best || attempt.placedAuto > best.placedAuto) {
+      best = attempt
+    }
+    if (best.placedAuto >= units.length) break
+  }
+
+  progress?.(100)
+  return best?.result ?? locked.slice(0, lockedCount)
 }
