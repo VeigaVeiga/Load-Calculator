@@ -632,3 +632,47 @@ body{overflow:hidden}
   .theme-portal .canvas-wrap{height:55vh;min-height:330px}
   .theme-portal .sidebar,.theme-portal .right-panel{border:0!important;border-top:1px solid var(--miao-line)!important}
 }
+
+/* READABILITY + 3D TERMINAL SCENE PASS */
+.theme-portal,
+.theme-portal button,
+.theme-portal input,
+.theme-portal select{font-size:12px!important}
+.theme-portal .topbar:before,.theme-portal .topbar:after{font-size:9px!important}
+.theme-portal .hero-title h1{font-size:20px!important}
+.theme-portal .top-actions label{font-size:10px!important}
+.theme-portal .top-actions select,.theme-portal .top-actions button{font-size:12px!important;height:32px!important}
+.theme-portal .summary span,.theme-portal .summary small{font-size:9px!important}
+.theme-portal .summary strong{font-size:14px!important}
+.theme-portal .sidebar-head h2,.theme-portal .viewer h2,.theme-portal .analysis h3{font-size:12px!important}
+.theme-portal .sidebar-head span,.theme-portal .viewer-head span{font-size:9px!important}
+.theme-portal .sidebar-head button,.theme-portal .tool-row button{font-size:12px!important;min-height:32px!important}
+.theme-portal .name-field>span,.theme-portal .fields label,.theme-portal .checks label{font-size:10px!important}
+.theme-portal .name-field input,.theme-portal .fields input,.theme-portal .custom-bar input{font-size:12px!important;min-height:29px!important}
+.theme-portal .type-toggle label{font-size:11px!important}
+.theme-portal .cargo-volume{font-size:9px!important}
+.theme-portal .view-toolbar button{font-size:12px!important;min-height:30px!important}
+.theme-portal .view-toolbar>.toolbar-group:nth-child(2) button{font-size:12px!important}
+.theme-portal .view-toolbar>.toolbar-group:nth-child(2)>button{font-size:0!important}
+.theme-portal .view-toolbar>.toolbar-group:nth-child(2)>button:nth-of-type(1)::after,.theme-portal .view-toolbar>.toolbar-group:nth-child(2)>button:nth-of-type(2)::after,.theme-portal .view-toolbar>.toolbar-group:nth-child(2)>button:nth-of-type(3)::after{font-size:12px!important}
+.theme-portal .scene-toolbox button,.theme-portal .scene-tool-row button,.theme-portal .scene-material-grid button{font-size:12px!important;min-height:30px!important}
+.theme-portal .scene-tool-title{font-size:10px!important}
+.theme-portal .scene-tool-tip{font-size:9px!important}
+.theme-portal .tabs button{font-size:11px!important;min-height:34px!important}
+.theme-portal .status-message{font-size:10px!important}
+.theme-portal .analysis h4{font-size:10px!important}
+.theme-portal .bias-primary span,.theme-portal .bias-primary strong,.theme-portal .balance-grid span,.theme-portal .material-stats span{font-size:10px!important}
+.theme-portal .bias-primary b{font-size:28px!important}
+.theme-portal .bias-secondary b,.theme-portal .bias-card b,.theme-portal .balance-grid b,.theme-portal .material-stats b,.theme-portal .cargo-data b{font-size:13px!important}
+.theme-portal .viewer-foot{font-size:9px!important}
+.theme-portal .cad-dimension,.theme-portal .cad-tick-label{font-size:11px!important}
+.theme-portal .packing-kicker{font-size:10px!important}
+.theme-portal .packing-panel strong{font-size:16px!important}
+.theme-portal .packing-panel span{font-size:11px!important}
+
+/* The 3D viewport is treated as the monochrome "game screen": no blue CAD shell and no photographic sky. */
+.theme-portal .canvas-wrap{background:#080808!important}
+.theme-portal .canvas-wrap:before{content:"3D LOAD VIEW // LIVE";position:absolute;right:12px;top:10px;z-index:4;pointer-events:none;color:#777;font:10px/1 Consolas,monospace;letter-spacing:.12em}
+.theme-portal .viewer-head{background:#070707!important}
+.theme-portal .view-toolbar{background:#070707!important}
+.theme-portal .viewer-foot{background:#070707!important}
