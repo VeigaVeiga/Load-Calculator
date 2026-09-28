@@ -28,7 +28,7 @@ const edgeMaterialFor = (_color: string) => {
     material = new THREE.LineBasicMaterial({ color: '#30373b', transparent: true, opacity: .82 })
     EDGE_MATERIAL_CACHE.set(key, material)
   }
-  return edgeMaterial
+  return material
 }
 
 type BoxProps = {
