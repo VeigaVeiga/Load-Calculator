@@ -15,7 +15,7 @@ export default function ContainerFloor({container}:{container:Container}){
      const major=Math.abs(offset)%1000===0
      if(axis==='x'){
        const X=offset*S
-       lines.push(<Line key={`x-${offset}`} points={[[X,-W/2,0.008],[X,W/2,0.008]]} color={major?'#879095':'#d7dcdd'} lineWidth={major?0.9:0.28}/>)
+       lines.push(<Line key={`x-${offset}`} points={[[X,-W/2,0.008],[X,W/2,0.008]]} color={major?'#8d8d87':'#3f3f3b'} lineWidth={major?0.9:0.28}/>)
      }else{
        const Y=offset*S
        lines.push(<Line key={`y-${offset}`} points={[[-L/2,Y,0.008],[L/2,Y,0.008]]} color={major?'#879095':'#d7dcdd'} lineWidth={major?0.9:0.28}/>)
@@ -24,7 +24,7 @@ export default function ContainerFloor({container}:{container:Container}){
  }
  addAxisLines('x'); addAxisLines('y')
  return <group>
-  <mesh position={[0,0,-container.floorThickness*S/2]} receiveShadow><boxGeometry args={[L,W,container.floorThickness*S]}/><meshStandardMaterial color="#aeb5b6" roughness={.9} /></mesh>
+  <mesh position={[0,0,-container.floorThickness*S/2]} receiveShadow><boxGeometry args={[L,W,container.floorThickness*S]}/><meshStandardMaterial color="#171717" roughness={.9} /></mesh>
   {lines}
  </group>
 }
