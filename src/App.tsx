@@ -480,6 +480,54 @@ function App() {
     })
   }
 
+  // Manual transforms are committed atomically after packing. The packing
+  // algorithm is not re-entered here: `placed` is the single source of truth
+  // for the finished loading plan, weight analysis, and all view exports.
+  const moveMany = (
+    updates: Array<{ id: string; x: number; y: number; z: number; rotation?: number }>,
+  ) => {
+    if (updates.length === 0) return
+    setPlaced((items) => {
+      const ids = new Set(updates.map((u) => u.id))
+      const next = items.map((p) => {
+        const u = updates.find((x) => x.id === p.id)
+        if (!u || p.locked) return p
+        return {
+          ...p,
+          x: u.x,
+          y: u.y,
+          z: u.z,
+          rotation: u.rotation == null
+            ? p.rotation
+            : ((Math.round(u.rotation / 90) * 90) % 360 + 360) % 360,
+          placementMode: 'manual' as const,
+        }
+      })
+
+      for (const p of next) {
+        if (!ids.has(p.id)) continue
+        const validation = validatePlacement(
+          p,
+          container,
+          next.filter((q) => q.id !== p.id),
+        )
+        if (!validation.ok) {
+          const translated = validation.errors.map((error) => {
+            if (lang === 'zh') return error
+            if (error === '超出集装箱内部尺寸') return 'Outside container internal dimensions'
+            if (error === '与其他货物发生碰撞') return 'Collision with another cargo'
+            return error
+          })
+          setMessage(translated.join(' · '))
+          return items
+        }
+      }
+
+      setMessage('')
+      return next
+    })
+  }
+
   const rotateCargo = (id: string, rotation: number) => {
     setP(id, { rotation: ((Math.round(rotation / 90) * 90) % 360 + 360) % 360 })
   }
@@ -1428,6 +1476,7 @@ function App() {
               onSelect={selectOne}
               onSelectMany={selectMany}
               onMove={move}
+              onMoveMany={moveMany}
               onRotate={rotateCargo}
               onMaterialMove={
                 moveMaterial
