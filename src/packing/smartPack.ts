@@ -76,7 +76,7 @@ export async function smartPack(cargo: Cargo[], container: Container, locked: Pl
     const i = spaces.findIndex(s => p.x >= s.x - EPS && p.y >= s.y - EPS && p.z >= s.z - EPS && p.x + d.l <= s.x + s.l + EPS && p.y + d.w <= s.y + s.w + EPS && p.z + p.height <= s.z + s.h + EPS)
     if (i < 0) continue
     const s = spaces[i]
-    const obstacle: Ori = { l: d.l, w: d.w, h: p.height, r: p.rotation }
+    const obstacle: Ori = { l: d.l, w: d.w, h: p.height, r: p.rotation === 90 ? 90 : 0 }
     const dummy = { ...({} as Cargo), stackable: false, loadBearing: false } as Cargo
     spaces = prune([...spaces.slice(0, i), ...spaces.slice(i + 1), ...split(s, obstacle, p.x, p.y, p.z, p.id, dummy)])
   }
