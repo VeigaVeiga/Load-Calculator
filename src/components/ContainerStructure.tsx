@@ -6,10 +6,6 @@ const S = .001
 const BEAM = '#2f6f9f'
 const EDGE = '#5e8db3'
 
-// The loading view is dimensioned against the usable internal height. The
-// external height remains visible in the top information panel, but the 3D
-// shell no longer adds the ~200 mm roof/floor difference and makes the user
-// think another cargo layer can physically fit.
 function visualHeight(container: Container) {
   return container.height * S
 }
@@ -62,6 +58,24 @@ function DoorLeaf({ container, side }: { container: Container; side: -1 | 1 }) {
   </group></group>
 }
 
+function StructuralCrossBeams({ container }: { container: Container }) {
+  const L = container.outerLength * S
+  const W = container.outerWidth * S
+  const H = visualHeight(container)
+  const topZ = Math.max(.03, H - .028)
+  const bottomZ = .042
+  const count = Math.max(5, Math.round(container.length / 1200))
+  const beams: ReactNode[] = []
+  for (let i = 0; i < count; i += 1) {
+    const x = count === 1 ? 0 : (-container.length / 2 + 120 + i * (container.length - 240) / (count - 1)) * S
+    beams.push(<Beam key={`top-${i}`} position={[x, 0, topZ]} size={[.075, W, .055]} color="#4a5656" opacity={.9} />)
+  }
+  // Two visible floor cross members. They are structural visuals only and do not
+  // participate in cargo collision/packing geometry.
+  for (const x of [-L * .25, L * .25]) beams.push(<Beam key={`bottom-${x}`} position={[x, 0, bottomZ]} size={[.085, W, .06]} color="#454c4c" opacity={.96} />)
+  return <group>{beams}</group>
+}
+
 function EndTick({ p, axis }: { p: [number, number, number]; axis: 'x' | 'y' }) {
   const d = .025
   return axis === 'y' ? <Line points={[[p[0] - d, p[1], p[2]], [p[0] + d, p[1], p[2]]]} color="#465260" lineWidth={.8} /> : <Line points={[[p[0], p[1] - d, p[2]], [p[0], p[1] + d, p[2]]]} color="#465260" lineWidth={.8} />
@@ -83,6 +97,7 @@ export default function ContainerStructure({ container, lang = 'zh', showDimensi
   const L = container.outerLength * S, W = container.outerWidth * S, H = visualHeight(container), IL = container.length * S, IW = container.width * S, IH = container.height * S, post = .075, rail = .055, rightX = L / 2
   return <group>
     <Roof container={container} /><HeadWall container={container} /><SideWall y={-W / 2} container={container} /><SideWall y={W / 2} container={container} />
+    <StructuralCrossBeams container={container} />
     {[-L / 2, L / 2].flatMap(x => [-W / 2, W / 2].map(y => <Beam key={`${x}-${y}`} position={[x, y, H / 2]} size={[post, post, H]} color="#454945" />))}
     <Beam position={[0, -W / 2, H - rail / 2]} size={[L, rail, rail]} /><Beam position={[0, W / 2, H - rail / 2]} size={[L, rail, rail]} /><DoorFrame container={container} /><DoorLeaf container={container} side={-1} /><DoorLeaf container={container} side={1} />
     {showDimensions && <>
