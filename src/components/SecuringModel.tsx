@@ -13,8 +13,8 @@ function Rope({ a, b, radius = .022, color = '#8b8f91' }: { a: THREE.Vector3; b:
   return <mesh position={mid} quaternion={quaternion} raycast={() => null}><cylinderGeometry args={[radius, radius, len, 8]} /><meshStandardMaterial color={color} roughness={.72} /></mesh>
 }
 
-// Door net: exact 45-degree dashed lines, 200 mm pitch, clipped to the
-// actual door rectangle. The geometry is visual-only and never blocks picking.
+// Full door net in the local Y/Z door plane. 45-degree dashed lines are
+// generated from the actual door rectangle, with a 200 mm pitch.
 function DashedDoorNet({ width, height, selected }: { width: number; height: number; selected: boolean }) {
   const w = Math.max(30, width) * S
   const h = Math.max(30, height) * S
@@ -23,34 +23,29 @@ function DashedDoorNet({ width, height, selected }: { width: number; height: num
   const gap = 95 * S
   const segments: ReactNode[] = []
   const color = selected ? '#f4a23b' : '#5f6870'
-  const bMin = -h / 2 - w / 2
-  const bMax = h / 2 + w / 2
+  const minB = -((w + h) / 2)
+  const maxB = (w + h) / 2
   let index = 0
 
-  for (let b = bMin; b <= bMax + 1e-7; b += pitch) {
+  for (let b = minB; b <= maxB + 1e-7; b += pitch) {
     const y0 = Math.max(-w / 2, -h / 2 - b)
     const y1 = Math.min(w / 2, h / 2 - b)
     if (y1 <= y0 + 1e-7) continue
+
     const p0 = new THREE.Vector3(0, y0, y0 + b)
     const p1 = new THREE.Vector3(0, y1, y1 + b)
     const direction = p1.clone().sub(p0)
     const length = direction.length()
     if (length < 0.001) continue
     const unit = direction.normalize()
+
     for (let d = 0; d < length - 1e-7; d += dash + gap) {
       const e = Math.min(length, d + dash)
-      if (e - d < 0.012) continue
-      segments.push(
-        <Rope
-          key={`door-net-${index++}`}
-          a={p0.clone().addScaledVector(unit, d)}
-          b={p0.clone().addScaledVector(unit, e)}
-          radius={.008}
-          color={color}
-        />,
-      )
+      if (e - d < 0.008) continue
+      segments.push(<Rope key={`door-net-${index++}`} a={p0.clone().addScaledVector(unit, d)} b={p0.clone().addScaledVector(unit, e)} radius={.006} color={color} />)
     }
   }
+
   return <group raycast={() => null}>{segments}</group>
 }
 
@@ -132,16 +127,7 @@ export default function SecuringModel({ item, container, selected, registerRef, 
   }
 
   return (
-    <group
-      ref={group => registerRef?.(item.id, group)}
-      position={center}
-      rotation={[0, 0, item.rotation * Math.PI / 180]}
-      raycast={() => null}
-      onPointerDown={e => { e.stopPropagation(); onSelect?.() }}
-      onPointerUp={e => e.stopPropagation()}
-      onClick={e => { e.stopPropagation(); onSelect?.() }}
-      onContextMenu={e => { e.stopPropagation(); e.nativeEvent.preventDefault(); onSelect?.() }}
-    >
+    <group ref={group => registerRef?.(item.id, group)} position={center} rotation={[0, 0, item.rotation * Math.PI / 180]} raycast={() => null} onPointerDown={e => { e.stopPropagation(); onSelect?.() }} onPointerUp={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); onSelect?.() }} onContextMenu={e => { e.stopPropagation(); e.nativeEvent.preventDefault(); onSelect?.() }}>
       {body}
     </group>
   )
