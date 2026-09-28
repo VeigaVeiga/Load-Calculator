@@ -1,0 +1,18 @@
+/* Spatial pass v2: structure, not recoloring. Loaded after the existing UI styles. */
+:root{--sp-depth:rgba(25,29,31,.10);--sp-line:rgba(72,78,80,.18);--sp-lift:0 10px 24px rgba(25,29,31,.10)}
+/* Keep the existing palette; add depth through nested surfaces and spacing. */
+.app-shell,.app-container,.workspace,.main-layout{position:relative}
+.workspace,.main-layout{isolation:isolate}
+.workspace::before{content:"";position:absolute;inset:8px 8px 6px;z-index:-1;border:1px solid var(--sp-line);box-shadow:var(--sp-lift);pointer-events:none}
+/* Left cargo rail: a recessed inner rail instead of a new card color. */
+[class*="cargo"], [class*="Cargo"]{position:relative}
+[class*="cargo"]::after,[class*="Cargo"]::after{content:"";position:absolute;inset:7px 5px 7px auto;width:1px;background:var(--sp-line);pointer-events:none;opacity:.7}
+/* Center stage gets a quiet inner frame. */
+[class*="scene"],[class*="Scene"],[class*="viewer"],[class*="Viewer"]{position:relative}
+[class*="scene"]::before,[class*="Scene"]::before,[class*="viewer"]::before,[class*="Viewer"]::before{content:"";position:absolute;inset:5px;border:1px solid var(--sp-line);pointer-events:none;z-index:2}
+/* Small elevation for direct workspace controls, without changing their fill. */
+[class*="toolbar"],[class*="Toolbar"]{filter:drop-shadow(0 7px 10px rgba(25,29,31,.10));}
+/* Analysis blocks gain an inset boundary, preserving their current background. */
+[class*="analysis"],[class*="Analysis"],[class*="gravity"],[class*="Gravity"]{position:relative}
+[class*="analysis"]::before,[class*="Analysis"]::before,[class*="gravity"]::before,[class*="Gravity"]::before{content:"";position:absolute;inset:6px;border:1px solid var(--sp-line);pointer-events:none;opacity:.65}
+@media(max-width:780px){.workspace::before{inset:4px}.workspace,.main-layout{isolation:auto}[class*="scene"]::before,[class*="Scene"]::before,[class*="viewer"]::before,[class*="Viewer"]::before{inset:2px}}
