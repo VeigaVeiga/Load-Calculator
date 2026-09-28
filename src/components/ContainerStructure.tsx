@@ -84,11 +84,10 @@ function LengthRuler({ container }: { container: Container }) {
 }
 
 export default function ContainerStructure({ container, lang = 'zh', showDimensions = true }: { container: Container; lang?: 'zh' | 'en'; showDimensions?: boolean }) {
-  const L = container.outerLength * S, W = container.outerWidth * S, H = visualHeight(container), IL = container.length * S, IW = container.width * S, IH = container.height * S, rail = .055, rightX = L / 2
+  const L = container.outerLength * S, W = container.outerWidth * S, H = visualHeight(container), IW = container.width * S, IH = container.height * S, rail = .055, rightX = L / 2
   const sideRailY = IW / 2 + rail / 2
   const topRailZ = IH + rail / 2
   const bottomRailZ = -rail / 2
-  const doorX = L / 2 + rail / 2
   const headX = -L / 2 - rail / 2
   return <group>
     <Roof container />
