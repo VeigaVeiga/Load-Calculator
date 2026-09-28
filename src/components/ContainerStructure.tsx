@@ -25,28 +25,29 @@ function SideWall({ y, container }: { y: number; container: Container }) {
 
 function HeadWall({ container, x, sideRailY, bottomZ, topZ, rail }: { container: Container; x: number; sideRailY: number; bottomZ: number; topZ: number; rail: number }) {
   const W = container.width * S, H = container.height * S
+  // Extend the head-wall assembly only far enough to close the structural gap.
+  // Its inner face stops at the inner face of the longitudinal rails, so the
+  // longitudinal rails are joined to the head frame instead of visually passing through it.
+  const headOuterX = x - rail / 2
+  const longitudinalInnerX = -(container.length * S) / 2 + rail / 2
+  const frameDepth = Math.max(rail, longitudinalInnerX - headOuterX)
+  const frameCenterX = (headOuterX + longitudinalInnerX) / 2
+  const wallOuterX = x - container.wallThickness * S / 2
+  const wallInnerX = x + container.wallThickness * S / 2
+  const wallFillDepth = Math.max(container.wallThickness * S, longitudinalInnerX - wallOuterX)
+  const wallFillCenterX = (wallOuterX + longitudinalInnerX) / 2
   return <group>
-    <Panel position={[x, 0, H / 2]} size={[container.wallThickness * S, container.outerWidth * S, H]} opacity={.70} />
-    {/* Thicken the complete head-wall assembly inward to close the visual gap.
-        The wall, surrounding frame rails and corner posts remain visually unified.
-        This is visual structure only and does not alter the cargo calculation envelope. */}
-    {(() => {
-      const floorEdge = -(container.length * S) / 2
-      const wallInnerFace = x + container.wallThickness * S / 2
-      const gap = floorEdge - wallInnerFace
-      if (gap <= 0) return null
-      const totalDepth = container.wallThickness * S + gap
-      const centerX = floorEdge - totalDepth / 2
-      return <Panel position={[centerX, 0, H / 2]} size={[totalDepth, container.outerWidth * S, H]} opacity={.70} />
-    })()}
-    <Beam position={[x, -sideRailY, bottomZ + rail / 2]} size={[rail, rail, rail]} />
-    <Beam position={[x, sideRailY, bottomZ + rail / 2]} size={[rail, rail, rail]} />
-    <Beam position={[x, -sideRailY, topZ]} size={[rail, rail, rail]} />
-    <Beam position={[x, sideRailY, topZ]} size={[rail, rail, rail]} />
-    <Beam position={[x, 0, bottomZ + rail / 2]} size={[rail, W + rail, rail]} />
-    <Beam position={[x, 0, topZ]} size={[rail, W + rail, rail]} />
-    <Beam position={[x, -sideRailY, H / 2]} size={[rail, rail, Math.max(.01, H)]} />
-    <Beam position={[x, sideRailY, H / 2]} size={[rail, rail, Math.max(.01, H)]} />
+    <Panel position={[wallFillCenterX, 0, H / 2]} size={[wallFillDepth, container.outerWidth * S, H]} opacity={.70} />
+    {/* Four head-frame members are thickened together with the wall. The outer
+        and inner faces are shared, preventing a separate central filler beam. */}
+    <Beam position={[frameCenterX, -sideRailY, bottomZ + rail / 2]} size={[frameDepth, rail, rail]} />
+    <Beam position={[frameCenterX, sideRailY, bottomZ + rail / 2]} size={[frameDepth, rail, rail]} />
+    <Beam position={[frameCenterX, -sideRailY, topZ]} size={[frameDepth, rail, rail]} />
+    <Beam position={[frameCenterX, sideRailY, topZ]} size={[frameDepth, rail, rail]} />
+    <Beam position={[frameCenterX, 0, bottomZ + rail / 2]} size={[frameDepth, W + rail, rail]} />
+    <Beam position={[frameCenterX, 0, topZ]} size={[frameDepth, W + rail, rail]} />
+    <Beam position={[frameCenterX, -sideRailY, H / 2]} size={[frameDepth, rail, Math.max(.01, H)]} />
+    <Beam position={[frameCenterX, sideRailY, H / 2]} size={[frameDepth, rail, Math.max(.01, H)]} />
   </group>
 }
 
@@ -75,9 +76,15 @@ function DoorFrame({ container, sideRailY, bottomZ, topZ, rail }: { container: C
   const floorEdge = container.length * S / 2
   const thresholdDepth = Math.max(0, x - floorEdge)
   const thresholdCenterX = floorEdge + thresholdDepth / 2
+  // Extend the two door-side posts outward to the outer face of the side walls,
+  // while keeping their inner face exactly on the internal cargo boundary.
+  const sideWallOuterY = container.outerWidth * S / 2 + container.wallThickness * S / 2
+  const sidePostInnerY = container.width * S / 2
+  const sidePostDepthY = Math.max(rail, sideWallOuterY - sidePostInnerY)
+  const sidePostCenterOffset = (sideWallOuterY + sidePostInnerY) / 2
   return <group>
-    <Beam position={[x, -sideRailY, H / 2]} size={[rail, rail, H]} />
-    <Beam position={[x, sideRailY, H / 2]} size={[rail, rail, H]} />
+    <Beam position={[x, -sidePostCenterOffset, H / 2]} size={[rail, sidePostDepthY, H]} />
+    <Beam position={[x, sidePostCenterOffset, H / 2]} size={[rail, sidePostDepthY, H]} />
     <Beam position={[x, 0, topZ]} size={[rail, W + rail, rail]} />
     {thresholdDepth > 0 && <>
       <Beam position={[thresholdCenterX, 0, topZ]} size={[thresholdDepth, W + rail, rail]} />
