@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Canvas, useThree } from '@react-three/fiber'
 import { createRoot, type Root } from 'react-dom/client'
-import { Html, Line, OrbitControls, OrthographicCamera, PerspectiveCamera, Sky, TransformControls } from '@react-three/drei'
+import { Html, Line, OrbitControls, OrthographicCamera, PerspectiveCamera, TransformControls } from '@react-three/drei'
 import * as THREE from 'three'
 import type { Cargo, Container, PlacedCargo, SecuringItem, SecuringMaterialType } from '../types'
 import { dims, validatePlacement } from '../packing/geometry'
