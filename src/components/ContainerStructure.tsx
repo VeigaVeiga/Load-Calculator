@@ -72,7 +72,7 @@ function EndTick({ p, axis }: { p: [number, number, number]; axis: 'x' | 'y' }) 
 }
 
 function DimensionLine({ points, label, position, axis, vertical = false }: { points: [[number, number, number], [number, number, number]]; label: string; position: [number, number, number]; axis: 'x' | 'y'; vertical?: boolean }) {
-  return <group><Line points={points} color="#465260" lineWidth={1.05} /><EndTick p={points[0]} axis={axis} /><EndTick p={points[1]} axis={axis} /><Html position={position} center><div className={`cad-dimension ${vertical ? 'cad-vertical' : ''}`}>{label}</div></group>
+  return <group><Line points={points} color="#465260" lineWidth={1.05} /><EndTick p={points[0]} axis={axis} /><EndTick p={points[1]} axis={axis} /><Html position={position} center><div className={`cad-dimension ${vertical ? 'cad-vertical' : ''}`}>{label}</div></Html></group>
 }
 
 function LengthRuler({ container }: { container: Container }) {
