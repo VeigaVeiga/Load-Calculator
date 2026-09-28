@@ -1,9 +1,8 @@
 import type { Container, LashingPoint } from '../types'
 
-// Lashing rings are defined only on the two side walls.  The four rings at
-// each longitudinal station are the lower/upper rings on the left/right
-// walls; duplicate floor rings are intentionally not generated because they
-// visually overlap the side rings in orthographic views.
+// Lashing rings are placed directly on the inner face line of the side rails.
+// The visual rail centerline is width/2 + rail/2, while the ring center is
+// exactly width/2, so the ring sits against the rail without entering cargo space.
 function points(length: number, width: number, height: number): LashingPoint[] {
   const out: LashingPoint[] = []
   const count = Math.max(5, Math.round(length / 1200))
@@ -13,10 +12,10 @@ function points(length: number, width: number, height: number): LashingPoint[] {
     const x = count === 1
       ? Math.round(length / 2)
       : Math.round(120 + i * (length - 240) / (count - 1))
-    out.push({ id: `LB${i + 1}`, x, y: 38, z: bottomZ, type: 'side', maxLoad: 1000 })
-    out.push({ id: `RB${i + 1}`, x, y: width - 38, z: bottomZ, type: 'side', maxLoad: 1000 })
-    out.push({ id: `LT${i + 1}`, x, y: 38, z: topZ, type: 'side', maxLoad: 1000 })
-    out.push({ id: `RT${i + 1}`, x, y: width - 38, z: topZ, type: 'side', maxLoad: 1000 })
+    out.push({ id: `LB${i + 1}`, x, y: 0, z: bottomZ, type: 'side', maxLoad: 1000 })
+    out.push({ id: `RB${i + 1}`, x, y: width, z: bottomZ, type: 'side', maxLoad: 1000 })
+    out.push({ id: `LT${i + 1}`, x, y: 0, z: topZ, type: 'side', maxLoad: 1000 })
+    out.push({ id: `RT${i + 1}`, x, y: width, z: topZ, type: 'side', maxLoad: 1000 })
   }
   return out
 }
