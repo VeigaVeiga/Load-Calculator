@@ -17,6 +17,8 @@ export type View = 'iso' | 'top' | 'front' | 'left' | 'right'
 export type SceneTool = 'translate' | 'rotate' | 'scale'
 export type SelectionMode = 'single' | 'box'
 const S = .001
+const MATERIAL_STAGE_GAP = 500
+const MATERIAL_STAGE_DEPTH = 3000
 
 type Props = {
   container: Container
@@ -75,6 +77,25 @@ function CoordinateAxes({ container }: { container: Container }) {
   return <group position={p} raycast={() => null}><Line points={[[0,0,0],[.55,0,0]]} color="#c23b36" lineWidth={2}/><Line points={[[0,0,0],[0,.55,0]]} color="#3d7b52" lineWidth={2}/><Line points={[[0,0,0],[0,0,.55]]} color="#376fa5" lineWidth={2}/><Html position={[.62,0,0]} center><div className="axis-label axis-x">X</div></Html><Html position={[0,.62,0]} center><div className="axis-label axis-y">Y</div></Html><Html position={[0,0,.62]} center><div className="axis-label axis-z">Z</div></Html></group>
 }
 
+function SecuringMaterialZone({ container }: { container: Container }) {
+  const depth = MATERIAL_STAGE_DEPTH * S
+  const gap = MATERIAL_STAGE_GAP * S
+  const width = container.length * S
+  const y = container.width * S / 2 + gap + depth / 2
+  const z = .006
+  const border = [
+    [-width / 2, y - depth / 2, z], [width / 2, y - depth / 2, z],
+    [width / 2, y + depth / 2, z], [-width / 2, y + depth / 2, z],
+    [-width / 2, y - depth / 2, z],
+  ] as [number, number, number][]
+  return <group raycast={() => null}>
+    <mesh position={[0, y, z]}><planeGeometry args={[width, depth]} /><meshStandardMaterial color="#7f8991" transparent opacity={.13} depthWrite={false} /></mesh>
+    <Line points={border} color="#68737b" lineWidth={1.5} transparent opacity={.7} />
+    <Line points={[[-width / 2, y, z], [width / 2, y, z]]} color="#8b949b" lineWidth={1} transparent opacity={.45} />
+    <Html position={[0, y, .03]} center distanceFactor={8}><div style={{padding:'4px 10px',border:'1px solid rgba(70,80,90,.45)',background:'rgba(235,239,242,.72)',color:'#45515a',fontSize:11,fontWeight:600,whiteSpace:'nowrap',pointerEvents:'none'}}>加固材料区域 · SECURING MATERIAL ZONE</div></Html>
+  </group>
+}
+
 function CargoObject({ p, container, selected, onSelect, registerRef, showName }: { p: PlacedCargo; container: Container; selected: boolean; onSelect: () => void; registerRef: (id: string, o: THREE.Group | null) => void; showName: boolean }) {
   const ref = useRef<THREE.Group>(null)
   useEffect(() => { registerRef(p.id, ref.current); return () => registerRef(p.id, null) }, [p.id, registerRef])
@@ -82,10 +103,48 @@ function CargoObject({ p, container, selected, onSelect, registerRef, showName }
   return <group ref={ref} onPointerDown={e=>{e.stopPropagation();onSelect()}} onClick={e=>{e.stopPropagation();onSelect()}}><CargoModel p={{...p,x:0,y:0,z:0}} container={container} selected={selected} hovered={false} showName={showName} local onPointerDown={e=>e.stopPropagation()} onPointerUp={e=>e.stopPropagation()} onPointerMove={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();onSelect()}}/></group>
 }
 
+function materialPlacement(item: SecuringItem, container: Container) {
+  const maxX = Math.max(0, container.length - item.length)
+  const maxY = Math.max(0, container.width + MATERIAL_STAGE_GAP + MATERIAL_STAGE_DEPTH - item.width)
+  const maxZ = Math.max(0, container.height - item.height)
+  return { x: Math.max(0, Math.min(maxX, item.x)), y: Math.max(0, Math.min(maxY, item.y)), z: Math.max(0, Math.min(maxZ, item.z)) }
+}
+
 function MaterialObject({ item, container, selected, onSelect, registerRef, onDelete }: { item: SecuringItem; container: Container; selected: boolean; onSelect: () => void; registerRef: (id: string, o: THREE.Group | null) => void; onDelete: () => void }) {
   const ref=useRef<THREE.Group>(null); useEffect(()=>{registerRef(item.id,ref.current);return()=>registerRef(item.id,null)},[item.id,registerRef])
-  const maxX=Math.max(0,container.length-item.length),maxY=Math.max(0,container.width-item.width),maxZ=Math.max(0,container.height-item.height),x=Math.max(0,Math.min(maxX,item.x)),y=Math.max(0,Math.min(maxY,item.y)),z=Math.max(0,Math.min(maxZ,item.z)),pos:[number,number,number]=[(x+item.length/2-container.length/2)*S,(y+item.width/2-container.width/2)*S,(z+item.height/2)*S]
+  const {x,y,z}=materialPlacement(item,container), pos:[number,number,number]=[(x+item.length/2-container.length/2)*S,(y+item.width/2-container.width/2)*S,(z+item.height/2)*S]
   return <group ref={ref} position={pos} rotation={[0,0,item.rotation*Math.PI/180]} onPointerDown={e=>{e.stopPropagation();onSelect()}} onPointerUp={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();onSelect()}} onContextMenu={e=>{e.stopPropagation();e.nativeEvent.preventDefault();onDelete()}}><SecuringModel item={{...item,x,y,z}} container={container} selected={selected} local onSelect={onSelect}/></group>
+}
+
+function stageFootprint(type: SecuringMaterialType, container: Container): [number, number] {
+  if (type === 'lashingBelt') return [700, Math.min(2700, container.width + 300)]
+  if (type === 'airBag') return [1100, 1100]
+  if (type === 'triangleWood') return [350, 350]
+  return [Math.min(container.length, 2800), Math.min(container.width, 2600)]
+}
+
+function stagePosition(type: SecuringMaterialType, materials: SecuringItem[], container: Container) {
+  const stageMinY = container.width + MATERIAL_STAGE_GAP
+  const stageMaxY = stageMinY + MATERIAL_STAGE_DEPTH
+  const centerX = container.length / 2
+  const centerY = stageMinY + MATERIAL_STAGE_DEPTH / 2
+  const [fw, fd] = stageFootprint(type, container)
+  const candidates: Array<[number, number]> = [[0,0],[-1,0],[1,0],[0,-1],[0,1],[-1,-1],[1,-1],[-1,1],[1,1],[-2,0],[2,0],[0,-2],[0,2],[-2,-1],[2,-1],[-2,1],[2,1]]
+  const stepX = Math.max(700, fw + 180)
+  const stepY = Math.max(650, Math.min(1200, fd + 180))
+  const intersects = (cx:number, cy:number) => materials.some(m => {
+    const [mw, md] = stageFootprint(m.type, container)
+    const mcx = m.x + m.length / 2
+    const mcy = m.type === 'lashingBelt' ? m.y + 2 : m.y + m.width / 2
+    return Math.abs(cx - mcx) < (fw + mw) / 2 && Math.abs(cy - mcy) < (fd + md) / 2
+  })
+  for (const [gx,gy] of candidates) {
+    const cx = centerX + gx * stepX
+    const cy = centerY + gy * stepY
+    if (cx - fw/2 < 0 || cx + fw/2 > container.length || cy - fd/2 < stageMinY || cy + fd/2 > stageMaxY) continue
+    if (!intersects(cx,cy)) return { x: Math.max(0,cx-fw/2), y: Math.max(0,cy-(type==='lashingBelt'?2:fw/2)), z: 0 }
+  }
+  return { x: Math.max(0,centerX-fw/2), y: stageMinY + 100, z: 0 }
 }
 
 function SceneContent({props}:{props:Props}){
@@ -95,12 +154,12 @@ function SceneContent({props}:{props:Props}){
  const activeMaterial=props.selectedMaterialId?materials.find(m=>m.id===props.selectedMaterialId)??null:null,activeId=activeMaterial?.id??(freePlacementEnabled?activeTransformId:null),activeObject=activeId?refs.current[activeId]??null:null,multi=sceneSelectionMode==='multi'
  const registerRef=useCallback((id:string,o:THREE.Group|null)=>{if(o)refs.current[id]=o;else delete refs.current[id]},[])
  const selectCargo=(id:string)=>{props.onSelectMaterial?.(null);setActiveTransformId(freePlacementEnabled?id:null);if(freePlacementEnabled){const p=items.find(q=>q.id===id);if(p){const d=dims(p);setFocusPoint([(p.x+d.length/2-container.length/2)*S,(p.y+d.width/2-container.width/2)*S,(p.z+p.height/2)*S]);setFocusNonce(n=>n+1)}}if(multi){const next=selectedIds.includes(id)?selectedIds.filter(x=>x!==id):[...selectedIds,id];onSelectMany(next)}else onSelect(id)}
- const selectMaterial=(id:string)=>{const m=materials.find(q=>q.id===id);props.onSelectMaterial?.(id);onSelect(null);onSelectMany([]);setActiveTransformId(null);if(m){const x=Math.max(0,Math.min(container.length-m.length,m.x)),y=Math.max(0,Math.min(container.width-m.width,m.y)),z=Math.max(0,Math.min(container.height-m.height,m.z));setFocusPoint([(x+m.length/2-container.length/2)*S,(y+m.width/2-container.width/2)*S,(z+m.height/2)*S]);setFocusNonce(n=>n+1)}}
+ const selectMaterial=(id:string)=>{const m=materials.find(q=>q.id===id);props.onSelectMaterial?.(id);onSelect(null);onSelectMany([]);setActiveTransformId(null);if(m){const {x,y,z}=materialPlacement(m,container);setFocusPoint([(x+m.length/2-container.length/2)*S,(y+m.width/2-container.width/2)*S,(z+m.height/2)*S]);setFocusNonce(n=>n+1)}}
  const capture=()=>{snapshots.current={};pendingTransforms.current={};const ids=selectedIds.length?selectedIds:(selectedId?[selectedId]:[]);for(const id of ids){const o=refs.current[id];if(o){snapshots.current[id]={position:o.position.clone(),rotation:o.rotation.z,scale:o.scale.clone()};pendingTransforms.current[id]={x:o.position.x,y:o.position.y,z:o.position.z,rotation:o.rotation.z}}}if(activeMaterial){const o=refs.current[activeMaterial.id];if(o)snapshots.current[activeMaterial.id]={position:o.position.clone(),rotation:o.rotation.z,scale:o.scale.clone()}}}
  const candidateFor=(p:PlacedCargo,o:THREE.Group)=>{const r=((Math.round(o.rotation.z/(Math.PI/2))*90)%360+360)%360,d=dims({...p,rotation:r}),x=Math.max(0,Math.min(container.length-d.length,Math.round((o.position.x/S-d.length/2+container.length/2)/10)*10)),y=Math.max(0,Math.min(container.width-d.width,Math.round((o.position.y/S-d.width/2+container.width/2)/10)*10)),z=Math.max(0,Math.round((o.position.z/S-p.height/2)/10)*10);return{candidate:{...p,x,y,z,rotation:r},x,y,z,r}}
  const rememberPending=()=>{const ids=selectedIds.length?selectedIds:(selectedId?[selectedId]:[]);for(const id of ids){const o=refs.current[id],p=items.find(q=>q.id===id);if(!o||!p)continue;const{x,y,z,r}=candidateFor(p,o);pendingTransforms.current[id]={x,y,z,rotation:r}}}
  const commit=()=>{
-  if(activeMaterial){const o=refs.current[activeMaterial.id];if(!o)return;const r=((Math.round(o.rotation.z/(Math.PI/2))*90)%360+360)%360,rawX=Math.round((o.position.x/S-activeMaterial.length/2+container.length/2)/10)*10,rawY=Math.round((o.position.y/S-activeMaterial.width/2+container.width/2)/10)*10;onMaterialMove(activeMaterial.id,Math.max(0,Math.min(container.length-activeMaterial.length,rawX)),Math.max(0,Math.min(container.width-activeMaterial.width,rawY)));onRotateMaterial(activeMaterial.id,r);if(tool==='scale'){const s=snapshots.current[activeMaterial.id];if(s){const f=Math.max(.25,Math.min(4,o.scale.x/Math.max(.001,s.scale.x)));o.scale.set(1,1,1);onMaterialScale(activeMaterial.id,f)}}return}
+  if(activeMaterial){const o=refs.current[activeMaterial.id];if(!o)return;const r=((Math.round(o.rotation.z/(Math.PI/2))*90)%360+360)%360,rawX=Math.round((o.position.x/S-activeMaterial.length/2+container.length/2)/10)*10,rawY=Math.round((o.position.y/S-activeMaterial.width/2+container.width/2)/10)*10,maxY=container.width+MATERIAL_STAGE_GAP+MATERIAL_STAGE_DEPTH-activeMaterial.width;onMaterialMove(activeMaterial.id,Math.max(0,Math.min(container.length-activeMaterial.length,rawX)),Math.max(0,Math.min(maxY,rawY)));onRotateMaterial(activeMaterial.id,r);if(tool==='scale'){const s=snapshots.current[activeMaterial.id];if(s){const f=Math.max(.25,Math.min(4,o.scale.x/Math.max(.001,s.scale.x)));o.scale.set(1,1,1);onMaterialScale(activeMaterial.id,f)}}return}
   const ids=selectedIds.length?selectedIds:(selectedId?[selectedId]:[]),updates:Array<{id:string;x:number;y:number;z:number;rotation?:number}>=[]
   for(const id of ids){const p=items.find(q=>q.id===id),o=refs.current[id];if(!p||!o)continue;const pending=pendingTransforms.current[id],result=pending??candidateFor(p,o),candidate={...p,x:result.x,y:result.y,z:result.z,rotation:result.rotation},validation=validatePlacement(candidate,container,items.filter(q=>q.id!==id&&!ids.includes(q.id)));if(validation.ok)updates.push({id,x:result.x,y:result.y,z:result.z,rotation:result.rotation});else if(snapshots.current[id]){o.position.copy(snapshots.current[id].position);o.rotation.z=snapshots.current[id].rotation}}
   if(updates.length){if(onMoveMany)onMoveMany(updates);else updates.forEach(u=>{if(u.rotation!=null)onRotate(u.id,u.rotation);onMove(u.id,u.x,u.y,u.z)})}
@@ -110,12 +169,12 @@ function SceneContent({props}:{props:Props}){
  useEffect(()=>{const releaseTransform=()=>onDragState(false);window.addEventListener('pointerup',releaseTransform,true);window.addEventListener('mouseup',releaseTransform,true);window.addEventListener('blur',releaseTransform);return()=>{window.removeEventListener('pointerup',releaseTransform,true);window.removeEventListener('mouseup',releaseTransform,true);window.removeEventListener('blur',releaseTransform)}},[onDragState])
  useEffect(()=>{const key=(e:KeyboardEvent)=>{if(e.key==='Escape'){onSelect(null);onSelectMany([]);props.onSelectMaterial?.(null);setActiveTransformId(null)}if(e.key==='Delete'&&props.selectedMaterialId){props.onDeleteMaterial?.(props.selectedMaterialId);props.onSelectMaterial?.(null);setActiveTransformId(null)}};window.addEventListener('keydown',key);return()=>window.removeEventListener('keydown',key)},[props.selectedMaterialId,props.onDeleteMaterial,onSelect,onSelectMany])
  useEffect(()=>{const group=document.querySelector('.view-toolbar>.toolbar-group:nth-child(2)') as HTMLElement|null;if(!group)return;const label=group.querySelector('b');if(label)label.textContent='模式';const buttons=Array.from(group.querySelectorAll('button')) as HTMLButtonElement[];const single=buttons[0],multiButton=buttons[1];if(!single||!multiButton)return;single.textContent='单选';multiButton.textContent='多选';let freeButton=group.querySelector('.scene-free-placement-dom') as HTMLButtonElement|null;if(!freeButton){freeButton=document.createElement('button');freeButton.className='scene-free-placement-dom';group.appendChild(freeButton)}freeButton.textContent='自由摆放';const stop=(e:Event)=>{e.preventDefault();e.stopImmediatePropagation()},onSingle=(e:Event)=>{stop(e);setSceneSelectionMode('single');onSelectMany([])},onMulti=(e:Event)=>{stop(e);setSceneSelectionMode('multi')},onFree=(e:Event)=>{stop(e);setFreePlacementEnabled(v=>{const next=!v;if(next&&selectedId)setActiveTransformId(selectedId);if(!next)setActiveTransformId(null);return next})};single.addEventListener('click',onSingle,true);multiButton.addEventListener('click',onMulti,true);freeButton.addEventListener('click',onFree,true);single.classList.toggle('active',sceneSelectionMode==='single');multiButton.classList.toggle('active',sceneSelectionMode==='multi');freeButton.classList.toggle('active',freePlacementEnabled);return()=>{single.removeEventListener('click',onSingle,true);multiButton.removeEventListener('click',onMulti,true);freeButton?.removeEventListener('click',onFree,true);freeButton?.remove()}},[sceneSelectionMode,freePlacementEnabled,onSelectMany,selectedId])
- const addMaterial=(type:SecuringMaterialType)=>{const id=onAddMaterial(type),sizes:Record<SecuringMaterialType,[number,number]>={triangleWood:[200,150],lashingBelt:[3000,4],airBag:[1000,1000],doorNet:[40,container.width]},[length,width]=sizes[type],x=Math.max(0,container.length-length),y=Math.max(0,(container.width-width)/2);onMaterialMove(id,x,y)}
- const toolbar=<div className="scene-toolbox" style={{pointerEvents:'auto'}}><button className={tool==='translate'?'active':''} onClick={()=>setTool('translate')}>↔ 移动</button><button className={tool==='rotate'?'active':''} onClick={()=>setTool('rotate')}>⟳ 旋转</button><button disabled={!activeMaterial} className={!activeMaterial?'disabled':tool==='scale'?'active':''} onClick={()=>setTool('scale')}>⤢ 缩放</button><button disabled={!activeMaterial} className={!activeMaterial?'disabled':'danger'} onClick={()=>{if(props.selectedMaterialId){props.onDeleteMaterial?.(props.selectedMaterialId);props.onSelectMaterial?.(null)}}}>删除选中</button><div className="tool-divider"/><b>加固材料</b><button onClick={()=>addMaterial('triangleWood')}>三角木</button><button onClick={()=>addMaterial('lashingBelt')}>紧固带</button><button onClick={()=>addMaterial('airBag')}>充气袋</button><button onClick={()=>addMaterial('doorNet')}>柜门网</button></div>
+ const addMaterial=(type:SecuringMaterialType)=>{if(type==='doorNet'){const existing=materials.find(m=>m.type==='doorNet');if(existing){selectMaterial(existing.id);return existing.id}}const id=onAddMaterial(type);const p=stagePosition(type,materials,container);onMaterialMove(id,p.x,p.y);return id}
+ const toolbar=<div className="scene-toolbox" style={{pointerEvents:'auto'}}><button className={tool==='translate'?'active':''} onClick={()=>setTool('translate')}>↔ 移动</button><button className={tool==='rotate'?'active':''} onClick={()=>setTool('rotate')}>⟳ 旋转</button><button disabled={!activeMaterial} className={!activeMaterial?'disabled':tool==='scale'?'active':''} onClick={()=>setTool('scale')}>⤢ 缩放</button><button disabled={!activeMaterial} className={!activeMaterial?'disabled':'danger'} onClick={()=>{if(props.selectedMaterialId){props.onDeleteMaterial?.(props.selectedMaterialId);props.onSelectMaterial?.(null)}}}>删除选中</button><div className="tool-divider"/><b>加固材料</b><button onClick={()=>addMaterial('triangleWood')}>三角木</button><button onClick={()=>addMaterial('lashingBelt')}>紧固带</button><button onClick={()=>addMaterial('airBag')}>充气袋</button><button disabled={materials.some(m=>m.type==='doorNet')} onClick={()=>addMaterial('doorNet')}>柜门网</button></div>
  const toolbarRoot=useRef<Root|null>(null)
- useEffect(()=>{const host=props.toolbarHost;if(!host)return;if(!toolbarRoot.current)toolbarRoot.current=createRoot(host);toolbarRoot.current.render(toolbar);return()=>{toolbarRoot.current?.unmount();toolbarRoot.current=null}},[props.toolbarHost,tool,activeMaterial?.id,props.selectedMaterialId,freePlacementEnabled,selectedId])
+ useEffect(()=>{const host=props.toolbarHost;if(!host)return;if(!toolbarRoot.current)toolbarRoot.current=createRoot(host);toolbarRoot.current.render(toolbar);return()=>{toolbarRoot.current?.unmount();toolbarRoot.current=null}},[props.toolbarHost,tool,activeMaterial?.id,props.selectedMaterialId,freePlacementEnabled,selectedId,materials.length])
  const instancedCartons=useMemo(()=>items.filter(p=>p.cargoType==='carton'&&!selectedIds.includes(p.id)&&p.id!==selectedId&&!cargo.find(c=>c.id===p.cargoId)?.showName),[items,selectedIds,selectedId,cargo]),instancedIds=useMemo(()=>new Set(instancedCartons.map(p=>p.id)),[instancedCartons]),individualItems=useMemo(()=>items.filter(p=>!instancedIds.has(p.id)),[items,instancedIds])
- return <><Sky distance={450000} sunPosition={[25,30,55]} inclination={.48} azimuth={.25} turbidity={3.2} rayleigh={2.1} mieCoefficient={.75}/><ambientLight intensity={1.65}/><directionalLight position={[8,10,18]} intensity={2.2}/><hemisphereLight intensity={.45} groundColor="#dbe3e8" color="#fff"/><ContainerStructure container={container} lang={lang} showDimensions={showDimensions}/><ContainerFloor container={container}/><LashingPoints container={container}/><CoordinateAxes container={container}/><InstancedCartons items={instancedCartons} container={container} onSelect={selectCargo}/>{individualItems.map(p=><CargoObject key={p.id} p={p} container={container} selected={selectedIds.includes(p.id)||p.id===selectedId} onSelect={()=>selectCargo(p.id)} registerRef={registerRef} showName={!!cargo.find(c=>c.id===p.cargoId)?.showName}/>)}{materials.map(m=><MaterialObject key={m.id} item={m} container={container} selected={m.id===props.selectedMaterialId} onSelect={()=>selectMaterial(m.id)} onDelete={()=>{props.onDeleteMaterial?.(m.id);props.onSelectMaterial?.(null);setActiveTransformId(null)}} registerRef={registerRef}/>)}{activeObject&&(activeMaterial||freePlacementEnabled)&&<TransformControls object={activeObject} mode={activeMaterial&&tool==='scale'?'scale':tool} axis={undefined} translationSnap={.01} rotationSnap={Math.PI/2} scaleSnap={.05} showX={true} showY={tool!=='rotate'} showZ onMouseDown={(event:any)=>{event.stopPropagation();capture();onDragState(true)}} onMouseUp={(event:any)=>{event.stopPropagation();commit();requestAnimationFrame(()=>onDragState(false))}} onChange={()=>{applyMulti();rememberPending()}}/>}<CameraRig view={view} container={container} dragging={dragging} transformActive={!!activeObject&&!!(activeMaterial||freePlacementEnabled)} focusPoint={focusPoint} focusNonce={focusNonce}/></>
+ return <><Sky distance={450000} sunPosition={[25,30,55]} inclination={.48} azimuth={.25} turbidity={3.2} rayleigh={2.1} mieCoefficient={.75}/><ambientLight intensity={1.65}/><directionalLight position={[8,10,18]} intensity={2.2}/><hemisphereLight intensity={.45} groundColor="#dbe3e8" color="#fff"/><ContainerStructure container={container} lang={lang} showDimensions={showDimensions}/><ContainerFloor container={container}/><SecuringMaterialZone container={container}/><LashingPoints container={container}/><CoordinateAxes container={container}/><InstancedCartons items={instancedCartons} container={container} onSelect={selectCargo}/>{individualItems.map(p=><CargoObject key={p.id} p={p} container={container} selected={selectedIds.includes(p.id)||p.id===selectedId} onSelect={()=>selectCargo(p.id)} registerRef={registerRef} showName={!!cargo.find(c=>c.id===p.cargoId)?.showName}/>)}{materials.map(m=><MaterialObject key={m.id} item={m} container={container} selected={m.id===props.selectedMaterialId} onSelect={()=>selectMaterial(m.id)} onDelete={()=>{props.onDeleteMaterial?.(m.id);props.onSelectMaterial?.(null);setActiveTransformId(null)}} registerRef={registerRef}/>)}{activeObject&&(activeMaterial||freePlacementEnabled)&&<TransformControls object={activeObject} mode={activeMaterial&&tool==='scale'?'scale':tool} axis={undefined} translationSnap={.01} rotationSnap={Math.PI/2} scaleSnap={.05} showX={true} showY={tool!=='rotate'} showZ onMouseDown={(event:any)=>{event.stopPropagation();capture();onDragState(true)}} onMouseUp={(event:any)=>{event.stopPropagation();commit();requestAnimationFrame(()=>onDragState(false))}} onChange={()=>{applyMulti();rememberPending()}}/>}<CameraRig view={view} container={container} dragging={dragging} transformActive={!!activeObject&&!!(activeMaterial||freePlacementEnabled)} focusPoint={focusPoint} focusNonce={focusNonce}/></>
 }
 
 export default function ContainerScene(props:Props){const [selectedMaterialId,setSelectedMaterialId]=useState<string|null>(null),[toolbarHost,setToolbarHost]=useState<HTMLDivElement|null>(null);return <div className="scene-shell" style={{position:'relative',width:'100%',height:'100%'}}><Canvas shadows dpr={[1,1.4]} gl={{antialias:true,powerPreference:'high-performance'}} camera={{position:[10,8,6],fov:42,near:.01,far:120,up:[0,0,1]}} onPointerMissed={()=>{props.onSelect(null);props.onSelectMany([]);setSelectedMaterialId(null)}}><SceneContent props={{...props,selectedMaterialId,onSelectMaterial:setSelectedMaterialId,toolbarHost}}/></Canvas><div ref={setToolbarHost} className="scene-toolbar-host" style={{position:'absolute',top:12,left:12,zIndex:50,pointerEvents:'none'}}/></div>
