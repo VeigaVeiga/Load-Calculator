@@ -70,12 +70,14 @@ export default function SecuringModel({ item, container, selected, registerRef, 
     const W = 150 * S
     const H = 150 * S
     const shape = new THREE.Shape()
+    // Cross-section in X/Z after rotating the extruded shape: the vertical
+    // right-angle face is at -X, while the sloped face falls toward +X.
     shape.moveTo(-L / 2, -H / 2)
-    shape.lineTo(L / 2, -H / 2)
     shape.lineTo(-L / 2, H / 2)
+    shape.lineTo(L / 2, -H / 2)
     shape.closePath()
     body = (
-      <group rotation={[0, Math.PI / 2, 0]}>
+      <group rotation={[Math.PI / 2, 0, 0]}>
         <mesh raycast={() => null}>
           <extrudeGeometry args={[shape, { depth: W, bevelEnabled: true, bevelThickness: .0015, bevelSize: .0015, bevelSegments: 1 }]} />
           {material('#3979b8')}
