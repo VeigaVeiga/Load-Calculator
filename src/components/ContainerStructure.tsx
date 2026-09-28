@@ -26,7 +26,15 @@ function SideWall({ y, container }: { y: number; container: Container }) {
 function HeadWall({ container, x, sideRailY, bottomZ, topZ, rail }: { container: Container; x: number; sideRailY: number; bottomZ: number; topZ: number; rail: number }) {
   const W = container.width * S, H = container.height * S
   return <group>
-    <Panel position={[x, 0, H / 2]} size={[container.wallThickness * S, container.outerWidth * S, H]} opacity={.16} />
+    <Panel position={[x, 0, H / 2]} size={[container.wallThickness * S, container.outerWidth * S, H]} opacity={.70} />
+    {/* Extend the head-wall material inward only to visually close the structural gap.
+        This does not alter the cargo calculation envelope. */}
+    {(() => {
+      const floorEdge = -(container.length * S) / 2
+      const wallInnerFace = x + container.wallThickness * S / 2
+      const fill = floorEdge - wallInnerFace
+      return fill > 0 ? <Panel position={[wallInnerFace + fill / 2, 0, H / 2]} size={[fill, container.wallThickness * S, H]} opacity={.70} /> : null
+    })()}
     <Beam position={[x, -sideRailY, bottomZ + rail / 2]} size={[rail, rail, rail]} />
     <Beam position={[x, sideRailY, bottomZ + rail / 2]} size={[rail, rail, rail]} />
     <Beam position={[x, -sideRailY, topZ]} size={[rail, rail, rail]} />
@@ -45,21 +53,29 @@ function Roof({ container }: { container: Container }) {
 
 // Three transverse roof members restore the visible top segmentation without
 // entering the cargo calculation volume. They are structural visualization only.
-function RoofCrossBeams({ container }: { container: Container }) {
-  const L = container.outerLength * S, W = container.outerWidth * S, H = visualHeight(container)
-  const z = H - Math.max(.02, container.roofThickness * S * .8)
+function RoofDividerLines({ container }: { container: Container }) {
+  const W = container.outerWidth * S, H = visualHeight(container)
+  // Match the three central longitudinal side-wall divider lines exactly:
+  // x = -3000 / 0 / +3000 mm.
   return <group>
-    {[-.25, 0, .25].map((f, i) => <Beam key={i} position={[L * f, 0, z]} size={[.06, W, .045]} />)}
+    {[-3000, 0, 3000].map((x) => <Line key={x} points={[[x * S, -W / 2, H - .006], [x * S, W / 2, H - .006]]} color={EDGE} lineWidth={.42} />)}
   </group>
 }
 
 function DoorFrame({ container, sideRailY, bottomZ, topZ, rail }: { container: Container; sideRailY: number; bottomZ: number; topZ: number; rail: number }) {
   const L = container.outerLength * S, x = L / 2 + rail / 2, W = container.width * S, H = container.height * S
   const doorH = Math.min(container.doorHeight * S, H)
+  const floorEdge = container.length * S / 2
+  const thresholdDepth = Math.max(0, x - floorEdge)
+  const thresholdCenterX = floorEdge + thresholdDepth / 2
   return <group>
     <Beam position={[x, -sideRailY, H / 2]} size={[rail, rail, H]} />
     <Beam position={[x, sideRailY, H / 2]} size={[rail, rail, H]} />
     <Beam position={[x, 0, topZ]} size={[rail, W + rail, rail]} />
+    {thresholdDepth > 0 && <>
+      <Beam position={[thresholdCenterX, 0, topZ]} size={[thresholdDepth, W + rail, rail]} />
+      <Beam position={[thresholdCenterX, 0, bottomZ + rail / 2]} size={[thresholdDepth, W + rail, rail]} />
+    </>}
     <Beam position={[x, 0, bottomZ + rail / 2]} size={[rail, W + rail, rail]} />
     {doorH < H - .001 && <Beam position={[x, 0, doorH + (H - doorH) / 2]} size={[rail, W, H - doorH]} />}
   </group>
@@ -101,7 +117,7 @@ export default function ContainerStructure({ container, lang = 'zh', showDimensi
   const headX = -L / 2 - rail / 2
   return <group>
     <Roof container={container} />
-    <RoofCrossBeams container={container} />
+    <RoofDividerLines container={container} />
     <SideWall y={-W / 2} container={container} />
     <SideWall y={W / 2} container={container} />
     <Beam position={[0, -sideRailY, topRailZ]} size={[L, rail, rail]} />
