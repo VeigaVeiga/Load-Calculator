@@ -43,6 +43,16 @@ function Roof({ container }: { container: Container }) {
   return <Panel position={[0, 0, H - t / 2]} size={[L, W, t]} opacity={.045} />
 }
 
+// Three transverse roof members restore the visible top segmentation without
+// entering the cargo calculation volume. They are structural visualization only.
+function RoofCrossBeams({ container }: { container: Container }) {
+  const L = container.outerLength * S, W = container.outerWidth * S, H = visualHeight(container)
+  const z = H - Math.max(.02, container.roofThickness * S * .8)
+  return <group>
+    {[-.25, 0, .25].map((f, i) => <Beam key={i} position={[L * f, 0, z]} size={[.06, W, .045]} />)}
+  </group>
+}
+
 function DoorFrame({ container, sideRailY, bottomZ, topZ, rail }: { container: Container; sideRailY: number; bottomZ: number; topZ: number; rail: number }) {
   const L = container.outerLength * S, x = L / 2 + rail / 2, W = container.width * S, H = container.height * S
   const doorH = Math.min(container.doorHeight * S, H)
@@ -91,6 +101,7 @@ export default function ContainerStructure({ container, lang = 'zh', showDimensi
   const headX = -L / 2 - rail / 2
   return <group>
     <Roof container={container} />
+    <RoofCrossBeams container={container} />
     <SideWall y={-W / 2} container={container} />
     <SideWall y={W / 2} container={container} />
     <Beam position={[0, -sideRailY, topRailZ]} size={[L, rail, rail]} />
