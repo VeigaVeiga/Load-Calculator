@@ -653,8 +653,6 @@ body{overflow:hidden}
 .theme-portal .cargo-volume{font-size:9px!important}
 .theme-portal .view-toolbar button{font-size:12px!important;min-height:30px!important}
 .theme-portal .view-toolbar>.toolbar-group:nth-child(2) button{font-size:12px!important}
-.theme-portal .view-toolbar>.toolbar-group:nth-child(2)>button{font-size:0!important}
-.theme-portal .view-toolbar>.toolbar-group:nth-child(2)>button:nth-of-type(1)::after,.theme-portal .view-toolbar>.toolbar-group:nth-child(2)>button:nth-of-type(2)::after,.theme-portal .view-toolbar>.toolbar-group:nth-child(2)>button:nth-of-type(3)::after{font-size:12px!important}
 .theme-portal .scene-toolbox button,.theme-portal .scene-tool-row button,.theme-portal .scene-material-grid button{font-size:12px!important;min-height:30px!important}
 .theme-portal .scene-tool-title{font-size:10px!important}
 .theme-portal .scene-tool-tip{font-size:9px!important}
