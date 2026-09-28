@@ -25,8 +25,6 @@ function SideWall({ y, container }: { y: number; container: Container }) {
 
 function HeadWall({ container, x, sideRailY, bottomZ, topZ, rail }: { container: Container; x: number; sideRailY: number; bottomZ: number; topZ: number; rail: number }) {
   const W = container.width * S, H = container.height * S
-  const innerY = W / 2
-  const innerTop = H
   return <group>
     <Panel position={[x, 0, H / 2]} size={[container.wallThickness * S, container.outerWidth * S, H]} opacity={.16} />
     <Beam position={[x, -sideRailY, bottomZ + rail / 2]} size={[rail, rail, rail]} />
@@ -37,7 +35,6 @@ function HeadWall({ container, x, sideRailY, bottomZ, topZ, rail }: { container:
     <Beam position={[x, 0, topZ]} size={[rail, W + rail, rail]} />
     <Beam position={[x, -sideRailY, H / 2]} size={[rail, rail, Math.max(.01, H)]} />
     <Beam position={[x, sideRailY, H / 2]} size={[rail, rail, Math.max(.01, H)]} />
-    <Line points={[[x, -innerY, 0], [x, -innerY, innerTop]]} color={BEAM} lineWidth={.5} />
   </group>
 }
 
@@ -50,7 +47,6 @@ function DoorFrame({ container, sideRailY, bottomZ, topZ, rail }: { container: C
   const L = container.outerLength * S, x = L / 2 + rail / 2, W = container.width * S, H = container.height * S
   const doorH = Math.min(container.doorHeight * S, H)
   return <group>
-    {/* Door jambs use the same centerlines as the longitudinal rails. Their inner faces are on the actual door opening envelope. */}
     <Beam position={[x, -sideRailY, H / 2]} size={[rail, rail, H]} />
     <Beam position={[x, sideRailY, H / 2]} size={[rail, rail, H]} />
     <Beam position={[x, 0, topZ]} size={[rail, W + rail, rail]} />
@@ -76,7 +72,7 @@ function EndTick({ p, axis }: { p: [number, number, number]; axis: 'x' | 'y' }) 
 }
 
 function DimensionLine({ points, label, position, axis, vertical = false }: { points: [[number, number, number], [number, number, number]]; label: string; position: [number, number, number]; axis: 'x' | 'y'; vertical?: boolean }) {
-  return <group><Line points={points} color="#465260" lineWidth={1.05} /><EndTick p={points[0]} axis={axis} /><EndTick p={points[1]} axis={axis} /><Html position={position} center><div className={`cad-dimension ${vertical ? 'cad-vertical' : ''}`}>{label}</div></Html></group>
+  return <group><Line points={points} color="#465260" lineWidth={1.05} /><EndTick p={points[0]} axis={axis} /><EndTick p={points[1]} axis={axis} /><Html position={position} center><div className={`cad-dimension ${vertical ? 'cad-vertical' : ''}`}>{label}</div></group>
 }
 
 function LengthRuler({ container }: { container: Container }) {
@@ -98,19 +94,14 @@ export default function ContainerStructure({ container, lang = 'zh', showDimensi
     <Roof container />
     <SideWall y={-W / 2} container={container} />
     <SideWall y={W / 2} container={container} />
-
-    {/* Longitudinal side rails. Their inner faces coincide with the real usable envelope. */}
     <Beam position={[0, -sideRailY, topRailZ]} size={[L, rail, rail]} />
     <Beam position={[0, sideRailY, topRailZ]} size={[L, rail, rail]} />
     <Beam position={[0, -sideRailY, bottomRailZ]} size={[L, rail, rail]} />
     <Beam position={[0, sideRailY, bottomRailZ]} size={[L, rail, rail]} />
-
-    {/* Four-sided head and door frames are aligned to those same rail centerlines. */}
     <HeadWall container={container} x={headX} sideRailY={sideRailY} bottomZ={bottomRailZ} topZ={topRailZ} rail={rail} />
     <DoorFrame container={container} sideRailY={sideRailY} bottomZ={bottomRailZ} topZ={topRailZ} rail={rail} />
     <DoorLeaf container={container} side={-1} />
     <DoorLeaf container={container} side={1} />
-
     {showDimensions && <>
       <LengthRuler container={container} />
       <DimensionLine axis="y" points={[[rightX + .28, -IW / 2, .12], [rightX + .28, IW / 2, .12]]} label={`${lang === 'zh' ? '内部宽度' : 'INTERNAL WIDTH'} · ${container.width.toLocaleString()} mm`} position={[rightX + .28, 0, .29]} />
