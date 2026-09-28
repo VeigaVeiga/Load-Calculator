@@ -6,16 +6,14 @@ const S = .001
 const BEAM = '#2f6f9f'
 const EDGE = '#5e8db3'
 
-function visualHeight(container: Container) {
-  return container.height * S
-}
+function visualHeight(container: Container) { return container.height * S }
 
 function Beam({ position, size, color = BEAM, opacity = .96 }: { position: [number, number, number]; size: [number, number, number]; color?: string; opacity?: number }) {
-  return <mesh position={position} castShadow><boxGeometry args={size} /><meshStandardMaterial color={color} transparent={opacity < 1} opacity={opacity} metalness={.15} roughness={.58} /></mesh>
+  return <mesh position={position} castShadow raycast={() => null}><boxGeometry args={size} /><meshStandardMaterial color={color} transparent={opacity < 1} opacity={opacity} metalness={.15} roughness={.58} /></mesh>
 }
 
 function Panel({ position, size, opacity = .08 }: { position: [number, number, number]; size: [number, number, number]; opacity?: number }) {
-  return <mesh position={position}><boxGeometry args={size} /><meshStandardMaterial color="#7da8c6" transparent opacity={opacity} depthWrite={false} /></mesh>
+  return <mesh position={position} raycast={() => null}><boxGeometry args={size} /><meshStandardMaterial color="#7da8c6" transparent opacity={opacity} depthWrite={false} /></mesh>
 }
 
 function SideWall({ y, container }: { y: number; container: Container }) {
@@ -27,7 +25,7 @@ function SideWall({ y, container }: { y: number; container: Container }) {
 
 function HeadWall({ container }: { container: Container }) {
   const W = container.outerWidth * S, H = visualHeight(container), x = -container.outerLength * S / 2
-  return <group><mesh position={[x, 0, H / 2]}><boxGeometry args={[container.wallThickness * S, W, H]} /><meshStandardMaterial color="#315f83" transparent opacity={.24} roughness={.78} metalness={.08} /></mesh><Beam position={[x + .012, 0, H / 2]} size={[.05, W, H]} color="#3d78a5" opacity={.42} /></group>
+  return <group><mesh position={[x, 0, H / 2]} raycast={() => null}><boxGeometry args={[container.wallThickness * S, W, H]} /><meshStandardMaterial color="#315f83" transparent opacity={.24} roughness={.78} metalness={.08} /></mesh><Beam position={[x + .012, 0, H / 2]} size={[.05, W, H]} color="#3d78a5" opacity={.42} /></group>
 }
 
 function Roof({ container }: { container: Container }) {
@@ -38,11 +36,11 @@ function Roof({ container }: { container: Container }) {
 }
 
 function DoorFrame({ container }: { container: Container }) {
-  const L = container.outerLength * S, W = container.outerWidth * S, H = visualHeight(container), x = L / 2 + .006, post = .10, rail = .13, dw = container.doorWidth * S, dh = Math.min(container.doorHeight * S, H), upperH = Math.max(0, H - dh)
+  const L = container.outerLength * S, W = container.outerWidth * S, H = visualHeight(container), x = L / 2 + .006, post = .10, dw = container.doorWidth * S, dh = Math.min(container.doorHeight * S, H), upperH = Math.max(0, H - dh)
   return <group>
     <Beam position={[x, -W / 2 + post / 2, H / 2]} size={[post, post, H]} />
     <Beam position={[x, W / 2 - post / 2, H / 2]} size={[post, post, H]} />
-    {upperH > .001 && <mesh position={[x, 0, dh + upperH / 2]} castShadow><boxGeometry args={[post, W * .94, upperH]} /><meshStandardMaterial color="#2f6f9f" metalness={.12} roughness={.58} /></mesh>}
+    {upperH > .001 && <mesh position={[x, 0, dh + upperH / 2]} castShadow raycast={() => null}><boxGeometry args={[post, W * .94, upperH]} /><meshStandardMaterial color="#2f6f9f" metalness={.12} roughness={.58} /></mesh>}
     <Beam position={[x, 0, .045]} size={[post, dw + post, .09]} />
   </group>
 }
@@ -50,29 +48,23 @@ function DoorFrame({ container }: { container: Container }) {
 function DoorLeaf({ container, side }: { container: Container; side: -1 | 1 }) {
   const L = container.outerLength * S, dw = container.doorWidth * S, dh = Math.min(container.doorHeight * S, visualHeight(container)), t = .035, leafW = dw / 2, x = L / 2 + .055, hingeY = side * dw / 2, openAngle = side * Math.PI / 2
   return <group position={[x, hingeY, dh / 2]} rotation={[0, 0, openAngle]}><group position={[0, -side * leafW / 2, 0]}>
-    <mesh castShadow><boxGeometry args={[t, leafW, dh]} /><meshStandardMaterial color="#3d7ea9" metalness={.2} roughness={.55} /></mesh>
+    <mesh castShadow raycast={() => null}><boxGeometry args={[t, leafW, dh]} /><meshStandardMaterial color="#3d7ea9" metalness={.2} roughness={.55} /></mesh>
     {[.18, .38, .58, .78].map((f, i) => <Beam key={i} position={[-.012, 0, dh * (f - .5)]} size={[.055, leafW - .04, .045]} color="#285d82" />)}
     <Beam position={[-.018, 0, 0]} size={[.065, .045, Math.max(.01, dh - .08)]} color="#234f70" />
     {[-.33, .33].map((f, i) => <Beam key={`v${i}`} position={[-.012, f * leafW, 0]} size={[.06, .045, Math.max(.01, dh - .06)]} color="#234f70" />)}
-    <mesh position={[-.032, 0, 0]}><boxGeometry args={[.025, Math.max(.01, leafW - .10), Math.max(.01, dh - .14)]} /><meshStandardMaterial color="#6e9fbe" transparent opacity={.7} /></mesh>
+    <mesh position={[-.032, 0, 0]} raycast={() => null}><boxGeometry args={[.025, Math.max(.01, leafW - .10), Math.max(.01, dh - .14)]} /><meshStandardMaterial color="#6e9fbe" transparent opacity={.7} /></mesh>
   </group></group>
 }
 
 function StructuralCrossBeams({ container }: { container: Container }) {
-  const L = container.outerLength * S
-  const W = container.outerWidth * S
-  const H = visualHeight(container)
-  const topZ = Math.max(.03, H - .028)
-  const bottomZ = .042
+  const L = container.outerLength * S, W = container.outerWidth * S, H = visualHeight(container)
+  const topZ = Math.max(.03, H - .028), bottomZ = .042
   const count = Math.max(5, Math.round(container.length / 1200))
   const beams: ReactNode[] = []
   for (let i = 0; i < count; i += 1) {
     const x = count === 1 ? 0 : (-container.length / 2 + 120 + i * (container.length - 240) / (count - 1)) * S
     beams.push(<Beam key={`top-${i}`} position={[x, 0, topZ]} size={[.075, W, .055]} color="#4a5656" opacity={.9} />)
   }
-  // Two visible floor cross members. They are structural visuals only and do not
-  // participate in cargo collision/packing geometry.
-  for (const x of [-L * .25, L * .25]) beams.push(<Beam key={`bottom-${x}`} position={[x, 0, bottomZ]} size={[.085, W, .06]} color="#454c4c" opacity={.96} />)
   return <group>{beams}</group>
 }
 
@@ -95,11 +87,17 @@ function LengthRuler({ container }: { container: Container }) {
 
 export default function ContainerStructure({ container, lang = 'zh', showDimensions = true }: { container: Container; lang?: 'zh' | 'en'; showDimensions?: boolean }) {
   const L = container.outerLength * S, W = container.outerWidth * S, H = visualHeight(container), IL = container.length * S, IW = container.width * S, IH = container.height * S, post = .075, rail = .055, rightX = L / 2
+  const sideRailY = W / 2 - rail / 2
   return <group>
     <Roof container={container} /><HeadWall container={container} /><SideWall y={-W / 2} container={container} /><SideWall y={W / 2} container={container} />
     <StructuralCrossBeams container={container} />
     {[-L / 2, L / 2].flatMap(x => [-W / 2, W / 2].map(y => <Beam key={`${x}-${y}`} position={[x, y, H / 2]} size={[post, post, H]} color="#454945" />))}
-    <Beam position={[0, -W / 2, H - rail / 2]} size={[L, rail, rail]} /><Beam position={[0, W / 2, H - rail / 2]} size={[L, rail, rail]} /><DoorFrame container={container} /><DoorLeaf container={container} side={-1} /><DoorLeaf container={container} side={1} />
+    {/* Top and bottom longitudinal side rails. These run from the door to the header. */}
+    <Beam position={[0, -sideRailY, H - rail / 2]} size={[L, rail, rail]} />
+    <Beam position={[0, sideRailY, H - rail / 2]} size={[L, rail, rail]} />
+    <Beam position={[0, -sideRailY, .045]} size={[L, rail, rail]} color="#454945" />
+    <Beam position={[0, sideRailY, .045]} size={[L, rail, rail]} color="#454945" />
+    <DoorFrame container={container} /><DoorLeaf container={container} side={-1} /><DoorLeaf container={container} side={1} />
     {showDimensions && <>
       <LengthRuler container={container} />
       <DimensionLine axis="y" points={[[rightX + .28, -IW / 2, .12], [rightX + .28, IW / 2, .12]]} label={`${lang === 'zh' ? '内部宽度' : 'INTERNAL WIDTH'} · ${container.width.toLocaleString()} mm`} position={[rightX + .28, 0, .29]} />
