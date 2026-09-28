@@ -6,9 +6,6 @@ const S = .001
 const HIT_GEOMETRY = new THREE.BoxGeometry(1, 1, 1)
 const OUTLINE_GEOMETRY = new THREE.EdgesGeometry(HIT_GEOMETRY)
 
-// Keep the geometry objects shared. Creating BoxGeometry/EdgesGeometry on every
-// React render was one of the causes of progressive GPU/CPU pressure during
-// long editing sessions.
 function OutlineBox({ size, selected }: { size: [number, number, number]; selected: boolean }) {
   return <lineSegments geometry={OUTLINE_GEOMETRY} scale={size} raycast={() => null}>
     <lineBasicMaterial color={selected ? '#f4a23b' : '#5d666b'} transparent opacity={selected ? .95 : .72} />
@@ -31,17 +28,18 @@ export default function SecuringModel({ item, container, selected, registerRef, 
   if (item.type === 'triangleWood') {
     const L = 150 * S, W = 150 * S, H = 150 * S, shape = new THREE.Shape()
     shape.moveTo(-L / 2, -H / 2); shape.lineTo(L / 2, -H / 2); shape.lineTo(-L / 2, H / 2); shape.closePath()
-    body = <group rotation={[0, -Math.PI / 2, 0]}><mesh><extrudeGeometry args={[shape, { depth: W, bevelEnabled: true, bevelThickness: .0015, bevelSize: .0015, bevelSegments: 1 }]} />{material('#3979b8')}</mesh><OutlineBox size={[150 * S, 150 * S, 150 * S]} selected={selected} /></group>
+    // The triangular wood itself is selectable through the shared hit target below.
+    // Do not draw a rectangular outline around it; that was the stray box visible beside it.
+    body = <group rotation={[0, -Math.PI / 2, 0]}><mesh><extrudeGeometry args={[shape, { depth: W, bevelEnabled: true, bevelThickness: .0015, bevelSize: .0015, bevelSegments: 1 }]} />{material('#3979b8')}</mesh></group>
   } else if (item.type === 'airBag') {
     const L = item.length * S, W = Math.max(100, item.width) * S, H = Math.min(220, item.height) * S
-    body = <group><mesh scale={[L * .46, W * .34, H * .30]}>{<sphereGeometry args={[1, 12, 6]} />}{material('#3fa36b')}</mesh><mesh position={[L * .27, 0, 0]} scale={[L * .25, W * .30, H * .27]}>{<sphereGeometry args={[1, 10, 6]} />}{material('#3fa36b')}</mesh><mesh position={[-L * .27, 0, 0]} scale={[L * .25, W * .30, H * .27]}>{<sphereGeometry args={[1, 10, 6]} />}{material('#3fa36b')}</mesh></group>
+    body = <group><mesh scale={[L * .46, W * .34, H * .30]}><sphereGeometry args={[1, 12, 6]} />{material('#3fa36b')}</mesh><mesh position={[L * .27, 0, 0]} scale={[L * .25, W * .30, H * .27]}><sphereGeometry args={[1, 10, 6]} />{material('#3fa36b')}</mesh><mesh position={[-L * .27, 0, 0]} scale={[L * .25, W * .30, H * .27]}><sphereGeometry args={[1, 10, 6]} />{material('#3fa36b')}</mesh></group>
   } else if (item.type === 'doorNet') {
     const w = Math.max(30, item.width) * S, h = Math.max(30, item.height) * S, cols = 18, rows = 14, ropes: ReactNode[] = []
     for (let i = 0; i <= cols; i++) { const x = -w / 2 + i * w / cols; ropes.push(<Rope key={`v${i}`} a={new THREE.Vector3(0, x, -h / 2)} b={new THREE.Vector3(0, x, h / 2)} radius={.026} color={selected ? '#f4a23b' : '#737b82'} />) }
     for (let j = 0; j <= rows; j++) { const z = -h / 2 + j * h / rows; ropes.push(<Rope key={`h${j}`} a={new THREE.Vector3(0, -w / 2, z)} b={new THREE.Vector3(0, w / 2, z)} radius={.026} color={selected ? '#f4a23b' : '#737b82'} />) }
     body = <group>{ropes}<mesh position={[0, -w / 2, 0]} raycast={() => null}><boxGeometry args={[.035, .035, h]} /><meshStandardMaterial color="#626970" /></mesh><mesh position={[0, w / 2, 0]} raycast={() => null}><boxGeometry args={[.035, .035, h]} /><meshStandardMaterial color="#626970" /></mesh><mesh position={[0, 0, -h / 2]} raycast={() => null}><boxGeometry args={[.035, w, .035]} /><meshStandardMaterial color="#626970" /></mesh><mesh position={[0, 0, h / 2]} raycast={() => null}><boxGeometry args={[.035, w, .035]} /><meshStandardMaterial color="#626970" /></mesh></group>
   } else {
-    // Use a local path so the material is not translated twice by the parent.
     const points = item.path && item.path.length > 1
       ? item.path.map(q => new THREE.Vector3((q.x - item.x - item.length / 2) * S, (q.y - item.y - item.width / 2) * S, (q.z - item.z - item.height / 2) * S))
       : [new THREE.Vector3(-item.length * S / 2, 0, .05), new THREE.Vector3(0, 0, .5), new THREE.Vector3(item.length * S / 2, 0, .05)]
@@ -49,8 +47,6 @@ export default function SecuringModel({ item, container, selected, registerRef, 
     body = <mesh geometry={geometry}><meshStandardMaterial color={selected ? '#ff7b55' : '#e86d43'} roughness={.45} /></mesh>
   }
 
-  // A modest hit target keeps thin belts selectable without making the hit box
-  // so large that clicking a neighbouring cargo selects the material instead.
   const hitL = Math.max(visualLength, 140), hitW = Math.max(visualWidth, 140), hitH = Math.max(visualHeight, 120)
   return <group
     ref={group => registerRef?.(item.id, group)}
