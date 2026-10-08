@@ -13,7 +13,7 @@ import type {
   SecuringItem,
   SecuringMaterialType,
 } from './types'
-import { autoPack, autoPackAsync } from './packing/packer'
+import { autoPackAsync } from './packing/packer'
 import { validatePlacement } from './packing/geometry'
 import { analyzeWeight } from './analysis/weight'
 import { cbm, mm } from './utils'
@@ -279,9 +279,9 @@ function App() {
     })),
   )
 
-  const [placed, setPlaced] = useState<PlacedCargo[]>(() =>
-    autoPack(cargoTemplates, base),
-  )
+  // The automatic solver runs only when the user explicitly starts packing.
+  // The finished `placed` array is the single source of truth after that.
+  const [placed, setPlaced] = useState<PlacedCargo[]>([])
 
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [selectedIds, setSelectedIds] = useState<string[]>([])
