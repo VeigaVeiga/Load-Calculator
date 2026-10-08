@@ -3,7 +3,7 @@ import { dims, supportMetrics } from './geometry'
 
 const EPS = 0.5
 const SUPPORT = 0.75
-const MAX_MERGE_GAP = 120
+const MAX_BRIDGE_RATIO = 0.25
 
 export type LayerUnit = { cargo: Cargo; index: number }
 
@@ -37,24 +37,15 @@ function splitRect(r: Rect, p: PlacedCargo) {
   return out
 }
 
-function mergeSupports(supports: PlacedCargo[]) {
-  const rects: Rect[] = supports.map(q => { const d=footprint(q); return {x:q.x,y:q.y,w:d.length,h:d.width} })
-  const out=[...rects]
-  for (let i=0;i<rects.length;i+=1) for (let j=i+1;j<rects.length;j+=1) {
-    const a=rects[i], b=rects[j]
-    const verticalGap=Math.max(b.y-(a.y+a.h),a.y-(b.y+b.h),0)
-    const horizontalGap=Math.max(b.x-(a.x+a.w),a.x-(b.x+b.w),0)
-    const yOverlap=Math.max(0,Math.min(a.y+a.h,b.y+b.h)-Math.max(a.y,b.y))
-    const xOverlap=Math.max(0,Math.min(a.x+a.w,b.x+b.w)-Math.max(a.x,b.x))
-    if ((horizontalGap<=MAX_MERGE_GAP && yOverlap>EPS) || (verticalGap<=MAX_MERGE_GAP && xOverlap>EPS)) {
-      out.push({x:Math.min(a.x,b.x),y:Math.min(a.y,b.y),w:Math.max(a.x+a.w,b.x+b.w)-Math.min(a.x,b.x),h:Math.max(a.y+a.h,b.y+b.h)-Math.min(a.y,b.y)})
-    }
-  }
-  return out
+function supportRects(supports: PlacedCargo[]) {
+  return supports.map(q => {
+    const d = footprint(q)
+    return { x:q.x, y:q.y, w:d.length, h:d.width }
+  })
 }
 
 function freeRects(z:number, placed:PlacedCargo[], supports:PlacedCargo[]) {
-  let rects=mergeSupports(supports)
+  let rects=supportRects(supports)
   const same=placed.filter(p=>Math.abs(p.z-z)<=EPS)
   for (const p of same) {
     const next:Rect[]=[]
@@ -64,11 +55,49 @@ function freeRects(z:number, placed:PlacedCargo[], supports:PlacedCargo[]) {
   return rects.filter(r=>r.w>EPS && r.h>EPS)
 }
 
+function bridgeRects(supports:PlacedCargo[], cargoLength:number, cargoWidth:number) {
+  const rects=supportRects(supports)
+  const result:Rect[]=[]
+  const maxGap=Math.max(cargoLength,cargoWidth)*MAX_BRIDGE_RATIO
+
+  for(let i=0;i<rects.length;i+=1) for(let j=i+1;j<rects.length;j+=1){
+    const a=rects[i], b=rects[j]
+    const horizontalGap=Math.max(b.x-(a.x+a.w),a.x-(b.x+b.w),0)
+    const verticalGap=Math.max(b.y-(a.y+a.h),a.y-(b.y+b.h),0)
+    const yOverlap=Math.max(0,Math.min(a.y+a.h,b.y+b.h)-Math.max(a.y,b.y))
+    const xOverlap=Math.max(0,Math.min(a.x+a.w,b.x+b.w)-Math.max(a.x,b.x))
+
+    if(horizontalGap<=maxGap+EPS && yOverlap>EPS){
+      result.push({
+        x:Math.min(a.x,b.x),
+        y:Math.max(a.y,b.y),
+        w:Math.max(a.x+a.w,b.x+b.w)-Math.min(a.x,b.x),
+        h:Math.min(a.y+a.h,b.y+b.h)-Math.max(a.y,b.y)
+      })
+    }
+
+    if(verticalGap<=maxGap+EPS && xOverlap>EPS){
+      result.push({
+        x:Math.max(a.x,b.x),
+        y:Math.min(a.y,b.y),
+        w:Math.min(a.x+a.w,b.x+b.w)-Math.max(a.x,b.x),
+        h:Math.max(a.y+a.h,b.y+b.h)-Math.min(a.y,b.y)
+      })
+    }
+  }
+  return result.filter(r=>r.w>EPS&&r.h>EPS)
+}
+
 function candidateInRect(u:LayerUnit,z:number,r:Rect,rotation:0|90,container:Container,placed:PlacedCargo[]) {
   const c=u.cargo
   const d=rotation===0?{length:c.length,width:c.width}:{length:c.width,width:c.length}
+  const maxX=r.x+r.w-d.length, maxY=r.y+r.h-d.width
+  if(maxX < r.x-EPS || maxY < r.y-EPS) return null
   const cx=r.x+(r.w-d.length)/2, cy=r.y+(r.h-d.width)/2
-  const positions:Array<[number,number]>=[[cx,cy],[r.x,r.y],[r.x+r.w-d.length,r.y],[r.x,r.y+r.h-d.width],[r.x+r.w-d.length,r.y+r.h-d.width],[cx,r.y],[cx,r.y+r.h-d.width],[r.x,cy],[r.x+r.w-d.length,cy]]
+  const positions:Array<[number,number]>=[
+    [r.x,r.y],[maxX,r.y],[r.x,maxY],[maxX,maxY],
+    [cx,r.y],[cx,maxY],[r.x,cy],[maxX,cy],[cx,cy]
+  ]
   let best:PlacedCargo|null=null, bestScore=-Infinity
   for(const [x,y] of positions){
     if(x<-EPS||y<-EPS||x+d.length>container.length+EPS||y+d.width>container.width+EPS) continue
@@ -99,7 +128,9 @@ export function packSupportedLayers(units:LayerUnit[],placed:PlacedCargo[],conta
     for(const z of levels){
       const supports=placed.filter(p=>Math.abs(p.z+p.height-z)<=EPS&&(p.loadBearing!==false||p.stackable===true))
       if(!supports.length) continue
-      const rects=freeRects(z,placed,supports)
+      const baseRects=freeRects(z,placed,supports)
+      const bridgeCandidates=bridgeRects(supports, Math.max(...remaining.map(u=>u.cargo.length),1), Math.max(...remaining.map(u=>u.cargo.width),1))
+      const rects=[...baseRects,...bridgeCandidates]
       let layerBest:PlacedCargo|null=null, layerIndex=-1, layerScore=-Infinity
       for(let i=0;i<remaining.length;i+=1){
         const u=remaining[i]
