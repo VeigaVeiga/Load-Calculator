@@ -298,6 +298,7 @@ function App() {
   const [freePlacement, setFreePlacement] = useState(false)
 
   const [message, setMessage] = useState('')
+  const [rawNumericInputs, setRawNumericInputs] = useState<Record<string, string>>({})
 
   const [securingMode, setSecuringMode] = useState(false)
   const [showDimensions, setShowDimensions] = useState(false)
@@ -617,20 +618,42 @@ function App() {
     }
   }
 
-  const updateNumber = (
-    id: string,
-    key: 'quantity'|'length'|'width'|'height'|'weight',
-    raw: number,
-  ) => {
-    const value = Math.max(key === 'quantity' || key === 'length' || key === 'width' || key === 'height' ? 1 : 0, Number.isFinite(raw) ? raw : 0)
-    setCargo(items => items.map(c => c.id === id ? { ...c, [key]: value } : c))
+  type NumericKey = 'quantity'|'length'|'width'|'height'|'weight'
+
+  const updateNumber = (id: string, key: NumericKey, raw: string | number) => {
+    const text = String(raw)
+    const isIntermediate = text === '' || text === '-' || text === '.'
+    const invalidFormat = /^0\d/.test(text) || /[^0-9.\-]/.test(text) || (text.match(/\./g) ?? []).length > 1
+    const value = Number(text)
+    if (isIntermediate || invalidFormat || !Number.isFinite(value)) {
+      setRawNumericInputs(items => ({ ...items, [id + ':' + key]: text }))
+      return
+    }
+    const min = key === 'weight' ? 0.001 : 1
+    if (value < min) {
+      setRawNumericInputs(items => ({ ...items, [id + ':' + key]: text }))
+      return
+    }
+    setRawNumericInputs(items => {
+      const next = { ...items }
+      delete next[id + ':' + key]
+      return next
+    })
+    setCargo(items => items.map(c => c.id === id ? { ...c, [key]: key === 'quantity' ? Math.floor(value) : value } : c))
   }
 
   const limitsFor=(c:Cargo)=>({maxQuantity:c.type==='pallet'?50:600,maxVolume:MAX_CARGO_VOLUME_CBM})
-  const inputInvalid=(c:Cargo,key:'quantity'|'length'|'width'|'height')=>{
+  const inputInvalid=(c:Cargo,key:'quantity'|'length'|'width'|'height'|'weight')=>{
+    const raw = rawNumericInputs[c.id + ':' + key]
+    if (raw !== undefined) return true
     const lim=limitsFor(c); const vol=cbm(c.length,c.width,c.height,c.quantity)
-    return key==='quantity' ? c.quantity>lim.maxQuantity || vol>lim.maxVolume : vol>lim.maxVolume
+    if (key === 'weight') return !Number.isFinite(c.weight) || c.weight <= 0
+    return !Number.isFinite(c[key]) || c[key] <= 0 || (key==='quantity' ? c.quantity>lim.maxQuantity || vol>lim.maxVolume : vol>lim.maxVolume)
   }
+
+  const hasInvalidCargoInput = cargo.some(c =>
+    (['quantity','length','width','height','weight'] as NumericKey[]).some(key => inputInvalid(c,key))
+  )
 
   const remove = (id: string) => {
     setCargo((items) =>
@@ -655,6 +678,10 @@ function App() {
 
   const runPacking = async (nextContainer = container) => {
     if (packingProgress !== null) return
+    if (hasInvalidCargoInput) {
+      setMessage(lang === 'zh' ? '货物数据无效，请检查红色输入框（重量、尺寸、数量必须为有效正数）' : 'Invalid cargo data. Check the red fields.')
+      return
+    }
     const locked = placed.filter((p) => p.locked)
     const controller = new AbortController()
     packingControllerRef.current = controller
