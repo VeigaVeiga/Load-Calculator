@@ -115,7 +115,7 @@ export function basePack(
     weight: c.weight,
     loadbear: c.maxLoadOnTop > 0 ? c.maxLoadOnTop : 100000000,
     updown: false,
-    fragile: !c.stackable || !c.loadBearing,
+    fragile: !c.stackable || !c.loadBearing || c.breakablePallet,
     nonStackable: !c.stackable,
     color: c.color,
   }))
