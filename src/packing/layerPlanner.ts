@@ -2,7 +2,6 @@ import type { Cargo, Container, PlacedCargo } from '../types'
 import { dims, supportMetrics } from './geometry'
 
 const EPS = 0.5
-const SUPPORT = 0.75
 const MAX_OVERHANG_RATIO = 0.25
 const BEAM_WIDTH = 8
 const EXPANSION_WIDTH = 10
@@ -328,6 +327,19 @@ function stateScore(state: State, z: number, supports: PlacedCargo[], container:
     return sum + d.length * d.width
   }, 0)
   const adjacency = level.reduce((sum, p) => sum + sameLevelAdjacency(p, level), 0)
+  const sameCargoAdjacency = level.reduce((sum, p) => {
+    const d = footprint(p)
+    return sum + level
+      .filter((q) => q.id !== p.id && q.cargoId === p.cargoId)
+      .reduce((inner, q) => {
+        const qd = footprint(q)
+        const yOverlap = Math.max(0, Math.min(p.y + d.width, q.y + qd.width) - Math.max(p.y, q.y))
+        const xOverlap = Math.max(0, Math.min(p.x + d.length, q.x + qd.length) - Math.max(p.x, q.x))
+        if (Math.abs(p.x + d.length - q.x) <= EPS || Math.abs(q.x + qd.length - p.x) <= EPS) return inner + yOverlap
+        if (Math.abs(p.y + d.width - q.y) <= EPS || Math.abs(q.y + qd.width - p.y) <= EPS) return inner + xOverlap
+        return inner
+      }, 0)
+  }, 0)
   const supportQuality = level.reduce((sum, p) => sum + supportMetrics(p, state.placed).ratio, 0)
   const fragmentationPenalty = fragmentation(z, state.placed, supports)
 
@@ -352,6 +364,7 @@ function stateScore(state: State, z: number, supports: PlacedCargo[], container:
     state.placed.length * 10000000 +
     area * 0.4 +
     adjacency * 140 +
+    sameCargoAdjacency * 220 +
     supportQuality * 900 +
     totalWeight * 0.001 -
     fragmentationPenalty * 1.2 -
