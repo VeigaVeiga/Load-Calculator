@@ -163,7 +163,7 @@ function candidatePoints(placed: PlacedCargo[], container: Container, cargoLengt
   for (const z of levels) {
     const samePlane = placed.filter(q => Math.abs(q.z - z) <= EPS)
     const supports = placed.filter(q =>
-      Math.abs(q.z + q.height - z) <= EPS && (q.cargoId === u.cargo.id ? q.stackable !== false : q.loadBearing !== false)
+      Math.abs(q.z + q.height - z) <= EPS && (q.loadBearing !== false || q.stackable !== false)
     )
     if (z > EPS && supports.length === 0) continue
 
