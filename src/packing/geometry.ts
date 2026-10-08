@@ -1,7 +1,13 @@
 import type { Cargo, Container, PlacedCargo, ValidationResult } from '../types'
 
 const EPS = 0.5
-const SUPPORT_THRESHOLD = 0.75
+
+// Packing stability policy:
+// - Full support is preferred, but it is unnecessarily restrictive for mixed layers.
+// - A small controlled overhang is allowed when the base remains statically supported.
+// - The default maximum unsupported edge distance is 25% of the upper cargo dimension.
+export const SUPPORT_THRESHOLD = 0.75
+export const MAX_OVERHANG_RATIO = 0.25
 
 export function dims(p: Pick<PlacedCargo, 'length' | 'width' | 'rotation'>) {
   return Math.abs(Math.round(p.rotation / 90)) % 2 === 0
@@ -85,16 +91,93 @@ function unionArea(rects: Rect[]) {
   return area
 }
 
-export function supportRatio(p: PlacedCargo, others: PlacedCargo[]) {
-  if (p.z <= EPS) return 1
+function pointSupported(x: number, y: number, rects: Rect[]) {
+  return rects.some((r) => x >= r.x1 - EPS && x <= r.x2 + EPS && y >= r.y1 - EPS && y <= r.y2 + EPS)
+}
+
+export type SupportMetrics = {
+  ratio: number
+  centerSupported: boolean
+  leftOverhang: number
+  rightOverhang: number
+  frontOverhang: number
+  backOverhang: number
+  maxOverhangRatio: number
+  stable: boolean
+  supporters: PlacedCargo[]
+}
+
+export function supportMetrics(p: PlacedCargo, others: PlacedCargo[]): SupportMetrics {
   const d = dims(p)
-  const baseArea = d.length * d.width
-  if (baseArea <= 0) return 0
-  const rects = others
-    .filter((q) => q.id !== p.id && Math.abs(q.z + q.height - p.z) <= EPS)
+  if (p.z <= EPS) {
+    return {
+      ratio: 1,
+      centerSupported: true,
+      leftOverhang: 0,
+      rightOverhang: 0,
+      frontOverhang: 0,
+      backOverhang: 0,
+      maxOverhangRatio: 0,
+      stable: true,
+      supporters: [],
+    }
+  }
+
+  const supporters = others.filter((q) =>
+    q.id !== p.id &&
+    Math.abs(q.z + q.height - p.z) <= EPS &&
+    (q.loadBearing !== false) &&
+    !!intersection(p, q)
+  )
+  const rects = supporters
     .map((q) => intersection(p, q))
     .filter((r): r is Rect => !!r)
-  return Math.min(1, unionArea(rects) / baseArea)
+
+  const ratio = Math.min(1, unionArea(rects) / Math.max(1, d.length * d.width))
+  const centerSupported = pointSupported(p.x + d.length / 2, p.y + d.width / 2, rects)
+
+  let minX = Infinity
+  let maxX = -Infinity
+  let minY = Infinity
+  let maxY = -Infinity
+  for (const r of rects) {
+    minX = Math.min(minX, r.x1)
+    maxX = Math.max(maxX, r.x2)
+    minY = Math.min(minY, r.y1)
+    maxY = Math.max(maxY, r.y2)
+  }
+
+  const leftOverhang = Number.isFinite(minX) ? Math.max(0, minX - p.x) : d.length
+  const rightOverhang = Number.isFinite(maxX) ? Math.max(0, p.x + d.length - maxX) : d.length
+  const frontOverhang = Number.isFinite(minY) ? Math.max(0, minY - p.y) : d.width
+  const backOverhang = Number.isFinite(maxY) ? Math.max(0, p.y + d.width - maxY) : d.width
+
+  const maxOverhangRatio = Math.max(
+    leftOverhang / Math.max(1, d.length),
+    rightOverhang / Math.max(1, d.length),
+    frontOverhang / Math.max(1, d.width),
+    backOverhang / Math.max(1, d.width),
+  )
+
+  const stable = ratio + EPS >= SUPPORT_THRESHOLD &&
+    centerSupported &&
+    maxOverhangRatio <= MAX_OVERHANG_RATIO + EPS
+
+  return {
+    ratio,
+    centerSupported,
+    leftOverhang,
+    rightOverhang,
+    frontOverhang,
+    backOverhang,
+    maxOverhangRatio,
+    stable,
+    supporters,
+  }
+}
+
+export function supportRatio(p: PlacedCargo, others: PlacedCargo[]) {
+  return supportMetrics(p, others).ratio
 }
 
 function cargoFor(p: PlacedCargo, cargoById?: Map<string, Cargo>) {
@@ -123,9 +206,6 @@ function maxLayers(p: PlacedCargo, cargoById?: Map<string, Cargo>) {
 }
 
 function supporters(p: PlacedCargo, others: PlacedCargo[], cargoById?: Map<string, Cargo>) {
-  // "stackable" describes whether this cargo may itself be stacked on
-  // something. It must NOT prevent a pallet/crate from supporting cargo.
-  // Support is governed by loadBearing only.
   return others.filter((q) =>
     Math.abs(q.z + q.height - p.z) <= EPS &&
     isLoadBearing(q, cargoById) &&
@@ -140,6 +220,13 @@ function stackDepth(p: PlacedCargo, others: PlacedCargo[], cargoById?: Map<strin
   const ss = supporters(p, others, cargoById)
   if (!ss.length) return 999
   return 1 + Math.max(...ss.map((q) => stackDepth(q, others, cargoById, new Set(seen))))
+}
+
+function overlapFootprintArea(a: PlacedCargo, b: PlacedCargo) {
+  const A = bounds(a)
+  const B = bounds(b)
+  return Math.max(0, Math.min(A.x2, B.x2) - Math.max(A.x1, B.x1)) *
+    Math.max(0, Math.min(A.y2, B.y2) - Math.max(A.y1, B.y1))
 }
 
 function transferredLoad(p: PlacedCargo, all: PlacedCargo[], cargoById?: Map<string, Cargo>, seen = new Set<string>()): number {
@@ -158,13 +245,6 @@ function transferredLoad(p: PlacedCargo, all: PlacedCargo[], cargoById?: Map<str
   }, 0)
 }
 
-function overlapFootprintArea(a: PlacedCargo, b: PlacedCargo) {
-  const A = bounds(a)
-  const B = bounds(b)
-  return Math.max(0, Math.min(A.x2, B.x2) - Math.max(A.x1, B.x1)) *
-    Math.max(0, Math.min(A.y2, B.y2) - Math.max(A.y1, B.y1))
-}
-
 function validateStacking(p: PlacedCargo, others: PlacedCargo[], cargoById?: Map<string, Cargo>) {
   const errors: string[] = []
   if (p.z <= EPS) return errors
@@ -175,8 +255,12 @@ function validateStacking(p: PlacedCargo, others: PlacedCargo[], cargoById?: Map
     return errors
   }
 
-  const ratio = supportRatio(p, others)
-  if (ratio + EPS < SUPPORT_THRESHOLD) errors.push('支撑面积不足')
+  const metrics = supportMetrics(p, others)
+  if (!metrics.stable) {
+    if (metrics.ratio + EPS < SUPPORT_THRESHOLD) errors.push('支撑面积不足')
+    else if (!metrics.centerSupported) errors.push('货物重心投影未落在支撑区域')
+    else if (metrics.maxOverhangRatio > MAX_OVERHANG_RATIO + EPS) errors.push('悬空范围超过允许容差')
+  }
 
   for (const q of ss) {
     const limit = maxTopLoad(q, cargoById)
@@ -211,8 +295,9 @@ export function validatePlacement(
     if (total > c.maxPayload + EPS) errors.push('超过集装箱最大载重')
   }
 
-  if (p.z > EPS && supportRatio(p, others) < 0.95 && supportRatio(p, others) >= SUPPORT_THRESHOLD) {
-    warnings.push('支撑面积低于 95%')
+  if (p.z > EPS) {
+    const metrics = supportMetrics(p, others)
+    if (metrics.stable && metrics.ratio < 0.95) warnings.push('采用部分支撑 / 小幅悬空')
   }
 
   return { ok: errors.length === 0, errors, warnings }
