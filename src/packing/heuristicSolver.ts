@@ -51,10 +51,12 @@ function overlapArea(a: PlacedCargo, b: PlacedCargo) {
 
 function supportInfo(p: PlacedCargo, placed: PlacedCargo[]) {
   if (p.z <= EPS) return { ratio: 1, supporters: [] as PlacedCargo[] }
-  const supporters = placed.filter(q => Math.abs(q.z + q.height - p.z) <= EPS && loadBearing(q) && overlapArea(p, q) > EPS)
-  const area = supporters.reduce((sum, q) => sum + overlapArea(p, q), 0)
-  const base = Math.max(1, footprint(p).length * footprint(p).width)
-  return { ratio: Math.min(1, area / base), supporters }
+  const metrics = supportMetrics(p, placed)
+  return {
+    ratio: metrics.ratio,
+    supporters: metrics.supporters,
+    stable: metrics.stable,
+  }
 }
 
 function transferredLoad(q: PlacedCargo, p: PlacedCargo, placed: PlacedCargo[]) {
