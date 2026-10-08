@@ -1,5 +1,5 @@
 import type { Cargo, Container, PlacedCargo } from '../types'
-import { validatePlan } from './geometry'
+import { dims, validatePlan } from './geometry'
 import { heuristicPack, type HeuristicOptions } from './heuristicSolver'
 
 const EPS = 0.5
@@ -32,20 +32,64 @@ function planVolume(placed: PlacedCargo[]) {
   }, 0)
 }
 
-function chooseBest(results: Array<{ result: SolverResult; options: HeuristicOptions }>) {
+function planQuality(result: SolverResult, container: Container) {
+  const placed = result.placed
+  if (!placed.length) return -Infinity
+
+  const volume = planVolume(placed)
+  const totalWeight = placed.reduce((sum, p) => sum + p.weight, 0)
+  const weighted = placed.reduce((acc, p) => {
+    const d = dimsFor(p)
+    const weight = Math.max(0, p.weight)
+    return {
+      x: acc.x + (p.x + d.length / 2) * weight,
+      y: acc.y + (p.y + d.width / 2) * weight,
+      z: acc.z + (p.z + p.height / 2) * weight,
+    }
+  }, { x: 0, y: 0, z: 0 })
+
+  const cgX = totalWeight > 0 ? weighted.x / totalWeight : container.length / 2
+  const cgY = totalWeight > 0 ? weighted.y / totalWeight : container.width / 2
+  const cgZ = totalWeight > 0 ? weighted.z / totalWeight : container.height / 2
+
+  const centerPenalty =
+    Math.abs(cgX - container.length / 2) / Math.max(1, container.length) +
+    Math.abs(cgY - container.width / 2) / Math.max(1, container.width)
+
+  const levelPenalty = placed.reduce((sum, p) => {
+    const d = dimsFor(p)
+    const centerX = p.x + d.length / 2
+    const centerY = p.y + d.width / 2
+    return sum +
+      Math.abs(centerX - container.length / 2) * p.weight +
+      Math.abs(centerY - container.width / 2) * p.weight
+  }, 0) / Math.max(1, totalWeight)
+
+  // Count remains the first objective. These terms only break ties or close
+  // candidates, so the solver never sacrifices a loaded unit merely to polish
+  // geometry. Weight balance is deliberately a secondary objective; a future
+  // explicit "optimize load" action can search this space more aggressively.
+  return placed.length * 1_000_000_000 +
+    volume * 10 +
+    totalWeight * 0.01 -
+    centerPenalty * 100_000 -
+    levelPenalty * 0.1 -
+    Math.abs(cgZ - container.height * 0.25) * 0.001
+}
+
+function chooseBest(results: Array<{ result: SolverResult; options: HeuristicOptions }>, container: Container) {
   let best = results[0]?.result
-  let bestCount = best?.placed.length ?? -1
-  let bestVolume = best ? planVolume(best.placed) : -1
+  let bestScore = best ? planQuality(best, container) : -Infinity
+
   for (let i = 1; i < results.length; i += 1) {
     const candidate = results[i].result
-    const count = candidate.placed.length
-    const volume = planVolume(candidate.placed)
-    if (count > bestCount || (count === bestCount && volume > bestVolume)) {
+    const candidateScore = planQuality(candidate, container)
+    if (candidateScore > bestScore) {
       best = candidate
-      bestCount = count
-      bestVolume = volume
+      bestScore = candidateScore
     }
   }
+
   return best ?? { placed: [], unplaced: [] }
 }
 
@@ -87,7 +131,7 @@ export function basePack(
     results.push({ result, options: strategies[i] })
   }
 
-  const result = chooseBest(results)
+  const result = chooseBest(results, container)
 
   // Never expose an invalid automatic result. If the final audit rejects
   // anything, keep the valid locked state and let the unplaced list reflect
