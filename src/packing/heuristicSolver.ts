@@ -161,8 +161,8 @@ function candidatePoints(placed: PlacedCargo[], container: Container, cargoLengt
     )
     if (z > EPS && supports.length === 0) continue
 
-    const xs = new Set<number>([0, Math.max(0, container.length - cargoLength)])
-    const ys = new Set<number>([0, Math.max(0, container.width - cargoWidth)])
+    const xs = new Set<number>([0, Math.max(0, container.length - cargoLength), Math.max(0, (container.length - cargoLength) / 2)])
+    const ys = new Set<number>([0, Math.max(0, container.width - cargoWidth), Math.max(0, (container.width - cargoWidth) / 2)])
 
     for (const q of samePlane) {
       const d = footprint(q)
