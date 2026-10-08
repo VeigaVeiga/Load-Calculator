@@ -113,9 +113,9 @@ export function basePack(
   const validLocked = locked.filter(p => fits(p, container))
   const strategies: HeuristicOptions[] = [
     { order: 'pallet-first', gapStep: 0, gapBias: 0 },
-    { order: 'pallet-first', gapStep: 10, gapBias: 0 },
-    { order: 'footprint', gapStep: 10, gapBias: 0 },
-    { order: 'volume', gapStep: 20, gapBias: 0 },
+    { order: 'pallet-first', gapStep: 10, gapBias: 0, adjacencyWeight: 90 },
+    { order: 'footprint', gapStep: 10, gapBias: 0, adjacencyWeight: 120 },
+    { order: 'volume', gapStep: 20, gapBias: 0, adjacencyWeight: 80 },
   ]
 
   const results: Array<{ result: SolverResult; options: HeuristicOptions }> = []
