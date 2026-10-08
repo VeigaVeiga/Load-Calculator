@@ -401,7 +401,7 @@ function candidatePlacements(
         seen.add(key)
         local.push(p)
       }
-      local.sort((a, b) => candidateScore(b) - candidateScore(a))
+      local.sort((a, b) => candidateScore(b, r) - candidateScore(a, r))
       candidates.push(...local.slice(0, 18))
     }
   }
