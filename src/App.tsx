@@ -1475,8 +1475,8 @@ function App() {
                     </label>
                     <label>
                       {lang === 'zh' ? '最大顶部承重 (kg)' : 'Max Top Load (kg)'}
-                      <input type="number" min="0" value={c.maxLoadOnTop || 0} onChange={(e) => update(c.id, 'maxLoadOnTop', Math.max(0, Number(e.target.value) || 0))} />
-                      <small>{lang === 'zh' ? '0 = 不限制' : '0 = unlimited'}</small>
+                      <input type="number" min="0" disabled={!c.loadBearing} value={c.maxLoadOnTop || 0} onChange={(e) => update(c.id, 'maxLoadOnTop', Math.max(0, Number(e.target.value) || 0))} />
+                      <small>{c.loadBearing ? (lang === 'zh' ? '仅对其他类型货物生效；0 = 不限制' : 'Applies to other cargo types; 0 = unlimited') : (lang === 'zh' ? '需勾选“可承重”后生效' : 'Enable Load-bearing to use this limit')}</small>
                     </label>
                   </div>
 
