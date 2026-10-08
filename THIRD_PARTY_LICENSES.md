@@ -2,7 +2,7 @@
 
 ## binpack3d
 
-This project uses **binpack3d 1.0.1** as the first-stage 3D packing solver.
+This project uses **binpack3d 0.1.1** as the first-stage 3D packing solver.
 
 Repository: https://github.com/wxul/binpack3d
 
