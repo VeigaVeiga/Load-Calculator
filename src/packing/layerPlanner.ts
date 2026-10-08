@@ -136,19 +136,12 @@ function candidateInRect(u:LayerUnit,z:number,r:Rect,rotation:0|90,container:Con
   return best
 }
 
-/**
- * Cheap one-step lookahead. Instead of recursively repacking the whole
- * container, evaluate whether a candidate leaves useful support rectangles
- * for several of the remaining cargo units. This strongly reduces the
- * "good first box, dead end later" behaviour in mixed loads.
- */
 function futureFitPotential(remaining:LayerUnit[], z:number, placedAfter:PlacedCargo[], supports:PlacedCargo[], limit=24) {
   const rects=freeRects(z,placedAfter,supports)
   if(!rects.length) return 0
   const sample=remaining.slice(0,limit)
   let fitCount=0
   let usableArea=0
-
   for(const r of rects){
     usableArea += r.w*r.h
     for(const u of sample){
@@ -158,7 +151,6 @@ function futureFitPotential(remaining:LayerUnit[], z:number, placedAfter:PlacedC
       if(fit0||fit90) fitCount+=1
     }
   }
-
   const largest=rects.reduce((m,r)=>Math.max(m,r.w*r.h),0)
   const fragmentation=Math.max(0,rects.length-1)
   return fitCount*120 + Math.sqrt(largest)*2 + Math.sqrt(usableArea)*0.5 - fragmentation*18
@@ -166,11 +158,11 @@ function futureFitPotential(remaining:LayerUnit[], z:number, placedAfter:PlacedC
 
 export function packSupportedLayers(units:LayerUnit[],placed:PlacedCargo[],container:Container,totalWeight:number,progress?:(percent:number)=>void){
   const remaining=[...units]
-  const stackLayerCount = (cargoId:string) => new Set(placed.filter(p => p.cargoId === cargoId).map(p => Math.round(p.z * 10) / 10)).size
+  const stackLayerCount=(cargoId:string)=>new Set(placed.filter(p=>p.cargoId===cargoId).map(p=>Math.round(p.z*10)/10)).size
   let weight=totalWeight
   const added:PlacedCargo[]=[]
   let guard=0
-  while(remaining.length && guard<units.length*2){
+  while(remaining.length&&guard<units.length*2){
     guard+=1
     const levels=[...new Set(placed.filter(p=>p.z+p.height>EPS&&p.z+p.height<container.height-EPS&&(p.loadBearing!==false||p.stackable===true)).map(p=>Math.round((p.z+p.height)*10)/10))].sort((a,b)=>a-b)
     let chosen:PlacedCargo|null=null, chosenIndex=-1
@@ -181,18 +173,16 @@ export function packSupportedLayers(units:LayerUnit[],placed:PlacedCargo[],conta
       for(let i=0;i<remaining.length;i+=1){
         const u=remaining[i]
         const existingLayers=stackLayerCount(u.cargo.id)
-        const maxLayers=u.cargo.maxStackLayers ?? Infinity
+        const maxLayers=u.cargo.maxStackLayers??Infinity
         if(existingLayers>=maxLayers) continue
         const rots:Array<0|90>=u.cargo.rotatable===false||u.cargo.length===u.cargo.width?[0]:[0,90]
-
         for(const rot of rots){
           const d=rot===0?{length:u.cargo.length,width:u.cargo.width}:{length:u.cargo.width,width:u.cargo.length}
           const rects=[...freeRects(z,placed,supports),...bridgeRects(supports,d.length,d.width)]
-
           for(const r of rects){
             const p=candidateInRect(u,z,r,rot,container,placed)
             if(!p) continue
-
+            const s=supportMetrics(p,placed)
             const pd=footprint(p)
             const adjacent=placed.reduce((sum,q)=>{
               if(Math.abs(q.z-z)>EPS) return sum
@@ -203,7 +193,6 @@ export function packSupportedLayers(units:LayerUnit[],placed:PlacedCargo[],conta
               const xOverlap=Math.max(0,Math.min(p.x+pd.length,q.x+qd.length)-Math.max(p.x,q.x))
               return sum+(xTouch?yTouch:0)+(yTouchEdge?xOverlap:0)
             },0)
-
             const centerDistance=Math.abs((p.x+pd.length/2)-container.length/2)+Math.abs((p.y+pd.width/2)-container.width/2)
             const currentSameLevel=placed.filter(q=>Math.abs(q.z-z)<=EPS)
             const currentMinX=currentSameLevel.length?Math.min(...currentSameLevel.map(q=>q.x)):p.x
@@ -216,7 +205,6 @@ export function packSupportedLayers(units:LayerUnit[],placed:PlacedCargo[],conta
             const placedAfter=[...placed,p]
             const future=futureFitPotential(remaining.filter(x=>x!==u),z,placedAfter,supports)
             const score=adjacent*180+supporterBonus+s.ratio*500+future*2+pd.length*pd.width*0.02-spanX*spanY*0.0008-centerDistance*0.2
-
             if(score>layerScore){layerBest=p;layerIndex=i;layerScore=score}
           }
         }
