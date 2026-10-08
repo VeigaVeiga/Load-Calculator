@@ -1,6 +1,6 @@
 import type { Cargo, Container, PlacedCargo } from '../types'
 import { validatePlan } from './geometry'
-import { heuristicPack } from './heuristicSolver'
+import { heuristicPack, type HeuristicOptions } from './heuristicSolver'
 
 const EPS = 0.5
 
@@ -21,6 +21,32 @@ function fits(p: PlacedCargo, c: Container) {
     p.x + d.length <= c.length + EPS &&
     p.y + d.width <= c.width + EPS &&
     p.z + p.height <= c.height + EPS
+}
+
+
+
+function planVolume(placed: PlacedCargo[]) {
+  return placed.reduce((sum, p) => {
+    const d = dimsFor(p)
+    return sum + d.length * d.width * p.height
+  }, 0)
+}
+
+function chooseBest(results: Array<{ result: SolverResult; options: HeuristicOptions }>) {
+  let best = results[0]?.result
+  let bestCount = best?.placed.length ?? -1
+  let bestVolume = best ? planVolume(best.placed) : -1
+  for (let i = 1; i < results.length; i += 1) {
+    const candidate = results[i].result
+    const count = candidate.placed.length
+    const volume = planVolume(candidate.placed)
+    if (count > bestCount || (count === bestCount && volume > bestVolume)) {
+      best = candidate
+      bestCount = count
+      bestVolume = volume
+    }
+  }
+  return best ?? { placed: [], unplaced: [] }
 }
 
 function completeUnplaced(cargo: Cargo[], placed: PlacedCargo[]) {
@@ -49,7 +75,19 @@ export function basePack(
   progress?: (percent: number) => void,
 ): SolverResult {
   const validLocked = locked.filter(p => fits(p, container))
-  const result = heuristicPack(cargo, container, validLocked, progress)
+
+  const signatures = new Set(cargo.map(c => [c.type, c.length, c.width, c.height].join('|')))
+  const mixed = signatures.size > 1
+  const strategies: HeuristicOptions[] = mixed ? [{ gapStep: 0 }, { gapStep: 10 }, { gapStep: 20 }] : [{ gapStep: 0 }]
+  const results: Array<{ result: SolverResult; options: HeuristicOptions }> = []
+
+  for (let i = 0; i < strategies.length; i += 1) {
+    const branchProgress = (p: number) => progress?.(Math.round((i * 100 + p) / strategies.length))
+    const result = heuristicPack(cargo, container, validLocked, branchProgress, strategies[i])
+    results.push({ result, options: strategies[i] })
+  }
+
+  const result = chooseBest(results)
 
   // Never expose an invalid automatic result. If the final audit rejects
   // anything, keep the valid locked state and let the unplaced list reflect
