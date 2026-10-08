@@ -88,12 +88,13 @@ function candidateInRect(u:LayerUnit,z:number,r:Rect,rotation:0|90,container:Con
 
 export function packSupportedLayers(units:LayerUnit[],placed:PlacedCargo[],container:Container,totalWeight:number,progress?:(percent:number)=>void){
   const remaining=[...units]
+  const placedByCargoId = (cargoId:string) => placed.filter(p => p.cargoId === cargoId).length
   let weight=totalWeight
   const added:PlacedCargo[]=[]
   let guard=0
   while(remaining.length && guard<units.length*2){
     guard+=1
-    const levels=[...new Set(placed.filter(p=>p.z+p.height>EPS&&p.z+p.height<container.height-EPS&&p.loadBearing!==false).map(p=>Math.round((p.z+p.height)*10)/10))].sort((a,b)=>a-b)
+    const levels=[...new Set(placed.filter(p=>p.z+p.height>EPS&&p.z+p.height<container.height-EPS&&(p.loadBearing!==false||p.stackable===true)).map(p=>Math.round((p.z+p.height)*10)/10))].sort((a,b)=>a-b)
     let chosen:PlacedCargo|null=null, chosenIndex=-1
     for(const z of levels){
       const supports=placed.filter(p=>Math.abs(p.z+p.height-z)<=EPS&&(p.loadBearing!==false||p.stackable===true))
@@ -102,6 +103,9 @@ export function packSupportedLayers(units:LayerUnit[],placed:PlacedCargo[],conta
       let layerBest:PlacedCargo|null=null, layerIndex=-1, layerScore=-Infinity
       for(let i=0;i<remaining.length;i+=1){
         const u=remaining[i]
+        const existingSame = placedByCargoId(u.cargo.id)
+        const maxLayers = u.cargo.maxStackLayers ?? Infinity
+        if (existingSame > 0 && existingSame >= u.cargo.quantity * maxLayers) continue
         const rots:Array<0|90>=u.cargo.rotatable===false||u.cargo.length===u.cargo.width?[0]:[0,90]
         for(const rot of rots) for(const r of rects){
           const p=candidateInRect(u,z,r,rot,container,placed)
