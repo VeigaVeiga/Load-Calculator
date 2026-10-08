@@ -88,7 +88,7 @@ function candidateInRect(u:LayerUnit,z:number,r:Rect,rotation:0|90,container:Con
 
 export function packSupportedLayers(units:LayerUnit[],placed:PlacedCargo[],container:Container,totalWeight:number,progress?:(percent:number)=>void){
   const remaining=[...units]
-  const placedByCargoId = (cargoId:string) => placed.filter(p => p.cargoId === cargoId).length
+  const stackLayerCount = (cargoId:string) => new Set(placed.filter(p => p.cargoId === cargoId).map(p => Math.round(p.z * 10) / 10)).size
   let weight=totalWeight
   const added:PlacedCargo[]=[]
   let guard=0
@@ -103,9 +103,9 @@ export function packSupportedLayers(units:LayerUnit[],placed:PlacedCargo[],conta
       let layerBest:PlacedCargo|null=null, layerIndex=-1, layerScore=-Infinity
       for(let i=0;i<remaining.length;i+=1){
         const u=remaining[i]
-        const existingSame = placedByCargoId(u.cargo.id)
+        const existingLayers = stackLayerCount(u.cargo.id)
         const maxLayers = u.cargo.maxStackLayers ?? Infinity
-        if (existingSame > 0 && existingSame >= u.cargo.quantity * maxLayers) continue
+        if (existingLayers >= maxLayers) continue
         const rots:Array<0|90>=u.cargo.rotatable===false||u.cargo.length===u.cargo.width?[0]:[0,90]
         for(const rot of rots) for(const r of rects){
           const p=candidateInRect(u,z,r,rot,container,placed)
