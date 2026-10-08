@@ -1,5 +1,6 @@
 import type { Cargo, Container, PlacedCargo } from '../types'
 import { dims, supportMetrics, validatePlan } from './geometry'
+import { packSupportedLayers, type LayerUnit } from './layerPlanner'
 
 const EPS = 0.5
 const SUPPORT = 0.75
@@ -244,10 +245,12 @@ export function heuristicPack(cargo: Cargo[], container: Container, locked: Plac
 
   let totalWeight = placed.reduce((s, p) => s + p.weight, 0)
   const unplaced: Cargo[] = []
+  const groundUnits = units.filter(u => u.cargo.type === 'pallet' || u.cargo.stackable === false)
+  const stackUnits = units.filter(u => u.cargo.type !== 'pallet' && u.cargo.stackable !== false)
   const total = Math.max(1, units.length)
 
-  for (let i = 0; i < units.length; i += 1) {
-    const u = units[i]
+  for (let i = 0; i < groundUnits.length; i += 1) {
+    const u = groundUnits[i]
     const rotations: Array<0 | 90> = u.cargo.rotatable === false || u.cargo.length === u.cargo.width ? [0] : [0, 90]
     let best: PlacedCargo | null = null
     let bestScore = -Infinity
@@ -278,6 +281,36 @@ export function heuristicPack(cargo: Cargo[], container: Container, locked: Plac
     }
 
     if ((i & 7) === 0) progress?.(Math.round((i / total) * 100))
+  }
+
+  const layerResult = packSupportedLayers(
+    stackUnits as LayerUnit[],
+    placed,
+    container,
+    totalWeight,
+    p => progress?.(Math.min(98, Math.round((groundUnits.length + p * stackUnits.length / 100) / total * 100))),
+  )
+  totalWeight = layerResult.totalWeight
+
+  // Any stackable cargo that could not find a stable support plane gets a final
+  // ground fallback. This is deliberately after layer packing so boxes do not
+  // consume floor space before the pallet-top layers have been filled.
+  for (const u of layerResult.remaining) {
+    const rotations: Array<0 | 90> = u.cargo.rotatable === false || u.cargo.length === u.cargo.width ? [0] : [0, 90]
+    let best: PlacedCargo | null = null
+    let bestScore = -Infinity
+    for (const rotation of rotations) {
+      const d = rotation === 0 ? { length: u.cargo.length, width: u.cargo.width } : { length: u.cargo.width, width: u.cargo.length }
+      const points = candidatePoints(placed, container, d.length, d.width, 0, false).filter(p => p[2] <= EPS)
+      for (const [x, y, z] of points) {
+        const p = makePlaced(u.cargo, u.index, x, y, z, rotation)
+        if (!validCandidate(p, placed, container, totalWeight)) continue
+        const candidateScore = score(p, placed, container)
+        if (candidateScore > bestScore) { best = p; bestScore = candidateScore }
+      }
+    }
+    if (best) { placed.push(best); totalWeight += best.weight }
+    else unplaced.push(u.cargo)
   }
 
   // Final audit is intentionally a single pass; the hot loop never calls the
