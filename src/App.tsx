@@ -433,10 +433,12 @@ function App() {
         placementMode: 'manual',
       }
 
+      const cargoById = new Map(cargo.map((c) => [c.id, c]))
       const validation = validatePlacement(
         next,
         container,
         items,
+        cargoById,
       )
 
       if (!validation.ok) {
@@ -510,10 +512,12 @@ function App() {
 
       for (const p of next) {
         if (!ids.has(p.id)) continue
+        const cargoById = new Map(cargo.map((c) => [c.id, c]))
         const validation = validatePlacement(
           p,
           container,
           next.filter((q) => q.id !== p.id),
+          cargoById,
         )
         if (!validation.ok) {
           const translated = validation.errors.map((error) => {
@@ -581,12 +585,25 @@ function App() {
     if (key === 'color') {
       setPlaced((items) =>
         items.map((p) =>
-          p.cargoId === id
-            ? {
-                ...p,
-                color: String(value),
-              }
-            : p,
+          p.cargoId === id ? { ...p, color: String(value) } : p,
+        ),
+      )
+    }
+
+    // Physical properties are shared cargo definitions. Keep the cached
+    // properties on already placed units synchronized so changing
+    // Stackable/Load-bearing immediately changes validation and manual moves.
+    if (key === 'stackable' || key === 'loadBearing' || key === 'maxStackLayers' || key === 'maxLoadOnTop' || key === 'rotatable') {
+      setPlaced((items) =>
+        items.map((p) =>
+          p.cargoId === id ? {
+            ...p,
+            ...(key === 'stackable' ? { stackable: Boolean(value) } : {}),
+            ...(key === 'loadBearing' ? { loadBearing: Boolean(value) } : {}),
+            ...(key === 'maxStackLayers' ? { maxStackLayers: Number(value) } : {}),
+            ...(key === 'maxLoadOnTop' ? { maxLoadOnTop: Number(value) } : {}),
+            ...(key === 'rotatable' ? { rotatable: Boolean(value) } : {}),
+          } : p,
         ),
       )
     }
