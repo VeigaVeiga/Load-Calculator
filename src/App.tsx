@@ -125,6 +125,7 @@ const T = {
     crate: 'Wood Crate',
     auto: 'Auto Pack',
     opt: 'Optimize Load',
+    optimizing: 'Optimizing load…',
     clear: 'Clear Unlocked',
     properties: 'Cargo',
     weight: 'Weight Analysis',
