@@ -4,7 +4,11 @@ import { dims, supportMetrics, validatePlan } from './geometry'
 const EPS = 0.5
 const SUPPORT = 0.75
 
-type Unit = { cargo: Cargo; index: number }\n\nexport type HeuristicOptions = {\n  gapStep?: number\n}
+type Unit = { cargo: Cargo; index: number }
+
+export type HeuristicOptions = {
+  gapStep?: number
+}
 
 function expand(cargo: Cargo[]): Unit[] {
   const result: Unit[] = []
