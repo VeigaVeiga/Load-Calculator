@@ -77,6 +77,9 @@ function validCandidate(p: PlacedCargo, placed: PlacedCargo[], container: Contai
   if (placed.some(q => overlaps(p, q))) return false
   if (container.maxPayload > 0 && totalWeight + p.weight > container.maxPayload + EPS) return false
   if (p.z <= EPS) return true
+  // Non-stackable cargo may support other cargo when loadBearing is enabled,
+  // but it may not itself be placed on another cargo.
+  if (p.stackable === false) return false
 
   const support = supportInfo(p, placed)
   if (support.ratio + EPS < SUPPORT) return false
