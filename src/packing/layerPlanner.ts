@@ -3,9 +3,9 @@ import { dims, supportMetrics } from './geometry'
 
 const EPS = 0.5
 const MAX_OVERHANG_RATIO = 0.25
-const BEAM_WIDTH = 24
+const BEAM_WIDTH = 32
 const MAX_LAYER_STEPS = 120
-const MAX_CANDIDATES_PER_UNIT = 96
+const MAX_CANDIDATES_PER_UNIT = 160
 
 export type LayerUnit = { cargo: Cargo; index: number }
 
@@ -205,43 +205,33 @@ function bridgeRects(supports: PlacedCargo[], cargoLength: number, cargoWidth: n
   return result
 }
 
-function candidatePositions(r: Rect, length: number, width: number): Array<[number, number]> {
+function candidatePositions(
+  r: Rect,
+  length: number,
+  width: number,
+  sameLevel: PlacedCargo[] = [],
+): Array<[number, number]> {
   const maxX = r.x + r.w - length
   const maxY = r.y + r.h - width
   if (maxX < r.x - EPS || maxY < r.y - EPS) return []
-
-  // Extreme-point generation: every left/right edge and top/bottom edge of
-  // an existing box becomes a candidate. This is much denser than only using
-  // rectangle corners and is essential for mixed carton sizes.
-  const xs = new Set<number>([
-    r.x,
-    maxX,
-    r.x + (r.w - length) / 2,
-  ])
-  const ys = new Set<number>([
-    r.y,
-    maxY,
-    r.y + (r.h - width) / 2,
-  ])
-
-
-
-  const out: Array<[number, number]> = []
-  for (const x of xs) {
-    for (const y of ys) {
-      if (x >= r.x - EPS && y >= r.y - EPS &&
-          x <= maxX + EPS && y <= maxY + EPS) {
-        out.push([Math.round(x), Math.round(y)])
-      }
+  const xs = new Set<number>([r.x, maxX])
+  const ys = new Set<number>([r.y, maxY])
+  for (const q of sameLevel) {
+    const qd = footprint(q)
+    for (const x of [q.x, q.x + qd.length, q.x - length, q.x + qd.length - length]) {
+      if (x >= r.x - EPS && x <= maxX + EPS) xs.add(Math.round(x))
+    }
+    for (const y of [q.y, q.y + qd.width, q.y - width, q.y + qd.width - width]) {
+      if (y >= r.y - EPS && y <= maxY + EPS) ys.add(Math.round(y))
     }
   }
-
-  // Keep candidates deterministic and prefer the lower/left frontier. The
-  // beam search will retain alternatives with better support/adjacency.
+  const out: Array<[number, number]> = []
+  for (const x of xs) for (const y of ys) {
+    if (x >= r.x - EPS && y >= r.y - EPS && x <= maxX + EPS && y <= maxY + EPS) out.push([Math.round(x), Math.round(y)])
+  }
   out.sort((a, b) => a[1] - b[1] || a[0] - b[0])
   return out
 }
-
 function sameLevelAdjacency(p: PlacedCargo, sameLevel: PlacedCargo[]) {
   const d = footprint(p)
   let shared = 0
@@ -376,12 +366,16 @@ function candidatePlacements(
     const edgeDistance = Math.max(0, p.x - region.x) + Math.max(0, p.y - region.y)
     const leftoverW = Math.max(0, region.w - d.length)
     const leftoverH = Math.max(0, region.h - d.width)
+    const shortSide = Math.min(leftoverW, leftoverH)
+    const longSide = Math.max(leftoverW, leftoverH)
     const fitWaste = leftoverW * leftoverH
     return support.ratio * 100000 +
-      adjacent * 260 +
+      adjacent * 900 +
       d.length * d.width * 0.05 -
+      shortSide * 1.8 -
+      longSide * 0.08 -
       edgeDistance * 0.12 -
-      fitWaste * 0.002
+      fitWaste * 0.0008
   }
 
   // Candidate budget is distributed per support region. A global top-N list
@@ -394,7 +388,7 @@ function candidatePlacements(
 
     for (const r of rects) {
       const local: PlacedCargo[] = []
-      for (const [x, y] of candidatePositions(r, d.length, d.width)) {
+      for (const [x, y] of candidatePositions(r, d.length, d.width, sameLevel)) {
         const p = makePlaced(u.cargo, u.index, x, y, z, rotation)
         const key = [Math.round(x), Math.round(y), rotation].join('|')
         if (seen.has(key) || !validCandidate(p, state, container, totalWeight)) continue
