@@ -40,6 +40,7 @@ function clonePlacedFromCargo(
     loadBearing: cargo.loadBearing,
     maxStackLayers: cargo.maxStackLayers,
     maxLoadOnTop: cargo.maxLoadOnTop,
+    rotatable: cargo.rotatable,
   }
 }
 
