@@ -32,7 +32,31 @@ function planVolume(placed: PlacedCargo[]) {
   }, 0)
 }
 
-function planQuality(result: SolverResult, container: Container) {
+function foundationCoverage(result: SolverResult, cargo: Cargo[]) {
+  const maxWeight = Math.max(0, ...cargo.map((c) => c.weight))
+  const maxArea = Math.max(1, ...cargo.map((c) => c.length * c.width))
+  const uniqueCargo = new Set(cargo.map((c) => c.id)).size
+  if (uniqueCargo <= 1) return 0
+
+  const foundationIds = new Set(
+    cargo
+      .filter((c) => {
+        const areaRatio = (c.length * c.width) / maxArea
+        const weightRatio = maxWeight > 0 ? c.weight / maxWeight : 0
+        return c.stackable === false || areaRatio >= 0.6 || weightRatio >= 0.6
+      })
+      .map((c) => c.id),
+  )
+  if (!foundationIds.size) return 0
+
+  const expected = cargo
+    .filter((c) => foundationIds.has(c.id))
+    .reduce((sum, c) => sum + Math.max(0, Math.floor(c.quantity)), 0)
+  const actual = result.placed.filter((p) => foundationIds.has(p.cargoId)).length
+  return actual / Math.max(1, expected)
+}
+
+function planQuality(result: SolverResult, container: Container, cargo: Cargo[]) {
   const placed = result.placed
   if (!placed.length) return -Infinity
 
@@ -69,7 +93,13 @@ function planQuality(result: SolverResult, container: Container) {
   // candidates, so the solver never sacrifices a loaded unit merely to polish
   // geometry. Weight balance is deliberately a secondary objective; a future
   // explicit "optimize load" action can search this space more aggressively.
-  return placed.length * 1_000_000_000 +
+  const foundation = foundationCoverage(result, cargo)
+
+  // Foundation completion is a hard strategic priority: an upper-layer
+  // solution must not sacrifice physically important lower cargo merely to
+  // gain more small cartons. This is derived from cargo attributes, not type.
+  return foundation * 5_000_000_000_000 +
+    placed.length * 1_000_000_000 +
     volume * 10 +
     totalWeight * 0.01 -
     centerPenalty * 100_000 -
@@ -79,11 +109,11 @@ function planQuality(result: SolverResult, container: Container) {
 
 function chooseBest(results: Array<{ result: SolverResult; options: HeuristicOptions }>, container: Container) {
   let best = results[0]?.result
-  let bestScore = best ? planQuality(best, container) : -Infinity
+  let bestScore = best ? planQuality(best, container, cargo) : -Infinity
 
   for (let i = 1; i < results.length; i += 1) {
     const candidate = results[i].result
-    const candidateScore = planQuality(candidate, container)
+    const candidateScore = planQuality(candidate, container, cargo)
     if (candidateScore > bestScore) {
       best = candidate
       bestScore = candidateScore
@@ -128,7 +158,9 @@ export function basePack(
     c.maxStackLayers, c.maxLoadOnTop,
   ].join('|')))
   const mixed = signatures.size > 1
-  const strategies: HeuristicOptions[] = mixed ? [{ gapStep: 0 }, { gapStep: 10 }, { gapStep: 20 }] : [{ gapStep: 0 }]
+  // Do not deliberately introduce floor gaps while solving the foundation.
+  // Real gaps should emerge only when cargo dimensions/constraints require them.
+  const strategies: HeuristicOptions[] = mixed ? [{ gapStep: 0 }] : [{ gapStep: 0 }]
   const results: Array<{ result: SolverResult; options: HeuristicOptions }> = []
 
   for (let i = 0; i < strategies.length; i += 1) {
