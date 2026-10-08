@@ -222,7 +222,10 @@ function score(p: PlacedCargo, placed: PlacedCargo[], container: Container) {
   // anchors. This deliberately produces orderly rows instead of scattered points.
   const layerReward = p.z > EPS ? p.z * 120 : 0
   const stableSupport = p.z > EPS ? supportMetrics(p, placed).ratio : 1
-  return stableSupport * 1_000_000 + layerReward + adjacency * 250 - rightGap * 0.02 - sideGap * 0.01 - p.x * 0.001 - p.y * 0.0005
+  const centerX = p.x + d.length / 2
+  const centerY = p.y + d.width / 2
+  const centerDistance = Math.abs(centerX - container.length / 2) + Math.abs(centerY - container.width / 2)
+  return stableSupport * 1_000_000 + layerReward + adjacency * 250 - centerDistance * 0.08 - rightGap * 0.004 - sideGap * 0.004
 }
 
 export function heuristicPack(cargo: Cargo[], container: Container, locked: PlacedCargo[] = [], progress?: (percent: number) => void, options: HeuristicOptions = {}): { placed: PlacedCargo[]; unplaced: Cargo[] } {
