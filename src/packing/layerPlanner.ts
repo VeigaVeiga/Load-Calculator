@@ -70,9 +70,9 @@ function bridgeRects(supports:PlacedCargo[], cargoLength:number, cargoWidth:numb
     if(horizontalGap<=maxGap+EPS && yOverlap>EPS){
       result.push({
         x:Math.min(a.x,b.x),
-        y:Math.max(a.y,b.y),
-        w:Math.max(a.x+a.w,b.x+b.w)-Math.min(a.x,b.x),
-        h:Math.min(a.y+a.h,b.y+b.h)-Math.max(a.y,b.y)
+        y:Math.min(a.y,b.y),
+        w:Math.max(a.x+a.w,b.x+b.x)-Math.min(a.x,b.x),
+        h:Math.max(a.y+a.h,b.y+b.h)-Math.min(a.y,b.y)
       })
     }
 
@@ -80,7 +80,7 @@ function bridgeRects(supports:PlacedCargo[], cargoLength:number, cargoWidth:numb
       result.push({
         x:Math.max(a.x,b.x),
         y:Math.min(a.y,b.y),
-        w:Math.min(a.x+a.w,b.x+b.w)-Math.max(a.x,b.x),
+        w:Math.max(a.x+a.w,b.x+b.w)-Math.min(a.x,b.x),
         h:Math.max(a.y+a.h,b.y+b.h)-Math.min(a.y,b.y)
       })
     }
