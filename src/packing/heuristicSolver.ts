@@ -44,6 +44,12 @@ function loadBearing(p: PlacedCargo) {
   return p.loadBearing !== false
 }
 
+function canSupport(lower: PlacedCargo, upper: PlacedCargo) {
+  return lower.cargoId === upper.cargoId
+    ? lower.stackable !== false
+    : lower.loadBearing !== false
+}
+
 function topLoadLimit(p: PlacedCargo) {
   return p.maxLoadOnTop ?? 0
 }
@@ -102,7 +108,7 @@ function validCandidate(p: PlacedCargo, placed: PlacedCargo[], container: Contai
 function stackDepth(p: PlacedCargo, placed: PlacedCargo[], seen = new Set<string>()): number {
   if (p.z <= EPS || seen.has(p.id)) return 1
   seen.add(p.id)
-  const supports = placed.filter(q => Math.abs(q.z + q.height - p.z) <= EPS && (loadBearing(q) || (q.cargoId === p.cargoId && q.stackable === true)) && overlapArea(p, q) > EPS)
+  const supports = placed.filter(q => Math.abs(q.z + q.height - p.z) <= EPS && canSupport(q, p) && overlapArea(p, q) > EPS)
   if (!supports.length) return 999
   return 1 + Math.max(...supports.map(q => stackDepth(q, placed, new Set(seen))))
 }
@@ -157,7 +163,7 @@ function candidatePoints(placed: PlacedCargo[], container: Container, cargoLengt
   for (const z of levels) {
     const samePlane = placed.filter(q => Math.abs(q.z - z) <= EPS)
     const supports = placed.filter(q =>
-      Math.abs(q.z + q.height - z) <= EPS && (loadBearing(q) || q.stackable === true)
+      Math.abs(q.z + q.height - z) <= EPS && (q.cargoId === u.cargo.id ? q.stackable !== false : q.loadBearing !== false)
     )
     if (z > EPS && supports.length === 0) continue
 
