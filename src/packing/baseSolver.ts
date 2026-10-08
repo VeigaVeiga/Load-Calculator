@@ -107,7 +107,7 @@ function planQuality(result: SolverResult, container: Container, cargo: Cargo[])
     Math.abs(cgZ - container.height * 0.25) * 0.001
 }
 
-function chooseBest(results: Array<{ result: SolverResult; options: HeuristicOptions }>, container: Container) {
+function chooseBest(results: Array<{ result: SolverResult; options: HeuristicOptions }>, container: Container, cargo: Cargo[]) {
   let best = results[0]?.result
   let bestScore = best ? planQuality(best, container, cargo) : -Infinity
 
@@ -169,7 +169,7 @@ export function basePack(
     results.push({ result, options: strategies[i] })
   }
 
-  const result = chooseBest(results, container)
+  const result = chooseBest(results, container, cargo)
 
   // Never expose an invalid automatic result. If the final audit rejects
   // anything, keep the valid locked state and let the unplaced list reflect
