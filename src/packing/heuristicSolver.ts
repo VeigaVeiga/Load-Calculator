@@ -138,14 +138,27 @@ function candidatePoints(placed: PlacedCargo[], container: Container) {
     }
   }
 
-  // Three canonical extreme points per placed item:
-  // right, front and top. This is the standard lightweight EP frontier and
-  // avoids the quadratic cross-product of every X/Y edge combination.
+  // Keep a compact EP frontier, but include all four horizontal corners
+  // and all four corners of the top face. The old 3-point frontier only exposed
+  // one corner of a pallet/box top, so the next carton could not discover the
+  // remaining usable top surface and large gaps accumulated.
   for (const q of placed) {
     const d = footprint(q)
-    add(q.x + d.length, q.y, q.z)
-    add(q.x, q.y + d.width, q.z)
-    add(q.x, q.y, q.z + q.height)
+    const x0 = q.x
+    const x1 = q.x + d.length
+    const y0 = q.y
+    const y1 = q.y + d.width
+    const z0 = q.z
+    const z1 = q.z + q.height
+
+    add(x1, y0, z0)
+    add(x0, y1, z0)
+    add(x1, y1, z0)
+
+    add(x0, y0, z1)
+    add(x1, y0, z1)
+    add(x0, y1, z1)
+    add(x1, y1, z1)
   }
 
   return points
