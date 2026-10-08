@@ -10,6 +10,7 @@ type Unit = { cargo: Cargo; index: number }
 export type HeuristicOptions = {
   gapStep?: number
   gapBias?: number
+  adjacencyWeight?: number
   order?: 'pallet-first' | 'footprint' | 'volume' | 'height'
 }
 
@@ -237,9 +238,10 @@ function score(
   // sacrifice a little adjacency so baseSolver can compare whole plans.
   const zPenalty = p.z * 8
   const gapPenalty = options.gapBias ?? 0
+  const adjacencyWeight = options.adjacencyWeight ?? 250
   const edgePenalty = rightGap * 0.02 + sideGap * 0.01
   return support * 1_000_000 +
-    adjacency * 250 -
+    adjacency * adjacencyWeight -
     zPenalty -
     edgePenalty -
     p.x * 0.001 -
