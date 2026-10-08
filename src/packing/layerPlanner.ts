@@ -67,7 +67,7 @@ function freeRects(z:number, placed:PlacedCargo[], supports:PlacedCargo[]) {
 function candidateInRect(u:LayerUnit,z:number,r:Rect,rotation:0|90,container:Container,placed:PlacedCargo[]) {
   const c=u.cargo
   const d=rotation===0?{length:c.length,width:c.width}:{length:c.width,width:c.length}
-  const positions:[[number,number]]=[[r.x,r.y],[r.x+r.w-d.length,r.y],[r.x,r.y+r.h-d.width],[r.x+r.w-d.length,r.y+r.h-d.width]]
+  const positions:Array<[number,number]>=[[r.x,r.y],[r.x+r.w-d.length,r.y],[r.x,r.y+r.h-d.width],[r.x+r.w-d.length,r.y+r.h-d.width]]
   let best:PlacedCargo|null=null, bestScore=-Infinity
   for(const [x,y] of positions){
     if(x<-EPS||y<-EPS||x+d.length>container.length+EPS||y+d.width>container.width+EPS) continue
@@ -90,7 +90,7 @@ export function packSupportedLayers(units:LayerUnit[],placed:PlacedCargo[],conta
   while(remaining.length && guard<units.length*2){
     guard+=1
     const levels=[...new Set(placed.filter(p=>p.z+p.height>EPS&&p.z+p.height<container.height-EPS&&p.loadBearing!==false).map(p=>Math.round((p.z+p.height)*10)/10))].sort((a,b)=>a-b)
-    let chosen:PlacedCargo|null=null, chosenIndex=-1, chosenZ=Infinity, chosenScore=-Infinity
+    let chosen:PlacedCargo|null=null, chosenIndex=-1
     for(const z of levels){
       const supports=placed.filter(p=>Math.abs(p.z+p.height-z)<=EPS&&p.loadBearing!==false)
       if(!supports.length) continue
@@ -106,7 +106,7 @@ export function packSupportedLayers(units:LayerUnit[],placed:PlacedCargo[],conta
           if(score>layerScore){layerBest=p;layerIndex=i;layerScore=score}
         }
       }
-      if(layerBest){chosen=layerBest;chosenIndex=layerIndex;chosenZ=z;chosenScore=layerScore;break}
+      if(layerBest){chosen=layerBest;chosenIndex=layerIndex;break}
     }
     if(!chosen) break
     remaining.splice(chosenIndex,1)
