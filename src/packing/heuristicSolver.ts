@@ -234,23 +234,53 @@ export function heuristicPack(cargo: Cargo[], container: Container, locked: Plac
   const units = expand(cargo)
     .filter(u => !placed.some(p => p.cargoId === u.cargo.id && p.id === u.cargo.id + '#' + (u.index + 1)))
     .sort((a, b) => {
-      const A = a.cargo.length * a.cargo.width
-      const B = b.cargo.length * b.cargo.width
-      const va = a.cargo.length * a.cargo.width * a.cargo.height
-      const vb = b.cargo.length * b.cargo.width * b.cargo.height
-      const palletBias = (a.cargo.type === 'pallet' ? 1 : 0) - (b.cargo.type === 'pallet' ? 1 : 0)
-      return palletBias || B - A || vb - va || b.cargo.height - a.cargo.height || a.cargo.id.localeCompare(b.cargo.id)
+      const priority = (u: Unit) => {
+        const c = u.cargo
+        const area = c.length * c.width
+        const volume = area * c.height
+        const density = c.weight / Math.max(1, volume)
+        // Foundation priority is based on physical behaviour, not cargo type.
+        // Heavy, large-footprint and non-stackable cargo naturally belongs in
+        // the lower structure; light stackable cargo can be used as upper fill.
+        return (
+          (c.stackable === false ? 1_000_000 : 0) +
+          Math.min(300_000, c.weight * 500) +
+          Math.min(200_000, area * 0.5) +
+          Math.min(100_000, density * 10_000) +
+          Math.min(50_000, volume * 0.01)
+        )
+      }
+      return priority(b) - priority(a) || a.cargo.id.localeCompare(b.cargo.id)
     })
 
   let totalWeight = placed.reduce((s, p) => s + p.weight, 0)
   const unplaced: Cargo[] = []
-  const homogeneous = new Set(units.map(u => u.cargo.id)).size <= 1
-  const groundUnits = homogeneous
+  const uniqueCargo = new Set(units.map(u => u.cargo.id)).size
+
+  const foundationScore = (u: Unit) => {
+    const c = u.cargo
+    const area = c.length * c.width
+    const volume = area * c.height
+    const density = c.weight / Math.max(1, volume)
+    return (
+      (c.stackable === false ? 1_000_000 : 0) +
+      Math.min(300_000, c.weight * 500) +
+      Math.min(200_000, area * 0.5) +
+      Math.min(100_000, density * 10_000) +
+      Math.min(50_000, volume * 0.01)
+    )
+  }
+
+  // Mixed cargo is split by physical role rather than pallet/carton labels.
+  // Foundation cargo gets a first pass on the floor. Stackable cargo is then
+  // packed into the support planes created by that foundation.
+  const foundationUnits = uniqueCargo <= 1
     ? [...units]
-    : units.filter(u => u.cargo.type === 'pallet' || u.cargo.stackable === false)
-  const stackUnits = homogeneous
-    ? units.filter(u => u.cargo.stackable !== false)
-    : units.filter(u => u.cargo.type !== 'pallet' && u.cargo.stackable !== false)
+    : [...units].sort((a, b) => foundationScore(b) - foundationScore(a))
+        .filter((u) => u.cargo.stackable === false || foundationScore(u) >= foundationScore(units[Math.floor(units.length / 2)]))
+  const foundationIds = new Set(foundationUnits.map(u => u.cargo.id + '#' + u.index))
+  const groundUnits = foundationUnits
+  const stackUnits = units.filter(u => !foundationIds.has(u.cargo.id + '#' + u.index) && u.cargo.stackable !== false)
   const total = Math.max(1, units.length)
 
   for (let i = 0; i < groundUnits.length; i += 1) {
@@ -263,7 +293,7 @@ export function heuristicPack(cargo: Cargo[], container: Container, locked: Plac
       const d = rotation === 0
         ? { length: u.cargo.length, width: u.cargo.width }
         : { length: u.cargo.width, width: u.cargo.length }
-      const points = candidatePoints(placed, container, d.length, d.width, options.gapStep ?? 0, u.cargo.type === 'pallet').filter(p => homogeneous ? true : p[2] <= EPS)
+      const points = candidatePoints(placed, container, d.length, d.width, options.gapStep ?? 0, true).filter(p => uniqueCargo <= 1 ? true : p[2] <= EPS)
       const candidates: PlacedCargo[] = []
       for (const [x, y, z] of points) {
         const p = makePlaced(u.cargo, u.index, x, y, z, rotation)
