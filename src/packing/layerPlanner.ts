@@ -310,55 +310,45 @@ function candidatePlacements(
 
   const candidates: PlacedCargo[] = []
   const seen = new Set<string>()
+  const sameLevel = state.placed.filter((p) => Math.abs(p.z - z) <= EPS)
 
+  const candidateScore = (p: PlacedCargo) => {
+    const d = footprint(p)
+    const support = supportMetrics(p, state.placed)
+    const adjacent = sameLevelAdjacency(p, sameLevel)
+    const center = Math.abs((p.x + d.length / 2) - container.length / 2) +
+      Math.abs((p.y + d.width / 2) - container.width / 2)
+    return support.ratio * 100000 +
+      adjacent * 300 +
+      d.length * d.width * 0.05 -
+      center * 0.05
+  }
+
+  // Candidate budget is distributed per support region. A global top-N list
+  // is dangerous for mixed pallet loading because the first pallet can consume
+  // the entire budget and starve later pallets.
   for (const rotation of rotations) {
     const d = rotation === 0
       ? { length: u.cargo.length, width: u.cargo.width }
       : { length: u.cargo.width, width: u.cargo.length }
 
     for (const r of rects) {
+      const local: PlacedCargo[] = []
       for (const [x, y] of candidatePositions(r, d.length, d.width)) {
         const p = makePlaced(u.cargo, u.index, x, y, z, rotation)
         const key = [Math.round(x), Math.round(y), rotation].join('|')
         if (seen.has(key) || !validCandidate(p, state, container, totalWeight)) continue
         seen.add(key)
-        candidates.push(p)
+        local.push(p)
       }
+      local.sort((a, b) => candidateScore(b) - candidateScore(a))
+      candidates.push(...local.slice(0, 18))
     }
   }
 
-  const sameLevel = state.placed.filter((p) => Math.abs(p.z - z) <= EPS)
-  candidates.sort((a, b) => {
-    const score = (p: PlacedCargo) => {
-      const d = footprint(p)
-      const support = supportMetrics(p, state.placed)
-      const adjacent = sameLevelAdjacency(p, sameLevel)
-      const center = Math.abs((p.x + d.length / 2) - container.length / 2) +
-        Math.abs((p.y + d.width / 2) - container.width / 2)
-      return support.ratio * 100000 +
-        adjacent * 900 +
-        d.length * d.width * 0.05 -
-        center * 0.15
-    }
-    return score(b) - score(a)
-  })
-
-  // Do not let one large support rectangle monopolize the candidate budget.
-  // Retain candidates across the whole support surface so mixed carton sizes
-  // can close gaps at both ends of a pallet.
-  candidates.sort((a, b) => {
-    const da = footprint(a), db = footprint(b)
-    const sa = supportMetrics(a, state.placed).ratio * 100000 +
-      sameLevelAdjacency(a, sameLevel) * 300 +
-      da.length * da.width * 0.05 -
-      (a.x + a.y) * 0.02
-    const sb = supportMetrics(b, state.placed).ratio * 100000 +
-      sameLevelAdjacency(b, sameLevel) * 300 +
-      db.length * db.width * 0.05 -
-      (b.x + b.y) * 0.02
-    return sb - sa
-  })
-
+  // Add a small global frontier as well, allowing a carton to bridge or finish
+  // an otherwise fragmented area when that genuinely scores better.
+  candidates.sort((a, b) => candidateScore(b) - candidateScore(a))
   return candidates.slice(0, MAX_CANDIDATES_PER_UNIT)
 }
 
