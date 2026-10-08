@@ -1318,6 +1318,7 @@ function App() {
                       {tr.unitWeight} <small className="field-unit">(KG)</small>
 
                       <input
+                        className={inputInvalid(c,'weight')?'input-limit-error':''}
                         type="number"
                         min="0"
                         value={rawNumericInputs[c.id + ':weight'] ?? c.weight}
