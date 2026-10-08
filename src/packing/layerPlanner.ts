@@ -136,6 +136,34 @@ function candidateInRect(u:LayerUnit,z:number,r:Rect,rotation:0|90,container:Con
   return best
 }
 
+/**
+ * Cheap one-step lookahead. Instead of recursively repacking the whole
+ * container, evaluate whether a candidate leaves useful support rectangles
+ * for several of the remaining cargo units. This strongly reduces the
+ * "good first box, dead end later" behaviour in mixed loads.
+ */
+function futureFitPotential(remaining:LayerUnit[], z:number, placedAfter:PlacedCargo[], supports:PlacedCargo[], limit=24) {
+  const rects=freeRects(z,placedAfter,supports)
+  if(!rects.length) return 0
+  const sample=remaining.slice(0,limit)
+  let fitCount=0
+  let usableArea=0
+
+  for(const r of rects){
+    usableArea += r.w*r.h
+    for(const u of sample){
+      const c=u.cargo
+      const fit0=c.length<=r.w+EPS&&c.width<=r.h+EPS
+      const fit90=c.rotatable!==false&&c.width<=r.w+EPS&&c.length<=r.h+EPS
+      if(fit0||fit90) fitCount+=1
+    }
+  }
+
+  const largest=rects.reduce((m,r)=>Math.max(m,r.w*r.h),0)
+  const fragmentation=Math.max(0,rects.length-1)
+  return fitCount*120 + Math.sqrt(largest)*2 + Math.sqrt(usableArea)*0.5 - fragmentation*18
+}
+
 export function packSupportedLayers(units:LayerUnit[],placed:PlacedCargo[],container:Container,totalWeight:number,progress?:(percent:number)=>void){
   const remaining=[...units]
   const stackLayerCount = (cargoId:string) => new Set(placed.filter(p => p.cargoId === cargoId).map(p => Math.round(p.z * 10) / 10)).size
@@ -185,7 +213,9 @@ export function packSupportedLayers(units:LayerUnit[],placed:PlacedCargo[],conta
             const spanX=Math.max(currentMaxX,p.x+pd.length)-Math.min(currentMinX,p.x)
             const spanY=Math.max(currentMaxY,p.y+pd.width)-Math.min(currentMinY,p.y)
             const supporterBonus=Math.max(0,s.supporters.length-1)*120
-            const score=adjacent*180+supporterBonus+s.ratio*500+pd.length*pd.width*0.02-spanX*spanY*0.0008-centerDistance*0.2
+            const placedAfter=[...placed,p]
+            const future=futureFitPotential(remaining.filter(x=>x!==u),z,placedAfter,supports)
+            const score=adjacent*180+supporterBonus+s.ratio*500+future*2+pd.length*pd.width*0.02-spanX*spanY*0.0008-centerDistance*0.2
 
             if(score>layerScore){layerBest=p;layerIndex=i;layerScore=score}
           }
