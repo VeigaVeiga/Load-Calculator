@@ -3,9 +3,10 @@ import { dims, supportMetrics } from './geometry'
 
 const EPS = 0.5
 const MAX_OVERHANG_RATIO = 0.25
-const BEAM_WIDTH = 8
-const EXPANSION_WIDTH = 10
-const MAX_LAYER_STEPS = 80
+const BEAM_WIDTH = 24
+const EXPANSION_WIDTH = 24
+const MAX_LAYER_STEPS = 120
+const MAX_CANDIDATES_PER_UNIT = 180
 
 export type LayerUnit = { cargo: Cargo; index: number }
 
@@ -158,19 +159,44 @@ function candidatePositions(r: Rect, length: number, width: number): Array<[numb
   const maxY = r.y + r.h - width
   if (maxX < r.x - EPS || maxY < r.y - EPS) return []
 
-  const cx = r.x + (r.w - length) / 2
-  const cy = r.y + (r.h - width) / 2
-  return [
-    [r.x, r.y],
-    [maxX, r.y],
-    [r.x, maxY],
-    [maxX, maxY],
-    [cx, r.y],
-    [cx, maxY],
-    [r.x, cy],
-    [maxX, cy],
-    [cx, cy],
-  ]
+  // Extreme-point generation: every left/right edge and top/bottom edge of
+  // an existing box becomes a candidate. This is much denser than only using
+  // rectangle corners and is essential for mixed carton sizes.
+  const xs = new Set<number>([
+    r.x,
+    maxX,
+    r.x + (r.w - length) / 2,
+  ])
+  const ys = new Set<number>([
+    r.y,
+    maxY,
+    r.y + (r.h - width) / 2,
+  ])
+
+  // Sweep in 10 mm increments only when the residual rectangle is large
+  // enough. This fills otherwise unreachable strips without exploding the
+  // search space for normal cases.
+  if (r.w - length >= 120) {
+    for (let x = r.x + 10; x < maxX - EPS; x += 10) xs.add(x)
+  }
+  if (r.h - width >= 120) {
+    for (let y = r.y + 10; y < maxY - EPS; y += 10) ys.add(y)
+  }
+
+  const out: Array<[number, number]> = []
+  for (const x of xs) {
+    for (const y of ys) {
+      if (x >= r.x - EPS && y >= r.y - EPS &&
+          x <= maxX + EPS && y <= maxY + EPS) {
+        out.push([Math.round(x), Math.round(y)])
+      }
+    }
+  }
+
+  // Keep candidates deterministic and prefer the lower/left frontier. The
+  // beam search will retain alternatives with better support/adjacency.
+  out.sort((a, b) => a[1] - b[1] || a[0] - b[0])
+  return out
 }
 
 function sameLevelAdjacency(p: PlacedCargo, sameLevel: PlacedCargo[]) {
@@ -317,7 +343,23 @@ function candidatePlacements(
     return score(b) - score(a)
   })
 
-  return candidates.slice(0, EXPANSION_WIDTH)
+  // Do not let one large support rectangle monopolize the candidate budget.
+  // Retain candidates across the whole support surface so mixed carton sizes
+  // can close gaps at both ends of a pallet.
+  candidates.sort((a, b) => {
+    const da = footprint(a), db = footprint(b)
+    const sa = supportMetrics(a, state.placed).ratio * 100000 +
+      sameLevelAdjacency(a, sameLevel) * 300 +
+      da.length * da.width * 0.05 -
+      (a.x + a.y) * 0.02
+    const sb = supportMetrics(b, state.placed).ratio * 100000 +
+      sameLevelAdjacency(b, sameLevel) * 300 +
+      db.length * db.width * 0.05 -
+      (b.x + b.y) * 0.02
+    return sb - sa
+  })
+
+  return candidates.slice(0, MAX_CANDIDATES_PER_UNIT)
 }
 
 function stateScore(state: State, z: number, supports: PlacedCargo[], container: Container, totalWeight: number) {
@@ -396,7 +438,7 @@ function beamLayer(
       const eligible = state.remaining
         .filter((u) => canUseUnit(u, state.placed))
         .sort((a, b) => unitUrgency(b) - unitUrgency(a))
-        .slice(0, 12)
+        .slice(0, 20)
 
       for (const u of eligible) {
         const candidates = candidatePlacements(u, z, state, supports, container, totalWeight)
@@ -450,6 +492,23 @@ function beamLayer(
   return best
 }
 
+function layerFillScore(state: State, z: number, supports: PlacedCargo[]) {
+  const level = state.placed.filter((p) => Math.abs(p.z - z) <= EPS)
+  if (!level.length) return -Infinity
+  const supportArea = supports.reduce((sum, p) => {
+    const d = footprint(p)
+    return sum + d.length * d.width
+  }, 0)
+  const occupied = level.reduce((sum, p) => {
+    const d = footprint(p)
+    return sum + d.length * d.width
+  }, 0)
+  const count = level.length
+  const fragmentationPenalty = fragmentation(z, state.placed, supports)
+  return count * 1e7 + occupied * 10 - fragmentationPenalty * 2 + state.score * 0.01 +
+    Math.min(1, occupied / Math.max(1, supportArea)) * 1e6
+}
+
 export function packSupportedLayers(
   units: LayerUnit[],
   placed: PlacedCargo[],
@@ -490,8 +549,7 @@ export function packSupportedLayers(
       if (result.placed.length <= current.length) continue
 
       if (!chosenState ||
-          result.placed.length > chosenState.placed.length ||
-          (result.placed.length === chosenState.placed.length && result.score > chosenState.score)) {
+          layerFillScore(result, z, supports) > layerFillScore(chosenState, chosenZ, current.filter((p) => Math.abs(p.z + p.height - chosenZ) <= EPS))) {
         chosenState = result
         chosenZ = z
       }
