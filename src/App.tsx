@@ -1301,7 +1301,8 @@ function App() {
 
                       <input
                         className={inputInvalid(c,'quantity')?'input-limit-error':''}
-                        type="number"
+                        type="text"
+                        inputMode="decimal"
                         min="1"
                         value={rawNumericInputs[c.id + ':quantity'] ?? c.quantity}
                         onChange={(e) =>
@@ -1319,7 +1320,8 @@ function App() {
 
                       <input
                         className={inputInvalid(c,'weight')?'input-limit-error':''}
-                        type="number"
+                        type="text"
+                        inputMode="decimal"
                         min="0"
                         value={rawNumericInputs[c.id + ':weight'] ?? c.weight}
                         onChange={(e) =>
@@ -1339,7 +1341,8 @@ function App() {
 
                       <input
                         className={inputInvalid(c,'length')?'input-limit-error':''}
-                        type="number"
+                        type="text"
+                        inputMode="decimal"
                         min="1"
                         value={rawNumericInputs[c.id + ':length'] ?? c.length}
                         onChange={(e) =>
@@ -1357,7 +1360,8 @@ function App() {
 
                       <input
                         className={inputInvalid(c,'width')?'input-limit-error':''}
-                        type="number"
+                        type="text"
+                        inputMode="decimal"
                         min="1"
                         value={rawNumericInputs[c.id + ':width'] ?? c.width}
                         onChange={(e) =>
@@ -1375,7 +1379,8 @@ function App() {
 
                       <input
                         className={inputInvalid(c,'height')?'input-limit-error':''}
-                        type="number"
+                        type="text"
+                        inputMode="decimal"
                         min="1"
                         value={rawNumericInputs[c.id + ':height'] ?? c.height}
                         onChange={(e) =>
