@@ -178,33 +178,30 @@ function pointKey(p: Point) {
 }
 
 function extremePoints(placed: PlacedState[], container: Container, z: number) {
-  const xs = [0, container.length]
-  const ys = [0, container.width]
+  const points: Point[] = [{ x: 0, y: 0, z }]
+  const seen = new Set<string>([pointKey(points[0])])
 
-  for (const s of placed) {
-    if (Math.abs(s.p.z - z) <= EPS || Math.abs(s.p.z + s.p.height - z) <= EPS) {
-      xs.push(s.p.x, s.p.x + s.l)
-      ys.push(s.p.y, s.p.y + s.w)
-    }
+  const add = (x: number, y: number) => {
+    if (x < -EPS || y < -EPS || x > container.length + EPS || y > container.width + EPS) return
+    const p = { x, y, z }
+    const key = pointKey(p)
+    if (seen.has(key)) return
+    seen.add(key)
+    points.push(p)
   }
 
-  const points: Point[] = []
-  const seen = new Set<string>()
-
-  for (const x of xs) {
-    for (const y of ys) {
-      const p = { x, y, z }
-      const key = pointKey(p)
-      if (!seen.has(key)) {
-        seen.add(key)
-        points.push(p)
-      }
-    }
+  // Linear extreme-point set: each placed footprint contributes its right,
+  // upper, and upper-right corners on the current support plane. This avoids
+  // the quadratic X-edge × Y-edge explosion of the previous implementation.
+  for (const s of placed) {
+    if (Math.abs(s.p.z - z) > EPS && Math.abs(s.p.z + s.p.height - z) > EPS) continue
+    add(s.p.x + s.l, s.p.y)
+    add(s.p.x, s.p.y + s.w)
+    add(s.p.x + s.l, s.p.y + s.w)
   }
 
   return points
 }
-
 function zLevels(placed: PlacedState[], c: Cargo, container: Container) {
   const levels = [0]
   if (!c.stackable || c.type === 'pallet') return levels
