@@ -126,7 +126,7 @@ export function supportMetrics(p: PlacedCargo, others: PlacedCargo[]): SupportMe
   const supporters = others.filter((q) =>
     q.id !== p.id &&
     Math.abs(q.z + q.height - p.z) <= EPS &&
-    ((q.loadBearing !== false) || (q.cargoId === p.cargoId && q.stackable === true)) &&
+    ((q.cargoId === p.cargoId ? q.stackable !== false : q.loadBearing !== false)) &&
     !!intersection(p, q)
   )
   const rects = supporters
@@ -205,10 +205,18 @@ function maxLayers(p: PlacedCargo, cargoById?: Map<string, Cargo>) {
   return c?.maxStackLayers ?? p.maxStackLayers ?? 0
 }
 
+function canSupport(lower: PlacedCargo, upper: PlacedCargo, cargoById?: Map<string, Cargo>) {
+  // Self-stacking and supporting other cargo are independent properties.
+  // Same cargo type: only the lower unit's stackable flag matters.
+  // Different cargo type: only the lower unit's load-bearing flag matters.
+  if (lower.cargoId === upper.cargoId) return isStackable(lower, cargoById)
+  return isLoadBearing(lower, cargoById)
+}
+
 function supporters(p: PlacedCargo, others: PlacedCargo[], cargoById?: Map<string, Cargo>) {
   return others.filter((q) =>
     Math.abs(q.z + q.height - p.z) <= EPS &&
-    (isLoadBearing(q, cargoById) || (q.cargoId === p.cargoId && isStackable(q, cargoById))) &&
+    canSupport(q, p, cargoById) &&
     footprintOverlap(p, q)
   )
 }
