@@ -208,7 +208,7 @@ function maxLayers(p: PlacedCargo, cargoById?: Map<string, Cargo>) {
 function supporters(p: PlacedCargo, others: PlacedCargo[], cargoById?: Map<string, Cargo>) {
   return others.filter((q) =>
     Math.abs(q.z + q.height - p.z) <= EPS &&
-    isLoadBearing(q, cargoById) &&
+    (isLoadBearing(q, cargoById) || (q.cargoId === p.cargoId && isStackable(q, cargoById))) &&
     footprintOverlap(p, q)
   )
 }
