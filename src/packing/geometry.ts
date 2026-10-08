@@ -126,7 +126,7 @@ export function supportMetrics(p: PlacedCargo, others: PlacedCargo[]): SupportMe
   const supporters = others.filter((q) =>
     q.id !== p.id &&
     Math.abs(q.z + q.height - p.z) <= EPS &&
-    (q.loadBearing !== false) &&
+    ((q.loadBearing !== false) || (q.cargoId === p.cargoId && q.stackable === true)) &&
     !!intersection(p, q)
   )
   const rects = supporters
@@ -263,8 +263,9 @@ function validateStacking(p: PlacedCargo, others: PlacedCargo[], cargoById?: Map
   }
 
   for (const q of ss) {
+    const sameType = q.cargoId === p.cargoId
     const limit = maxTopLoad(q, cargoById)
-    if (limit > 0 && transferredLoad(q, others.concat(p), cargoById) - q.weight > limit + EPS) {
+    if (!sameType && limit > 0 && transferredLoad(q, others.concat(p), cargoById) - q.weight > limit + EPS) {
       errors.push('超过下方货物允许的顶部承重')
     }
     const layers = maxLayers(q, cargoById)
