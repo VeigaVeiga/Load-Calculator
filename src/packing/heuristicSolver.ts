@@ -4,7 +4,7 @@ import { dims, supportMetrics, validatePlan } from './geometry'
 const EPS = 0.5
 const SUPPORT = 0.75
 
-type Unit = { cargo: Cargo; index: number }
+type Unit = { cargo: Cargo; index: number }\n\nexport type HeuristicOptions = {\n  gapStep?: number\n}
 
 function expand(cargo: Cargo[]): Unit[] {
   const result: Unit[] = []
@@ -126,7 +126,7 @@ function makePlaced(c: Cargo, index: number, x: number, y: number, z: number, ro
   }
 }
 
-function candidatePoints(placed: PlacedCargo[], container: Container, cargoLength: number, cargoWidth: number) {
+function candidatePoints(placed: PlacedCargo[], container: Container, cargoLength: number, cargoWidth: number, gapStep = 0, allowFloorGap = false) {
   const points: Array<[number, number, number]> = []
   const seen = new Set<string>()
   const add = (x: number, y: number, z: number) => {
@@ -169,6 +169,12 @@ function candidatePoints(placed: PlacedCargo[], container: Container, cargoLengt
       ys.add(Math.round(q.y))
       ys.add(Math.round(q.y + d.width))
       ys.add(Math.round(q.y + d.width - cargoWidth))
+      if (allowFloorGap && z <= EPS && gapStep > 0) {
+        xs.add(Math.round(q.x + d.length + gapStep))
+        xs.add(Math.round(q.x - cargoLength - gapStep))
+        ys.add(Math.round(q.y + d.width + gapStep))
+        ys.add(Math.round(q.y - cargoWidth - gapStep))
+      }
     }
 
     for (const q of supports) {
@@ -216,7 +222,7 @@ function score(p: PlacedCargo, placed: PlacedCargo[], container: Container) {
   return stableSupport * 1_000_000 + layerReward + adjacency * 250 - rightGap * 0.02 - sideGap * 0.01 - p.x * 0.001 - p.y * 0.0005
 }
 
-export function heuristicPack(cargo: Cargo[], container: Container, locked: PlacedCargo[] = [], progress?: (percent: number) => void): { placed: PlacedCargo[]; unplaced: Cargo[] } {
+export function heuristicPack(cargo: Cargo[], container: Container, locked: PlacedCargo[] = [], progress?: (percent: number) => void, options: HeuristicOptions = {}): { placed: PlacedCargo[]; unplaced: Cargo[] } {
   const validLocked = locked.filter(p => fits(p, container))
   const placed = validLocked.map(p => ({ ...p }))
   const units = expand(cargo)
@@ -244,7 +250,7 @@ export function heuristicPack(cargo: Cargo[], container: Container, locked: Plac
       const d = rotation === 0
         ? { length: u.cargo.length, width: u.cargo.width }
         : { length: u.cargo.width, width: u.cargo.length }
-      const points = candidatePoints(placed, container, d.length, d.width)
+      const points = candidatePoints(placed, container, d.length, d.width, options.gapStep ?? 0, u.cargo.type === 'pallet')
       const candidates: PlacedCargo[] = []
       for (const [x, y, z] of points) {
         const p = makePlaced(u.cargo, u.index, x, y, z, rotation)
