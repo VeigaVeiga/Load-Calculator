@@ -67,6 +67,13 @@ export interface PlacedCargo {
   color: string
   placementMode: 'automatic' | 'manual'
   locked: boolean
+
+  // Cached physical constraints copied from Cargo for placement validation.
+  // Kept optional for backwards compatibility with saved plans.
+  stackable?: boolean
+  loadBearing?: boolean
+  maxStackLayers?: number
+  maxLoadOnTop?: number
 }
 
 export type SecuringMaterialType = 'triangleWood' | 'lashingBelt' | 'airBag' | 'doorNet'
