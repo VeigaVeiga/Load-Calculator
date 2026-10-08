@@ -111,12 +111,23 @@ export function basePack(
   progress?: (percent: number) => void,
 ): SolverResult {
   const validLocked = locked.filter(p => fits(p, container))
-  const strategies: HeuristicOptions[] = [
-    { order: 'pallet-first', gapStep: 0, gapBias: 0 },
-    { order: 'pallet-first', gapStep: 10, gapBias: 0, adjacencyWeight: 90 },
-    { order: 'footprint', gapStep: 10, gapBias: 0, adjacencyWeight: 120 },
-    { order: 'volume', gapStep: 20, gapBias: 0, adjacencyWeight: 80 },
-  ]
+  const signatures = new Set(
+    cargo.map((c) => [c.type, c.length, c.width, c.height, c.weight, c.stackable, c.loadBearing].join('|')),
+  )
+  const mixedLoad = signatures.size > 1
+
+  // Homogeneous loads are already well served by the deterministic baseline.
+  // Only mixed geometry needs the more expensive look-ahead/seam search.
+  const strategies: HeuristicOptions[] = mixedLoad
+    ? [
+        { order: 'pallet-first', gapStep: 0, gapBias: 0 },
+        { order: 'pallet-first', gapStep: 10, gapBias: 0, adjacencyWeight: 90 },
+        { order: 'footprint', gapStep: 10, gapBias: 0, adjacencyWeight: 120 },
+        { order: 'volume', gapStep: 20, gapBias: 0, adjacencyWeight: 80 },
+      ]
+    : [
+        { order: 'pallet-first', gapStep: 0, gapBias: 0 },
+      ]
 
   const results: Array<{ result: SolverResult; options: HeuristicOptions }> = []
   for (let i = 0; i < strategies.length; i += 1) {
