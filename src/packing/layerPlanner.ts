@@ -67,7 +67,8 @@ function freeRects(z:number, placed:PlacedCargo[], supports:PlacedCargo[]) {
 function candidateInRect(u:LayerUnit,z:number,r:Rect,rotation:0|90,container:Container,placed:PlacedCargo[]) {
   const c=u.cargo
   const d=rotation===0?{length:c.length,width:c.width}:{length:c.width,width:c.length}
-  const positions:Array<[number,number]>=[[r.x,r.y],[r.x+r.w-d.length,r.y],[r.x,r.y+r.h-d.width],[r.x+r.w-d.length,r.y+r.h-d.width]]
+  const cx=r.x+(r.w-d.length)/2, cy=r.y+(r.h-d.width)/2
+  const positions:Array<[number,number]>=[[cx,cy],[r.x,r.y],[r.x+r.w-d.length,r.y],[r.x,r.y+r.h-d.width],[r.x+r.w-d.length,r.y+r.h-d.width],[cx,r.y],[cx,r.y+r.h-d.width],[r.x,cy],[r.x+r.w-d.length,cy]]
   let best:PlacedCargo|null=null, bestScore=-Infinity
   for(const [x,y] of positions){
     if(x<-EPS||y<-EPS||x+d.length>container.length+EPS||y+d.width>container.width+EPS) continue
@@ -76,7 +77,10 @@ function candidateInRect(u:LayerUnit,z:number,r:Rect,rotation:0|90,container:Con
     const s=supportMetrics(p,placed)
     if(s.ratio+EPS<SUPPORT||!s.centerSupported||s.maxOverhangRatio>0.25+EPS) continue
     const density=(d.length*d.width)/(r.w*r.h)
-    const score=s.ratio*1000000+density*100000+Math.min(r.w-d.length,r.h-d.width)*-10
+    const residualShort=Math.min(Math.max(0,r.w-d.length),Math.max(0,r.h-d.width))
+    const residualLong=Math.max(Math.max(0,r.w-d.length),Math.max(0,r.h-d.width))
+    const centerDist=Math.abs((x+d.length/2)-(container.length/2))+Math.abs((y+d.width/2)-(container.width/2))
+    const score=s.ratio*1000000+density*100000-residualShort*30-residualLong*5-centerDist*0.15
     if(score>bestScore){best=p;bestScore=score}
   }
   return best
@@ -92,7 +96,7 @@ export function packSupportedLayers(units:LayerUnit[],placed:PlacedCargo[],conta
     const levels=[...new Set(placed.filter(p=>p.z+p.height>EPS&&p.z+p.height<container.height-EPS&&p.loadBearing!==false).map(p=>Math.round((p.z+p.height)*10)/10))].sort((a,b)=>a-b)
     let chosen:PlacedCargo|null=null, chosenIndex=-1
     for(const z of levels){
-      const supports=placed.filter(p=>Math.abs(p.z+p.height-z)<=EPS&&p.loadBearing!==false)
+      const supports=placed.filter(p=>Math.abs(p.z+p.height-z)<=EPS&&(p.loadBearing!==false||p.stackable===true))
       if(!supports.length) continue
       const rects=freeRects(z,placed,supports)
       let layerBest:PlacedCargo|null=null, layerIndex=-1, layerScore=-Infinity
