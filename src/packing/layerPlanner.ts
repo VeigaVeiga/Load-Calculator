@@ -71,7 +71,7 @@ function bridgeRects(supports:PlacedCargo[], cargoLength:number, cargoWidth:numb
       result.push({
         x:Math.min(a.x,b.x),
         y:Math.min(a.y,b.y),
-        w:Math.max(a.x+a.w,b.x+b.x)-Math.min(a.x,b.x),
+        w:Math.max(a.x+a.w,b.x+b.w)-Math.min(a.x,b.x),
         h:Math.max(a.y+a.h,b.y+b.h)-Math.min(a.y,b.y)
       })
     }
