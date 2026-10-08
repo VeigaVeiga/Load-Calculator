@@ -1303,14 +1303,12 @@ function App() {
                         className={inputInvalid(c,'quantity')?'input-limit-error':''}
                         type="number"
                         min="1"
-                        value={c.quantity}
+                        value={rawNumericInputs[c.id + ':quantity'] ?? c.quantity}
                         onChange={(e) =>
                           updateNumber(
                             c.id,
                             'quantity',
-                            Number(
-                              e.target.value,
-                            ),
+                            e.target.value,
                           )
                         }
                       />
@@ -1322,14 +1320,12 @@ function App() {
                       <input
                         type="number"
                         min="0"
-                        value={c.weight}
+                        value={rawNumericInputs[c.id + ':weight'] ?? c.weight}
                         onChange={(e) =>
                           updateNumber(
                             c.id,
                             'weight',
-                            Number(
-                              e.target.value,
-                            ),
+                            e.target.value,
                           )
                         }
                       />
@@ -1344,14 +1340,12 @@ function App() {
                         className={inputInvalid(c,'length')?'input-limit-error':''}
                         type="number"
                         min="1"
-                        value={c.length}
+                        value={rawNumericInputs[c.id + ':length'] ?? c.length}
                         onChange={(e) =>
                           updateNumber(
                             c.id,
                             'length',
-                            Number(
-                              e.target.value,
-                            ),
+                            e.target.value,
                           )
                         }
                       />
@@ -1364,14 +1358,12 @@ function App() {
                         className={inputInvalid(c,'width')?'input-limit-error':''}
                         type="number"
                         min="1"
-                        value={c.width}
+                        value={rawNumericInputs[c.id + ':width'] ?? c.width}
                         onChange={(e) =>
                           updateNumber(
                             c.id,
                             'width',
-                            Number(
-                              e.target.value,
-                            ),
+                            e.target.value,
                           )
                         }
                       />
@@ -1384,14 +1376,12 @@ function App() {
                         className={inputInvalid(c,'height')?'input-limit-error':''}
                         type="number"
                         min="1"
-                        value={c.height}
+                        value={rawNumericInputs[c.id + ':height'] ?? c.height}
                         onChange={(e) =>
                           updateNumber(
                             c.id,
                             'height',
-                            Number(
-                              e.target.value,
-                            ),
+                            e.target.value,
                           )
                         }
                       />
