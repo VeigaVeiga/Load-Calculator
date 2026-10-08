@@ -257,6 +257,12 @@ function sameLevelAdjacency(p: PlacedCargo, sameLevel: PlacedCargo[]) {
   return shared
 }
 
+function canSupport(lower: PlacedCargo, upper: PlacedCargo) {
+  return lower.cargoId === upper.cargoId
+    ? lower.stackable !== false
+    : lower.loadBearing !== false
+}
+
 function fragmentation(z: number, placed: PlacedCargo[], supports: PlacedCargo[]) {
   const rects = freeRects(z, placed, supports)
   if (!rects.length) return 0
@@ -563,7 +569,7 @@ export function packSupportedLayers(
         .filter((p) =>
           p.z + p.height > EPS &&
           p.z + p.height < container.height - EPS &&
-          (p.loadBearing !== false || p.stackable === true),
+          true,
         )
         .map((p) => Math.round((p.z + p.height) * 10) / 10),
     )].sort((a, b) => a - b)
@@ -574,7 +580,7 @@ export function packSupportedLayers(
     for (const z of levels) {
       const supports = current.filter((p) =>
         Math.abs(p.z + p.height - z) <= EPS &&
-        (p.loadBearing !== false || p.stackable === true),
+        true,
       )
       if (!supports.length) continue
 
