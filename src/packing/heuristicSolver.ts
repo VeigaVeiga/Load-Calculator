@@ -84,10 +84,6 @@ function validCandidate(p: PlacedCargo, placed: PlacedCargo[], container: Contai
   if (placed.some(q => overlaps(p, q))) return false
   if (container.maxPayload > 0 && totalWeight + p.weight > container.maxPayload + EPS) return false
   if (p.z <= EPS) return true
-  // Non-stackable cargo may support other cargo when loadBearing is enabled,
-  // but it may not itself be placed on another cargo.
-  if (p.stackable === false) return false
-
   const support = supportInfo(p, placed)
   if (support.ratio + EPS < SUPPORT) return false
 
@@ -106,7 +102,7 @@ function validCandidate(p: PlacedCargo, placed: PlacedCargo[], container: Contai
 function stackDepth(p: PlacedCargo, placed: PlacedCargo[], seen = new Set<string>()): number {
   if (p.z <= EPS || seen.has(p.id)) return 1
   seen.add(p.id)
-  const supports = placed.filter(q => Math.abs(q.z + q.height - p.z) <= EPS && loadBearing(q) && overlapArea(p, q) > EPS)
+  const supports = placed.filter(q => Math.abs(q.z + q.height - p.z) <= EPS && (loadBearing(q) || (q.cargoId === p.cargoId && q.stackable === true)) && overlapArea(p, q) > EPS)
   if (!supports.length) return 999
   return 1 + Math.max(...supports.map(q => stackDepth(q, placed, new Set(seen))))
 }
