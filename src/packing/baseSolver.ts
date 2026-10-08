@@ -1,5 +1,6 @@
 import { pack, RotationType } from 'binpack3d'
 import type { Cargo, Container, PlacedCargo } from '../types'
+import { validatePlan } from './geometry'
 
 const EPS = 0.5
 
@@ -175,7 +176,30 @@ export function basePack(
     placed.push(p)
   }
 
-  return { placed, unplaced }
+  // binpack3d handles the generic stability rules. Our application-specific
+  // stack-layer constraints are audited once more here. If a business rule
+  // rejects a top item, remove that item rather than exposing an invalid plan.
+  let audit = validatePlan(placed, container, cargo)
+  while (!audit.ok) {
+    const offending = new Set(audit.errors.map((e) => e.split(':', 1)[0]))
+    const before = placed.length
+    for (let i = placed.length - 1; i >= 0; i -= 1) {
+      if (!placed[i].locked && offending.has(placed[i].id)) placed.splice(i, 1)
+    }
+    if (placed.length === before) break
+    audit = validatePlan(placed, container, cargo)
+  }
+
+  const placedCounts = new Map<string, number>()
+  for (const p of placed) placedCounts.set(p.cargoId, (placedCounts.get(p.cargoId) ?? 0) + 1)
+  const finalUnplaced: Cargo[] = [...unplaced]
+  for (const c of cargo) {
+    const missing = Math.max(0, Math.floor(c.quantity) - (placedCounts.get(c.id) ?? 0))
+    const already = finalUnplaced.filter((x) => x.id === c.id).length
+    for (let i = already; i < missing; i += 1) finalUnplaced.push(c)
+  }
+
+  return { placed, unplaced: finalUnplaced }
 }
 
 export async function basePackAsync(
