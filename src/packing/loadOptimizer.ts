@@ -90,7 +90,7 @@ function shiftCandidate(items: PlacedCargo[], index: number, dx: number, dy: num
 
 function rotationCandidate(items: PlacedCargo[], index: number, container: Container) {
   const p = items[index]
-  if (!p || p.locked || p.z > 0.5 || p.length === p.width) return null
+  if (!p || p.locked || p.rotatable === false || p.z > 0.5 || p.length === p.width) return null
   const next = items.map((q) => ({ ...q }))
   const rotation = p.rotation % 180 === 0 ? 90 : 0
   const d = dims({ ...p, rotation })
