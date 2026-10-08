@@ -123,9 +123,11 @@ function maxLayers(p: PlacedCargo, cargoById?: Map<string, Cargo>) {
 }
 
 function supporters(p: PlacedCargo, others: PlacedCargo[], cargoById?: Map<string, Cargo>) {
+  // "stackable" describes whether this cargo may itself be stacked on
+  // something. It must NOT prevent a pallet/crate from supporting cargo.
+  // Support is governed by loadBearing only.
   return others.filter((q) =>
     Math.abs(q.z + q.height - p.z) <= EPS &&
-    isStackable(q, cargoById) &&
     isLoadBearing(q, cargoById) &&
     footprintOverlap(p, q)
   )
