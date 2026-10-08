@@ -95,7 +95,9 @@ function validCandidate(p: PlacedCargo, placed: PlacedCargo[], container: Contai
 
   for (const q of support.supporters) {
     const limit = topLoadLimit(q)
-    if (limit > 0 && transferredLoad(q, p, placed) > limit + EPS) return false
+    // maxLoadOnTop is about supporting OTHER cargo. It must never disable
+    // or constrain self-stacking; self-stacking is controlled by stackable.
+    if (q.cargoId !== p.cargoId && limit > 0 && transferredLoad(q, p, placed) > limit + EPS) return false
     const maxLayers = q.maxStackLayers ?? 0
     if (maxLayers > 0) {
       const depth = stackDepth(q, placed)
