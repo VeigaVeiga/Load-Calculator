@@ -107,8 +107,6 @@ function candidateSwap(items: PlacedCargo[], aIndex: number, bIndex: number) {
   const b = items[bIndex]
   if (!a || !b || a.locked || b.locked || a.z > EPS || b.z > EPS) return null
 
-  const ad = dims(a)
-  const bd = dims(b)
   const next = items.map((p) => ({ ...p }))
   next[aIndex] = {
     ...a,
@@ -125,12 +123,6 @@ function candidateSwap(items: PlacedCargo[], aIndex: number, bIndex: number) {
     placementMode: 'automatic',
   }
 
-  // Different footprints may not fit the other's old slot. Validation below
-  // decides feasibility, but this cheap bound check avoids many full audits.
-  if (
-    next[aIndex].x + ad.length > Number.MAX_SAFE_INTEGER ||
-    next[bIndex].x + bd.length > Number.MAX_SAFE_INTEGER
-  ) return null
   return next
 }
 
