@@ -291,7 +291,10 @@ function stackLayerCount(cargoId: string, placed: PlacedCargo[]) {
 
 function canUseUnit(u: LayerUnit, placed: PlacedCargo[]) {
   const maxLayers = u.cargo.maxStackLayers ?? 0
-  return maxLayers <= 0 || stackLayerCount(u.cargo.id, placed) < maxLayers
+  if (maxLayers <= 0) return true
+  // maxStackLayers limits self-stacking only. Whether this unit can support
+  // other cargo is a separate loadBearing property.
+  return u.cargo.stackable !== false && stackLayerCount(u.cargo.id, placed) < maxLayers
 }
 
 function transferredLoad(q: PlacedCargo, p: PlacedCargo, placed: PlacedCargo[]) {
@@ -361,16 +364,24 @@ function candidatePlacements(
   const seen = new Set<string>()
   const sameLevel = state.placed.filter((p) => Math.abs(p.z - z) <= EPS)
 
-  const candidateScore = (p: PlacedCargo) => {
+  const candidateScore = (p: PlacedCargo, region: Rect) => {
     const d = footprint(p)
     const support = supportMetrics(p, state.placed)
     const adjacent = sameLevelAdjacency(p, sameLevel)
-    const center = Math.abs((p.x + d.length / 2) - container.length / 2) +
-      Math.abs((p.y + d.width / 2) - container.width / 2)
+    // Upper-layer packing must not prefer the container centre. That bias is
+    // what creates the old "mountain" pattern: middle columns get selected
+    // first while equally valid side space is stranded.
+    // Prefer physically supported, bottom-left/frontier placements and compact
+    // fits inside the current free rectangle instead.
+    const edgeDistance = Math.max(0, p.x - region.x) + Math.max(0, p.y - region.y)
+    const leftoverW = Math.max(0, region.w - d.length)
+    const leftoverH = Math.max(0, region.h - d.width)
+    const fitWaste = leftoverW * leftoverH
     return support.ratio * 100000 +
-      adjacent * 300 +
+      adjacent * 260 +
       d.length * d.width * 0.05 -
-      center * 0.05
+      edgeDistance * 0.12 -
+      fitWaste * 0.002
   }
 
   // Candidate budget is distributed per support region. A global top-N list
@@ -397,7 +408,15 @@ function candidatePlacements(
 
   // Add a small global frontier as well, allowing a carton to bridge or finish
   // an otherwise fragmented area when that genuinely scores better.
-  candidates.sort((a, b) => candidateScore(b) - candidateScore(a))
+  candidates.sort((a, b) => {
+    const ar = rects.find((r) => a.x >= r.x - EPS && a.y >= r.y - EPS &&
+      a.x + footprint(a).length <= r.x + r.w + EPS &&
+      a.y + footprint(a).width <= r.y + r.h + EPS)
+    const br = rects.find((r) => b.x >= r.x - EPS && b.y >= r.y - EPS &&
+      b.x + footprint(b).length <= r.x + r.w + EPS &&
+      b.y + footprint(b).width <= r.y + r.h + EPS)
+    return candidateScore(b, br ?? rects[0]) - candidateScore(a, ar ?? rects[0])
+  })
   return candidates.slice(0, MAX_CANDIDATES_PER_UNIT)
 }
 
