@@ -276,9 +276,13 @@ function validateStacking(p: PlacedCargo, others: PlacedCargo[], cargoById?: Map
     if (!sameType && limit > 0 && transferredLoad(q, others.concat(p), cargoById) - q.weight > limit + EPS) {
       errors.push('超过下方货物允许的顶部承重')
     }
-    const layers = maxLayers(q, cargoById)
-    if (layers > 0 && stackDepth(p, others.concat(q), cargoById) > layers) {
-      errors.push('超过货物允许的最大堆叠层数')
+    // maxStackLayers belongs to self-stacking. A different cargo type is
+    // governed by the lower unit's loadBearing/maxLoadOnTop instead.
+    if (sameType) {
+      const layers = maxLayers(q, cargoById)
+      if (layers > 0 && stackDepth(p, others.concat(q), cargoById) > layers) {
+        errors.push('超过货物允许的最大堆叠层数')
+      }
     }
   }
   return errors
