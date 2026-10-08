@@ -580,7 +580,7 @@ export function packSupportedLayers(
     for (const z of levels) {
       const supports = current.filter((p) =>
         Math.abs(p.z + p.height - z) <= EPS &&
-        true,
+        (p.loadBearing !== false || p.stackable !== false),
       )
       if (!supports.length) continue
 
