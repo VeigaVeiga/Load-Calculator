@@ -123,40 +123,30 @@ function makePlaced(c: Cargo, index: number, x: number, y: number, z: number, ro
   }
 }
 
-function candidatePoints(p: PlacedCargo, placed: PlacedCargo[], container: Container) {
+function candidatePoints(placed: PlacedCargo[], container: Container) {
   const points: Array<[number, number, number]> = [[0, 0, 0]]
   const seen = new Set<string>(['0|0|0'])
   const add = (x: number, y: number, z: number) => {
     if (x < -EPS || y < -EPS || z < -EPS || x > container.length + EPS || y > container.width + EPS || z > container.height + EPS) return
     const key = Math.round(x) + '|' + Math.round(y) + '|' + Math.round(z)
-    if (!seen.has(key)) { seen.add(key); points.push([Math.round(x), Math.round(y), Math.round(z)]) }
-  }
-
-  for (const q of placed) {
-    const d = footprint(q)
-    const top = q.z + q.height
-    add(q.x, q.y, top)
-    add(q.x + d.length, q.y, top)
-    add(q.x, q.y + d.width, top)
-    add(q.x + d.length, q.y + d.width, top)
-
-    if (Math.abs(q.z) <= EPS) {
-      add(q.x, q.y, 0)
-      add(q.x + d.length, q.y, 0)
-      add(q.x, q.y + d.width, 0)
-      add(q.x + d.length, q.y + d.width, 0)
+    if (!seen.has(key)) {
+      seen.add(key)
+      points.push([Math.round(x), Math.round(y), Math.round(z)])
     }
   }
 
-  // Keep the candidate set small and deterministic. These extra anchors let
-  // rows start against the far wall when the first item is rotated.
-  add(container.length, 0, 0)
-  add(0, container.width, 0)
-  add(container.length, container.width, 0)
+  // Three canonical extreme points per placed item:
+  // right, front and top. This is the standard lightweight EP frontier and
+  // avoids the quadratic cross-product of every X/Y edge combination.
+  for (const q of placed) {
+    const d = footprint(q)
+    add(q.x + d.length, q.y, q.z)
+    add(q.x, q.y + d.width, q.z)
+    add(q.x, q.y, q.z + q.height)
+  }
 
   return points
 }
-
 function adjacencyScore(p: PlacedCargo, placed: PlacedCargo[]) {
   const A = footprint(p)
   let score = 0
@@ -203,23 +193,16 @@ export function heuristicPack(cargo: Cargo[], container: Container, locked: Plac
   for (let i = 0; i < units.length; i += 1) {
     const u = units[i]
     const rotations: Array<0 | 90> = u.cargo.rotatable === false || u.cargo.length === u.cargo.width ? [0] : [0, 90]
-    const points = candidatePoints(makePlaced(u.cargo, u.index, 0, 0, 0, 0), placed, container)
+    const points = candidatePoints(placed, container)
     let best: PlacedCargo | null = null
     let bestScore = -Infinity
 
     for (const rotation of rotations) {
-      for (const [ax, ay, az] of points) {
-        const d = rotation === 0 ? { length: u.cargo.length, width: u.cargo.width } : { length: u.cargo.width, width: u.cargo.length }
-        const xCandidates = [ax, ax - d.length]
-        const yCandidates = [ay, ay - d.width]
-        for (const x of xCandidates) {
-          for (const y of yCandidates) {
-            const p = makePlaced(u.cargo, u.index, x, y, az, rotation)
-            if (!validCandidate(p, placed, container, totalWeight)) continue
-            const s = score(p, placed, container)
-            if (s > bestScore) { best = p; bestScore = s }
-          }
-        }
+      for (const [x, y, z] of points) {
+        const p = makePlaced(u.cargo, u.index, x, y, z, rotation)
+        if (!validCandidate(p, placed, container, totalWeight)) continue
+        const candidateScore = score(p, placed, container)
+        if (candidateScore > bestScore) { best = p; bestScore = candidateScore }
       }
     }
 
