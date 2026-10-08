@@ -18,12 +18,6 @@ function overlap(a: PlacedCargo, b: PlacedCargo) {
     a.z < b.z + b.height - EPS && a.z + a.height > b.z + EPS
 }
 
-function inside(p: PlacedCargo, r: Rect) {
-  const d = footprint(p)
-  return p.x >= r.x - EPS && p.y >= r.y - EPS &&
-    p.x + d.length <= r.x + r.w + EPS && p.y + d.width <= r.y + r.h + EPS
-}
-
 function splitRect(r: Rect, p: PlacedCargo) {
   const d = footprint(p)
   const x1=Math.max(r.x,p.x), x2=Math.min(r.x+r.w,p.x+d.length)
@@ -55,37 +49,64 @@ function freeRects(z:number, placed:PlacedCargo[], supports:PlacedCargo[]) {
   return rects.filter(r=>r.w>EPS && r.h>EPS)
 }
 
+function mergeBounds(items: Rect[]): Rect {
+  const x = Math.min(...items.map(r => r.x))
+  const y = Math.min(...items.map(r => r.y))
+  const x2 = Math.max(...items.map(r => r.x + r.w))
+  const y2 = Math.max(...items.map(r => r.y + r.h))
+  return { x, y, w:x2-x, h:y2-y }
+}
+
 function bridgeRects(supports:PlacedCargo[], cargoLength:number, cargoWidth:number) {
   const rects=supportRects(supports)
-  const result:Rect[]=[]
-  const maxGap=Math.max(cargoLength,cargoWidth)*MAX_BRIDGE_RATIO
+  if (rects.length < 2) return [] as Rect[]
 
-  for(let i=0;i<rects.length;i+=1) for(let j=i+1;j<rects.length;j+=1){
-    const a=rects[i], b=rects[j]
+  const maxGap=Math.max(cargoLength,cargoWidth)*MAX_BRIDGE_RATIO
+  const near=(a:Rect,b:Rect) => {
     const horizontalGap=Math.max(b.x-(a.x+a.w),a.x-(b.x+b.w),0)
     const verticalGap=Math.max(b.y-(a.y+a.h),a.y-(b.y+b.h),0)
     const yOverlap=Math.max(0,Math.min(a.y+a.h,b.y+b.h)-Math.max(a.y,b.y))
     const xOverlap=Math.max(0,Math.min(a.x+a.w,b.x+b.w)-Math.max(a.x,b.x))
+    return (horizontalGap<=maxGap+EPS && yOverlap>EPS) ||
+      (verticalGap<=maxGap+EPS && xOverlap>EPS)
+  }
 
-    if(horizontalGap<=maxGap+EPS && yOverlap>EPS){
-      result.push({
-        x:Math.min(a.x,b.x),
-        y:Math.min(a.y,b.y),
-        w:Math.max(a.x+a.w,b.x+b.w)-Math.min(a.x,b.x),
-        h:Math.max(a.y+a.h,b.y+b.h)-Math.min(a.y,b.y)
-      })
+  const groups: Rect[][] = []
+  const used = new Set<number>()
+  for (let start=0; start<rects.length; start+=1) {
+    if (used.has(start)) continue
+    const group:number[]=[start]
+    used.add(start)
+    for (let cursor=0; cursor<group.length; cursor+=1) {
+      const i=group[cursor]
+      for (let j=0;j<rects.length;j+=1) {
+        if (used.has(j)) continue
+        if (group.some(k => near(rects[k],rects[j]))) {
+          used.add(j)
+          group.push(j)
+        }
+      }
     }
+    if (group.length>=2) groups.push(group.map(i=>rects[i]))
+  }
 
-    if(verticalGap<=maxGap+EPS && xOverlap>EPS){
-      result.push({
-        x:Math.max(a.x,b.x),
-        y:Math.min(a.y,b.y),
-        w:Math.max(a.x+a.w,b.x+b.w)-Math.min(a.x,b.x),
-        h:Math.max(a.y+a.h,b.y+b.h)-Math.min(a.y,b.y)
-      })
+  const result:Rect[]=[]
+  for (const group of groups) {
+    result.push(mergeBounds(group))
+    for (const r of group) {
+      const neighbours=group.filter(q => q !== r && near(r,q)).slice(0,4)
+      for (const q of neighbours) result.push(mergeBounds([r,q]))
     }
   }
-  return result.filter(r=>r.w>EPS&&r.h>EPS)
+
+  const seen=new Set<string>()
+  return result.filter(r=>{
+    if(r.w<=EPS||r.h<=EPS) return false
+    const key=[Math.round(r.x),Math.round(r.y),Math.round(r.w),Math.round(r.h)].join('|')
+    if(seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
 }
 
 function candidateInRect(u:LayerUnit,z:number,r:Rect,rotation:0|90,container:Container,placed:PlacedCargo[]) {
@@ -128,59 +149,55 @@ export function packSupportedLayers(units:LayerUnit[],placed:PlacedCargo[],conta
     for(const z of levels){
       const supports=placed.filter(p=>Math.abs(p.z+p.height-z)<=EPS&&(p.loadBearing!==false||p.stackable===true))
       if(!supports.length) continue
-      const baseRects=freeRects(z,placed,supports)
-      const bridgeCandidates=bridgeRects(supports, Math.max(...remaining.map(u=>u.cargo.length),1), Math.max(...remaining.map(u=>u.cargo.width),1))
-      const rects=[...baseRects,...bridgeCandidates]
       let layerBest:PlacedCargo|null=null, layerIndex=-1, layerScore=-Infinity
       for(let i=0;i<remaining.length;i+=1){
         const u=remaining[i]
-        const existingLayers = stackLayerCount(u.cargo.id)
-        const maxLayers = u.cargo.maxStackLayers ?? Infinity
-        if (existingLayers >= maxLayers) continue
+        const existingLayers=stackLayerCount(u.cargo.id)
+        const maxLayers=u.cargo.maxStackLayers ?? Infinity
+        if(existingLayers>=maxLayers) continue
         const rots:Array<0|90>=u.cargo.rotatable===false||u.cargo.length===u.cargo.width?[0]:[0,90]
-        for(const rot of rots) for(const r of rects){
-          const p=candidateInRect(u,z,r,rot,container,placed)
-          if(!p) continue
 
-          const d=footprint(p)
-          const adjacent = placed.reduce((sum,q)=>{
-            if(Math.abs(q.z-z)>EPS) return sum
-            const qd=footprint(q)
-            const xTouch = Math.abs(p.x+d.length-q.x)<=EPS || Math.abs(q.x+qd.length-p.x)<=EPS
-            const yTouch = Math.max(0,Math.min(p.y+d.width,q.y+qd.width)-Math.max(p.y,q.y))
-            const yTouchEdge = Math.abs(p.y+d.width-q.y)<=EPS || Math.abs(q.y+qd.width-p.y)<=EPS
-            const xOverlap = Math.max(0,Math.min(p.x+d.length,q.x+qd.length)-Math.max(p.x,q.x))
-            return sum + (xTouch ? yTouch : 0) + (yTouchEdge ? xOverlap : 0)
-          },0)
+        for(const rot of rots){
+          const d=rot===0?{length:u.cargo.length,width:u.cargo.width}:{length:u.cargo.width,width:u.cargo.length}
+          const rects=[...freeRects(z,placed,supports),...bridgeRects(supports,d.length,d.width)]
 
-          const centerDistance =
-            Math.abs((p.x+d.length/2)-container.length/2) +
-            Math.abs((p.y+d.width/2)-container.width/2)
+          for(const r of rects){
+            const p=candidateInRect(u,z,r,rot,container,placed)
+            if(!p) continue
 
-          const currentSameLevel = placed.filter(q=>Math.abs(q.z-z)<=EPS)
-          const currentMinX = currentSameLevel.length ? Math.min(...currentSameLevel.map(q=>q.x)) : p.x
-          const currentMaxX = currentSameLevel.length ? Math.max(...currentSameLevel.map(q=>q.x+footprint(q).length)) : p.x+d.length
-          const currentMinY = currentSameLevel.length ? Math.min(...currentSameLevel.map(q=>q.y)) : p.y
-          const currentMaxY = currentSameLevel.length ? Math.max(...currentSameLevel.map(q=>q.y+footprint(q).width)) : p.y+d.width
-          const spanX = Math.max(currentMaxX,p.x+d.length)-Math.min(currentMinX,p.x)
-          const spanY = Math.max(currentMaxY,p.y+d.width)-Math.min(currentMinY,p.y)
+            const pd=footprint(p)
+            const adjacent=placed.reduce((sum,q)=>{
+              if(Math.abs(q.z-z)>EPS) return sum
+              const qd=footprint(q)
+              const xTouch=Math.abs(p.x+pd.length-q.x)<=EPS||Math.abs(q.x+qd.length-p.x)<=EPS
+              const yTouch=Math.max(0,Math.min(p.y+pd.width,q.y+qd.width)-Math.max(p.y,q.y))
+              const yTouchEdge=Math.abs(p.y+pd.width-q.y)<=EPS||Math.abs(q.y+qd.width-p.y)<=EPS
+              const xOverlap=Math.max(0,Math.min(p.x+pd.length,q.x+qd.length)-Math.max(p.x,q.x))
+              return sum+(xTouch?yTouch:0)+(yTouchEdge?xOverlap:0)
+            },0)
 
-          // Prefer edge contact and a compact footprint, then center the layer.
-          // Support remains the hard constraint inside candidateInRect().
-          const score =
-            adjacent * 180 +
-            d.length*d.width * 0.02 -
-            spanX * spanY * 0.0008 -
-            centerDistance * 0.2
+            const centerDistance=Math.abs((p.x+pd.length/2)-container.length/2)+Math.abs((p.y+pd.width/2)-container.width/2)
+            const currentSameLevel=placed.filter(q=>Math.abs(q.z-z)<=EPS)
+            const currentMinX=currentSameLevel.length?Math.min(...currentSameLevel.map(q=>q.x)):p.x
+            const currentMaxX=currentSameLevel.length?Math.max(...currentSameLevel.map(q=>q.x+footprint(q).length)):p.x+pd.length
+            const currentMinY=currentSameLevel.length?Math.min(...currentSameLevel.map(q=>q.y)):p.y
+            const currentMaxY=currentSameLevel.length?Math.max(...currentSameLevel.map(q=>q.y+footprint(q).width)):p.y+pd.width
+            const spanX=Math.max(currentMaxX,p.x+pd.length)-Math.min(currentMinX,p.x)
+            const spanY=Math.max(currentMaxY,p.y+pd.width)-Math.min(currentMinY,p.y)
+            const supporterBonus=Math.max(0,s.supporters.length-1)*120
+            const score=adjacent*180+supporterBonus+s.ratio*500+pd.length*pd.width*0.02-spanX*spanY*0.0008-centerDistance*0.2
 
-          if(score>layerScore){layerBest=p;layerIndex=i;layerScore=score}
+            if(score>layerScore){layerBest=p;layerIndex=i;layerScore=score}
+          }
         }
       }
       if(layerBest){chosen=layerBest;chosenIndex=layerIndex;break}
     }
     if(!chosen) break
     remaining.splice(chosenIndex,1)
-    placed.push(chosen); added.push(chosen); weight+=chosen.weight
+    placed.push(chosen)
+    added.push(chosen)
+    weight+=chosen.weight
     progress?.(Math.round((added.length/Math.max(1,units.length))*100))
   }
   return {remaining,added,totalWeight:weight}
