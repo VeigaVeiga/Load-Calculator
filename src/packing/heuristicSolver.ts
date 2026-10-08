@@ -257,27 +257,36 @@ export function heuristicPack(cargo: Cargo[], container: Container, locked: Plac
   const unplaced: Cargo[] = []
   const uniqueCargo = new Set(units.map(u => u.cargo.id)).size
 
+  const maxWeight = Math.max(0, ...units.map((u) => u.cargo.weight))
+  const maxArea = Math.max(1, ...units.map((u) => u.cargo.length * u.cargo.width))
+
   const foundationScore = (u: Unit) => {
     const c = u.cargo
     const area = c.length * c.width
-    const volume = area * c.height
-    const density = c.weight / Math.max(1, volume)
+    const weightRatio = maxWeight > 0 ? c.weight / maxWeight : 0
+    const areaRatio = area / maxArea
     return (
       (c.stackable === false ? 1_000_000 : 0) +
-      Math.min(300_000, c.weight * 500) +
-      Math.min(200_000, area * 0.5) +
-      Math.min(100_000, density * 10_000) +
-      Math.min(50_000, volume * 0.01)
+      weightRatio * 500_000 +
+      areaRatio * 350_000
     )
   }
 
   // Mixed cargo is split by physical role rather than pallet/carton labels.
-  // Foundation cargo gets a first pass on the floor. Stackable cargo is then
-  // packed into the support planes created by that foundation.
+  // A cargo unit becomes foundation material when it is intrinsically
+  // non-stackable, or is among the materially heavier/larger pieces. The
+  // thresholds are relative to the actual shipment, so the rule adapts to
+  // different cargo mixes without knowing "pallet" or "carton" semantics.
   const foundationUnits = uniqueCargo <= 1
     ? [...units]
-    : [...units].sort((a, b) => foundationScore(b) - foundationScore(a))
-        .filter((u) => u.cargo.stackable === false || foundationScore(u) >= foundationScore(units[Math.floor(units.length / 2)]))
+    : [...units]
+        .filter((u) => {
+          const c = u.cargo
+          const areaRatio = (c.length * c.width) / maxArea
+          const weightRatio = maxWeight > 0 ? c.weight / maxWeight : 0
+          return c.stackable === false || areaRatio >= 0.6 || weightRatio >= 0.6
+        })
+        .sort((a, b) => foundationScore(b) - foundationScore(a))
   const foundationIds = new Set(foundationUnits.map(u => u.cargo.id + '#' + u.index))
   const groundUnits = foundationUnits
   const stackUnits = units.filter(u => !foundationIds.has(u.cargo.id + '#' + u.index) && u.cargo.stackable !== false)
