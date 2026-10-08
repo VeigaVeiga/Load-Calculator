@@ -4,9 +4,8 @@ import { dims, supportMetrics } from './geometry'
 const EPS = 0.5
 const MAX_OVERHANG_RATIO = 0.25
 const BEAM_WIDTH = 24
-const EXPANSION_WIDTH = 24
 const MAX_LAYER_STEPS = 120
-const MAX_CANDIDATES_PER_UNIT = 180
+const MAX_CANDIDATES_PER_UNIT = 96
 
 export type LayerUnit = { cargo: Cargo; index: number }
 
@@ -173,15 +172,7 @@ function candidatePositions(r: Rect, length: number, width: number): Array<[numb
     r.y + (r.h - width) / 2,
   ])
 
-  // Sweep in 10 mm increments only when the residual rectangle is large
-  // enough. This fills otherwise unreachable strips without exploding the
-  // search space for normal cases.
-  if (r.w - length >= 120) {
-    for (let x = r.x + 10; x < maxX - EPS; x += 10) xs.add(x)
-  }
-  if (r.h - width >= 120) {
-    for (let y = r.y + 10; y < maxY - EPS; y += 10) ys.add(y)
-  }
+
 
   const out: Array<[number, number]> = []
   for (const x of xs) {
