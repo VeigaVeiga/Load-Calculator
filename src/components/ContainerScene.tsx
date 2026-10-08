@@ -53,7 +53,7 @@ function CameraRig({ view, container, dragging, transformActive, focusPoint, foc
   }, [view, container.length, container.width, container.height, size.width, size.height, camera])
   useEffect(() => { const c = controls.current; if (!c || !focusPoint || focusNonce === 0) return; const nextTarget = new THREE.Vector3(...focusPoint); const offset = camera.position.clone().sub(c.target); c.target.copy(nextTarget); camera.position.copy(nextTarget).add(offset); camera.lookAt(nextTarget); c.update() }, [focusNonce, focusPoint, camera])
   useEffect(() => { const c = controls.current; if (!c) return; c.enabled = !(dragging && transformActive); if (c.enabled) c.update() }, [dragging, transformActive])
-  return <OrbitControls ref={controls} makeDefault enableDamping={false} rotateSpeed={.7} panSpeed={.65} zoomSpeed={.8} minDistance={1.2} maxDistance={45} onChange={invalidate} />
+  return <OrbitControls ref={controls} makeDefault enableDamping={false} rotateSpeed={.7} panSpeed={.65} zoomSpeed={.8} minDistance={1.2} maxDistance={45} onChange={() => invalidate()} />
 }
 
 function CoordinateAxes({ container }: { container: Container }) {
