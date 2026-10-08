@@ -1,5 +1,5 @@
 import type { Cargo, Container, PlacedCargo } from '../types'
-import { dims, validatePlan } from './geometry'
+import { validatePlan } from './geometry'
 import { heuristicPack, type HeuristicOptions } from './heuristicSolver'
 
 const EPS = 0.5
