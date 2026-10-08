@@ -126,39 +126,65 @@ function makePlaced(c: Cargo, index: number, x: number, y: number, z: number, ro
   }
 }
 
-function candidatePoints(placed: PlacedCargo[], container: Container) {
-  const points: Array<[number, number, number]> = [[0, 0, 0]]
-  const seen = new Set<string>(['0|0|0'])
+function candidatePoints(placed: PlacedCargo[], container: Container, cargoLength: number, cargoWidth: number) {
+  const points: Array<[number, number, number]> = []
+  const seen = new Set<string>()
   const add = (x: number, y: number, z: number) => {
-    if (x < -EPS || y < -EPS || z < -EPS || x > container.length + EPS || y > container.width + EPS || z > container.height + EPS) return
-    const key = Math.round(x) + '|' + Math.round(y) + '|' + Math.round(z)
+    if (x < -EPS || y < -EPS || z < -EPS ||
+      x + cargoLength > container.length + EPS ||
+      y + cargoWidth > container.width + EPS ||
+      z > container.height + EPS) return
+    const px = Math.round(x), py = Math.round(y), pz = Math.round(z)
+    const key = px + '|' + py + '|' + pz
     if (!seen.has(key)) {
       seen.add(key)
-      points.push([Math.round(x), Math.round(y), Math.round(z)])
+      points.push([px, py, pz])
     }
   }
 
-  // Keep a compact EP frontier, but include all four horizontal corners
-  // and all four corners of the top face. The old 3-point frontier only exposed
-  // one corner of a pallet/box top, so the next carton could not discover the
-  // remaining usable top surface and large gaps accumulated.
+  // Build candidates per support plane. Coordinates are derived from the
+  // actual size of the cargo being placed, so residual strips on pallet tops
+  // become explicit candidates instead of being hidden between EP corners.
+  const levels = new Set<number>([0])
   for (const q of placed) {
-    const d = footprint(q)
-    const x0 = q.x
-    const x1 = q.x + d.length
-    const y0 = q.y
-    const y1 = q.y + d.width
-    const z0 = q.z
-    const z1 = q.z + q.height
+    const top = q.z + q.height
+    if (top <= container.height + EPS) levels.add(Math.round(top))
+  }
 
-    add(x1, y0, z0)
-    add(x0, y1, z0)
-    add(x1, y1, z0)
+  for (const z of levels) {
+    const samePlane = placed.filter(q => Math.abs(q.z - z) <= EPS)
+    const supports = placed.filter(q =>
+      Math.abs(q.z + q.height - z) <= EPS && loadBearing(q)
+    )
+    if (z > EPS && supports.length === 0) continue
 
-    add(x0, y0, z1)
-    add(x1, y0, z1)
-    add(x0, y1, z1)
-    add(x1, y1, z1)
+    const xs = new Set<number>([0, Math.max(0, container.length - cargoLength)])
+    const ys = new Set<number>([0, Math.max(0, container.width - cargoWidth)])
+
+    for (const q of samePlane) {
+      const d = footprint(q)
+      xs.add(Math.round(q.x))
+      xs.add(Math.round(q.x + d.length))
+      xs.add(Math.round(q.x + d.length - cargoLength))
+      ys.add(Math.round(q.y))
+      ys.add(Math.round(q.y + d.width))
+      ys.add(Math.round(q.y + d.width - cargoWidth))
+    }
+
+    for (const q of supports) {
+      const d = footprint(q)
+      xs.add(Math.round(q.x))
+      xs.add(Math.round(q.x + d.length - cargoLength))
+      ys.add(Math.round(q.y))
+      ys.add(Math.round(q.y + d.width - cargoWidth))
+    }
+
+    for (const x of xs) {
+      for (const y of ys) {
+        add(x, y, z)
+        if (points.length >= 3500) return points
+      }
+    }
   }
 
   return points
@@ -209,11 +235,14 @@ export function heuristicPack(cargo: Cargo[], container: Container, locked: Plac
   for (let i = 0; i < units.length; i += 1) {
     const u = units[i]
     const rotations: Array<0 | 90> = u.cargo.rotatable === false || u.cargo.length === u.cargo.width ? [0] : [0, 90]
-    const points = candidatePoints(placed, container)
     let best: PlacedCargo | null = null
     let bestScore = -Infinity
 
     for (const rotation of rotations) {
+      const d = rotation === 0
+        ? { length: u.cargo.length, width: u.cargo.width }
+        : { length: u.cargo.width, width: u.cargo.length }
+      const points = candidatePoints(placed, container, d.length, d.width)
       for (const [x, y, z] of points) {
         const p = makePlaced(u.cargo, u.index, x, y, z, rotation)
         if (!validCandidate(p, placed, container, totalWeight)) continue
