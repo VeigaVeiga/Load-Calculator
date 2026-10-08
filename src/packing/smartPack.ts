@@ -348,7 +348,7 @@ async function runAttempt(
             y < -EPS ||
             x + o.l > container.length + EPS ||
             y + o.w > container.width + EPS ||
-            z + o.h > container.height + EPS
+            z + c.height > container.height + EPS
           ) continue
 
           const p = makePlaced(c, o, x, y, z, sequence + 1)
