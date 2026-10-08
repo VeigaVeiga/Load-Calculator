@@ -263,7 +263,7 @@ export function heuristicPack(cargo: Cargo[], container: Container, locked: Plac
       const d = rotation === 0
         ? { length: u.cargo.length, width: u.cargo.width }
         : { length: u.cargo.width, width: u.cargo.length }
-      const points = candidatePoints(placed, container, d.length, d.width, options.gapStep ?? 0, u.cargo.type === 'pallet')
+      const points = candidatePoints(placed, container, d.length, d.width, options.gapStep ?? 0, u.cargo.type === 'pallet').filter(p => homogeneous ? true : p[2] <= EPS)
       const candidates: PlacedCargo[] = []
       for (const [x, y, z] of points) {
         const p = makePlaced(u.cargo, u.index, x, y, z, rotation)
