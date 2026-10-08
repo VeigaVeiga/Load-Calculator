@@ -14,7 +14,6 @@ import type {
   SecuringMaterialType,
 } from './types'
 import { autoPackAsync } from './packing/packer'
-import { optimizeLoad } from './packing/loadOptimizer'
 import { validatePlacement } from './packing/geometry'
 import { analyzeWeight } from './analysis/weight'
 import { cbm, mm } from './utils'
@@ -699,12 +698,38 @@ function App() {
     setOptimizing(true)
     setPackingProgress(0)
     setMessage('')
+
+    const worker = new Worker(new URL('./packing/loadOptimizer.worker.ts', import.meta.url), { type: 'module' })
+
+    const cleanup = () => {
+      worker.onmessage = null
+      worker.onerror = null
+      controller.signal.removeEventListener('abort', abort)
+      worker.terminate()
+    }
+    const abort = () => {
+      cleanup()
+      controller.abort()
+    }
+
+    controller.signal.addEventListener('abort', abort, { once: true })
+
     try {
-      const result = await optimizeLoad(placed, container, {
-        signal: controller.signal,
-        maxIterations: 700,
-        progress: (percent) => setPackingProgress(Math.min(100, Math.max(0, Math.round(percent)))),
+      const result = await new Promise<any>((resolve, reject) => {
+        worker.onmessage = event => {
+          const message = event.data
+          if (message?.type === 'progress') {
+            setPackingProgress(Math.min(100, Math.max(0, Math.round(message.percent))))
+          } else if (message?.type === 'result') {
+            resolve(message.result)
+          } else if (message?.type === 'error') {
+            reject(new Error(message.message || 'Load optimization worker failed'))
+          }
+        }
+        worker.onerror = event => reject(event.error instanceof Error ? event.error : new Error(event.message || 'Load optimization worker failed'))
+        worker.postMessage({ items: placed, container, maxIterations: 700 })
       })
+
       if (controller.signal.aborted) return
       setPlaced(result.placed)
       setSelectedId(null)
@@ -718,12 +743,12 @@ function App() {
         setMessage(lang === 'zh' ? '重量负载优化失败，请重试' : 'Load optimization failed')
       }
     } finally {
+      cleanup()
       if (packingControllerRef.current === controller) packingControllerRef.current = null
       setOptimizing(false)
       setPackingProgress(null)
     }
   }
-
 
   const addMaterial = (
     type: SecuringMaterialType,
