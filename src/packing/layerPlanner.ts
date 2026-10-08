@@ -415,7 +415,8 @@ function candidatePlacements(
     const br = rects.find((r) => b.x >= r.x - EPS && b.y >= r.y - EPS &&
       b.x + footprint(b).length <= r.x + r.w + EPS &&
       b.y + footprint(b).width <= r.y + r.h + EPS)
-    return candidateScore(b, br ?? rects[0]) - candidateScore(a, ar ?? rects[0])
+    const fallback: Rect = { x: 0, y: 0, w: container.length, h: container.width }
+    return candidateScore(b, br ?? rects[0] ?? fallback) - candidateScore(a, ar ?? rects[0] ?? fallback)
   })
   return candidates.slice(0, MAX_CANDIDATES_PER_UNIT)
 }
