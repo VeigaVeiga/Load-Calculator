@@ -74,6 +74,7 @@ export interface PlacedCargo {
   loadBearing?: boolean
   maxStackLayers?: number
   maxLoadOnTop?: number
+  rotatable?: boolean
 }
 
 export type SecuringMaterialType = 'triangleWood' | 'lashingBelt' | 'airBag' | 'doorNet'
