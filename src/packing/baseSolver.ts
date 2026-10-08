@@ -1,4 +1,4 @@
-import { pack, RotationType } from 'binpack3d'
+import { pack, RotationType } from './binpack3d/index'
 import type { Cargo, Container, PlacedCargo } from '../types'
 import { validatePlan } from './geometry'
 
