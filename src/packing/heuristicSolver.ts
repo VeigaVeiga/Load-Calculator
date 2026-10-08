@@ -157,7 +157,7 @@ function candidatePoints(placed: PlacedCargo[], container: Container, cargoLengt
   for (const z of levels) {
     const samePlane = placed.filter(q => Math.abs(q.z - z) <= EPS)
     const supports = placed.filter(q =>
-      Math.abs(q.z + q.height - z) <= EPS && loadBearing(q)
+      Math.abs(q.z + q.height - z) <= EPS && (loadBearing(q) || q.stackable === true)
     )
     if (z > EPS && supports.length === 0) continue
 
@@ -244,8 +244,13 @@ export function heuristicPack(cargo: Cargo[], container: Container, locked: Plac
 
   let totalWeight = placed.reduce((s, p) => s + p.weight, 0)
   const unplaced: Cargo[] = []
-  const groundUnits = units.filter(u => u.cargo.type === 'pallet' || u.cargo.stackable === false)
-  const stackUnits = units.filter(u => u.cargo.type !== 'pallet' && u.cargo.stackable !== false)
+  const homogeneous = new Set(units.map(u => u.cargo.id)).size <= 1
+  const groundUnits = homogeneous
+    ? [...units]
+    : units.filter(u => u.cargo.type === 'pallet' || u.cargo.stackable === false)
+  const stackUnits = homogeneous
+    ? units.filter(u => u.cargo.stackable !== false)
+    : units.filter(u => u.cargo.type !== 'pallet' && u.cargo.stackable !== false)
   const total = Math.max(1, units.length)
 
   for (let i = 0; i < groundUnits.length; i += 1) {
