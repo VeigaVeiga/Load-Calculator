@@ -13,7 +13,8 @@ import type {
   SecuringItem,
   SecuringMaterialType,
 } from './types'
-import { autoPack, autoPackAsync } from './packing/packer'
+import { autoPackAsync } from './packing/packer'
+import { optimizeLoad } from './packing/loadOptimizer'
 import { validatePlacement } from './packing/geometry'
 import { analyzeWeight } from './analysis/weight'
 import { cbm, mm } from './utils'
@@ -32,6 +33,8 @@ const T = {
     pallet: '托盘',
     crate: '木箱',
     auto: '自动装柜',
+    opt: '⚖ 优化重量负载',
+    optimizing: '正在优化重量负载…',
     clear: '清除未锁定',
     properties: '货物属性',
     weight: '重量分析',
@@ -279,9 +282,8 @@ function App() {
     })),
   )
 
-  const [placed, setPlaced] = useState<PlacedCargo[]>(() =>
-    autoPack(cargoTemplates, base),
-  )
+  const [placed, setPlaced] = useState<PlacedCargo[]>([])
+
 
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [selectedIds, setSelectedIds] = useState<string[]>([])
@@ -301,6 +303,7 @@ function App() {
   const [showDimensions, setShowDimensions] = useState(false)
   const [airBagStretch] = useState(false)
   const [packingProgress, setPackingProgress] = useState<number | null>(null)
+  const [optimizing, setOptimizing] = useState(false)
   const packingControllerRef = useRef<AbortController | null>(null)
 
 
@@ -688,6 +691,38 @@ function App() {
     setMessage(lang === 'zh' ? '已取消装柜计算' : 'Packing cancelled')
   }
 
+  const runLoadOptimization = async () => {
+    if (optimizing || packingProgress !== null || placed.length < 2) return
+    const controller = new AbortController()
+    packingControllerRef.current = controller
+    setOptimizing(true)
+    setPackingProgress(0)
+    setMessage('')
+    try {
+      const result = await optimizeLoad(placed, container, {
+        signal: controller.signal,
+        maxIterations: 700,
+        progress: (percent) => setPackingProgress(Math.min(100, Math.max(0, Math.round(percent)))),
+      })
+      if (controller.signal.aborted) return
+      setPlaced(result.placed)
+      setSelectedId(null)
+      setSelectedIds([])
+      setMessage(result.improved
+        ? (lang === 'zh' ? '重量负载优化完成' : 'Load balance optimization complete')
+        : (lang === 'zh' ? '当前方案已接近最佳重量分布，未作改动' : 'Current plan was already near the best load balance'))
+    } catch (error) {
+      if (!controller.signal.aborted) {
+        console.error(error)
+        setMessage(lang === 'zh' ? '重量负载优化失败，请重试' : 'Load optimization failed')
+      }
+    } finally {
+      if (packingControllerRef.current === controller) packingControllerRef.current = null
+      setOptimizing(false)
+      setPackingProgress(null)
+    }
+  }
+
 
   const addMaterial = (
     type: SecuringMaterialType,
@@ -1035,8 +1070,12 @@ function App() {
           </div>
 
           <div className="tool-row">
-            <button onClick={() => void runPacking(container)}>
+            <button disabled={packingProgress !== null || optimizing} onClick={() => void runPacking(container)}>
               {tr.auto}
+            </button>
+
+            <button disabled={packingProgress !== null || optimizing || placed.length < 2} onClick={() => void runLoadOptimization()}>
+              {optimizing ? tr.optimizing : tr.opt}
             </button>
 
             <button
