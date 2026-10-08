@@ -50,7 +50,7 @@ function overlapArea(a: PlacedCargo, b: PlacedCargo) {
 }
 
 function supportInfo(p: PlacedCargo, placed: PlacedCargo[]) {
-  if (p.z <= EPS) return { ratio: 1, supporters: [] as PlacedCargo[] }
+  if (p.z <= EPS) return { ratio: 1, supporters: [] as PlacedCargo[], stable: true }
   const metrics = supportMetrics(p, placed)
   return {
     ratio: metrics.ratio,
