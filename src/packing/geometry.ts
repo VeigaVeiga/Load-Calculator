@@ -103,6 +103,7 @@ function cargoFor(p: PlacedCargo, cargoById?: Map<string, Cargo>) {
 
 function isStackable(p: PlacedCargo, cargoById?: Map<string, Cargo>) {
   const c = cargoFor(p, cargoById)
+  if (c?.breakablePallet) return false
   return c?.stackable ?? p.stackable ?? true
 }
 
