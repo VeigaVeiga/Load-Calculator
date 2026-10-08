@@ -108,7 +108,7 @@ function completeUnplaced(cargo: Cargo[], placed: PlacedCargo[]) {
  * First-stage production solver.
  *
  * This is deliberately a deterministic layered/extreme-point style heuristic:
- * large footprint cargo is placed first, then candidate support planes are
+ * physical foundation candidates are placed first, then support planes are
  * generated from existing cargo tops and edges. The hot loop uses cheap AABB
  * checks; the full application validator runs only once at the end.
  */
@@ -120,7 +120,13 @@ export function basePack(
 ): SolverResult {
   const validLocked = locked.filter(p => fits(p, container))
 
-  const signatures = new Set(cargo.map(c => [c.type, c.length, c.width, c.height].join('|')))
+  // Strategy branching is based only on physical geometry/constraints. Cargo
+  // labels such as pallet/carton/crate must never change solver behaviour.
+  const signatures = new Set(cargo.map(c => [
+    c.length, c.width, c.height,
+    c.stackable, c.loadBearing, c.rotatable,
+    c.maxStackLayers, c.maxLoadOnTop,
+  ].join('|')))
   const mixed = signatures.size > 1
   const strategies: HeuristicOptions[] = mixed ? [{ gapStep: 0 }, { gapStep: 10 }, { gapStep: 20 }] : [{ gapStep: 0 }]
   const results: Array<{ result: SolverResult; options: HeuristicOptions }> = []
