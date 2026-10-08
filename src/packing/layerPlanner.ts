@@ -110,7 +110,38 @@ export function packSupportedLayers(units:LayerUnit[],placed:PlacedCargo[],conta
         for(const rot of rots) for(const r of rects){
           const p=candidateInRect(u,z,r,rot,container,placed)
           if(!p) continue
-          const d=footprint(p), score=d.length*d.width
+
+          const d=footprint(p)
+          const adjacent = placed.reduce((sum,q)=>{
+            if(Math.abs(q.z-z)>EPS) return sum
+            const qd=footprint(q)
+            const xTouch = Math.abs(p.x+d.length-q.x)<=EPS || Math.abs(q.x+qd.length-p.x)<=EPS
+            const yTouch = Math.max(0,Math.min(p.y+d.width,q.y+qd.width)-Math.max(p.y,q.y))
+            const yTouchEdge = Math.abs(p.y+d.width-q.y)<=EPS || Math.abs(q.y+qd.width-p.y)<=EPS
+            const xOverlap = Math.max(0,Math.min(p.x+d.length,q.x+qd.length)-Math.max(p.x,q.x))
+            return sum + (xTouch ? yTouch : 0) + (yTouchEdge ? xOverlap : 0)
+          },0)
+
+          const centerDistance =
+            Math.abs((p.x+d.length/2)-container.length/2) +
+            Math.abs((p.y+d.width/2)-container.width/2)
+
+          const currentSameLevel = placed.filter(q=>Math.abs(q.z-z)<=EPS)
+          const currentMinX = currentSameLevel.length ? Math.min(...currentSameLevel.map(q=>q.x)) : p.x
+          const currentMaxX = currentSameLevel.length ? Math.max(...currentSameLevel.map(q=>q.x+footprint(q).length)) : p.x+d.length
+          const currentMinY = currentSameLevel.length ? Math.min(...currentSameLevel.map(q=>q.y)) : p.y
+          const currentMaxY = currentSameLevel.length ? Math.max(...currentSameLevel.map(q=>q.y+footprint(q).width)) : p.y+d.width
+          const spanX = Math.max(currentMaxX,p.x+d.length)-Math.min(currentMinX,p.x)
+          const spanY = Math.max(currentMaxY,p.y+d.width)-Math.min(currentMinY,p.y)
+
+          // Prefer edge contact and a compact footprint, then center the layer.
+          // Support remains the hard constraint inside candidateInRect().
+          const score =
+            adjacent * 180 +
+            d.length*d.width * 0.02 -
+            spanX * spanY * 0.0008 -
+            centerDistance * 0.2
+
           if(score>layerScore){layerBest=p;layerIndex=i;layerScore=score}
         }
       }
