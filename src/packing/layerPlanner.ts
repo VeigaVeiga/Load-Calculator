@@ -61,6 +61,55 @@ function supportRects(supports: PlacedCargo[]): Rect[] {
   })
 }
 
+function canMergeRectangles(a: Rect, b: Rect) {
+  const aRight = a.x + a.w
+  const bRight = b.x + b.w
+  const aBottom = a.y + a.h
+  const bBottom = b.y + b.h
+
+  // Only merge surfaces that form one continuous rectangle. Partial overlap
+  // is excluded because its bounding box could contain unsupported space.
+  const sameRow = Math.abs(a.y - b.y) <= EPS &&
+    Math.abs(a.h - b.h) <= EPS &&
+    (Math.abs(aRight - b.x) <= EPS || Math.abs(bRight - a.x) <= EPS)
+
+  const sameColumn = Math.abs(a.x - b.x) <= EPS &&
+    Math.abs(a.w - b.w) <= EPS &&
+    (Math.abs(aBottom - b.y) <= EPS || Math.abs(bBottom - a.y) <= EPS)
+
+  return sameRow || sameColumn
+}
+
+function mergeRectangles(rects: Rect[]) {
+  const merged = rects.map((r) => ({ ...r }))
+
+  let changed = true
+  while (changed) {
+    changed = false
+
+    outer:
+    for (let i = 0; i < merged.length; i += 1) {
+      for (let j = i + 1; j < merged.length; j += 1) {
+        if (!canMergeRectangles(merged[i], merged[j])) continue
+
+        const a = merged[i]
+        const b = merged[j]
+        merged[i] = {
+          x: Math.min(a.x, b.x),
+          y: Math.min(a.y, b.y),
+          w: Math.max(a.x + a.w, b.x + b.w) - Math.min(a.x, b.x),
+          h: Math.max(a.y + a.h, b.y + b.h) - Math.min(a.y, b.y),
+        }
+        merged.splice(j, 1)
+        changed = true
+        break outer
+      }
+    }
+  }
+
+  return merged
+}
+
 function splitRect(r: Rect, p: PlacedCargo): Rect[] {
   const d = footprint(p)
   const x1 = Math.max(r.x, p.x)
@@ -78,7 +127,10 @@ function splitRect(r: Rect, p: PlacedCargo): Rect[] {
 }
 
 function freeRects(z: number, placed: PlacedCargo[], supports: PlacedCargo[]): Rect[] {
-  let rects = supportRects(supports)
+  // Adjacent pallet/support surfaces become one continuous 2D packing
+  // surface. Physical support is still validated later by supportMetrics(),
+  // so this does not permit unsupported bridging.
+  let rects = mergeRectangles(supportRects(supports))
   const same = placed.filter((p) => Math.abs(p.z - z) <= EPS)
 
   for (const p of same) {
