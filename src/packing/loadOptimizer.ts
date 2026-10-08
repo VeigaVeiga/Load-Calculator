@@ -1,6 +1,6 @@
 import type { Cargo, Container, PlacedCargo } from '../types'
 import { analyzeWeight } from '../analysis/weight'
-import { dims, validatePlan, validatePlacement } from './geometry'
+import { dims, validatePlan } from './geometry'
 
 export type OptimizationResult = {
   placed: PlacedCargo[]
