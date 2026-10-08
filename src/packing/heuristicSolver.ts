@@ -3,16 +3,8 @@ import { dims, supportMetrics, validatePlan } from './geometry'
 
 const EPS = 0.5
 const SUPPORT = 0.75
-const MAX_GAP = 120
 
 type Unit = { cargo: Cargo; index: number }
-
-export type HeuristicOptions = {
-  gapStep?: number
-  gapBias?: number
-  adjacencyWeight?: number
-  order?: 'pallet-first' | 'footprint' | 'volume' | 'height'
-}
 
 function expand(cargo: Cargo[]): Unit[] {
   const result: Unit[] = []
@@ -57,6 +49,14 @@ function overlapArea(a: PlacedCargo, b: PlacedCargo) {
     Math.max(0, Math.min(a.y + A.width, b.y + B.width) - Math.max(a.y, b.y))
 }
 
+function supportInfo(p: PlacedCargo, placed: PlacedCargo[]) {
+  if (p.z <= EPS) return { ratio: 1, supporters: [] as PlacedCargo[] }
+  const supporters = placed.filter(q => Math.abs(q.z + q.height - p.z) <= EPS && loadBearing(q) && overlapArea(p, q) > EPS)
+  const area = supporters.reduce((sum, q) => sum + overlapArea(p, q), 0)
+  const base = Math.max(1, footprint(p).length * footprint(p).width)
+  return { ratio: Math.min(1, area / base), supporters }
+}
+
 function transferredLoad(q: PlacedCargo, p: PlacedCargo, placed: PlacedCargo[]) {
   const direct = placed.filter(x =>
     x.id !== q.id &&
@@ -72,23 +72,17 @@ function transferredLoad(q: PlacedCargo, p: PlacedCargo, placed: PlacedCargo[]) 
   return total - q.weight
 }
 
-function stackDepth(p: PlacedCargo, placed: PlacedCargo[], seen = new Set<string>()): number {
-  if (p.z <= EPS || seen.has(p.id)) return 1
-  seen.add(p.id)
-  const supports = placed.filter(q => Math.abs(q.z + q.height - p.z) <= EPS && loadBearing(q) && overlapArea(p, q) > EPS)
-  if (!supports.length) return 999
-  return 1 + Math.max(...supports.map(q => stackDepth(q, placed, new Set(seen))))
-}
-
 function validCandidate(p: PlacedCargo, placed: PlacedCargo[], container: Container, totalWeight: number) {
   if (!fits(p, container)) return false
   if (placed.some(q => overlaps(p, q))) return false
   if (container.maxPayload > 0 && totalWeight + p.weight > container.maxPayload + EPS) return false
   if (p.z <= EPS) return true
+  // Non-stackable cargo may support other cargo when loadBearing is enabled,
+  // but it may not itself be placed on another cargo.
   if (p.stackable === false) return false
 
-  const support = supportMetrics(p, placed)
-  if (support.ratio + EPS < SUPPORT || !support.centerSupported || support.maxOverhangRatio > 0.25 + EPS) return false
+  const support = supportInfo(p, placed)
+  if (support.ratio + EPS < SUPPORT) return false
 
   for (const q of support.supporters) {
     const limit = topLoadLimit(q)
@@ -100,6 +94,14 @@ function validCandidate(p: PlacedCargo, placed: PlacedCargo[], container: Contai
     }
   }
   return true
+}
+
+function stackDepth(p: PlacedCargo, placed: PlacedCargo[], seen = new Set<string>()): number {
+  if (p.z <= EPS || seen.has(p.id)) return 1
+  seen.add(p.id)
+  const supports = placed.filter(q => Math.abs(q.z + q.height - p.z) <= EPS && loadBearing(q) && overlapArea(p, q) > EPS)
+  if (!supports.length) return 999
+  return 1 + Math.max(...supports.map(q => stackDepth(q, placed, new Set(seen))))
 }
 
 function makePlaced(c: Cargo, index: number, x: number, y: number, z: number, rotation: 0 | 90): PlacedCargo {
@@ -124,13 +126,7 @@ function makePlaced(c: Cargo, index: number, x: number, y: number, z: number, ro
   }
 }
 
-function candidatePoints(
-  placed: PlacedCargo[],
-  container: Container,
-  cargoLength: number,
-  cargoWidth: number,
-  gapStep: number,
-) {
+function candidatePoints(placed: PlacedCargo[], container: Container, cargoLength: number, cargoWidth: number) {
   const points: Array<[number, number, number]> = []
   const seen = new Set<string>()
   const add = (x: number, y: number, z: number) => {
@@ -146,6 +142,9 @@ function candidatePoints(
     }
   }
 
+  // Build candidates per support plane. Coordinates are derived from the
+  // actual size of the cargo being placed, so residual strips on pallet tops
+  // become explicit candidates instead of being hidden between EP corners.
   const levels = new Set<number>([0])
   for (const q of placed) {
     const top = q.z + q.height
@@ -154,7 +153,9 @@ function candidatePoints(
 
   for (const z of levels) {
     const samePlane = placed.filter(q => Math.abs(q.z - z) <= EPS)
-    const supports = placed.filter(q => Math.abs(q.z + q.height - z) <= EPS && loadBearing(q))
+    const supports = placed.filter(q =>
+      Math.abs(q.z + q.height - z) <= EPS && loadBearing(q)
+    )
     if (z > EPS && supports.length === 0) continue
 
     const xs = new Set<number>([0, Math.max(0, container.length - cargoLength)])
@@ -168,17 +169,6 @@ function candidatePoints(
       ys.add(Math.round(q.y))
       ys.add(Math.round(q.y + d.width))
       ys.add(Math.round(q.y + d.width - cargoWidth))
-
-      // Active floor-gap candidates: deliberately leave a small, controlled
-      // seam between first-layer cargo. The seam is never used as an excuse
-      // to overlap cargo; it only creates an alternative packing branch.
-      if (z <= EPS && gapStep > 0) {
-        const g = Math.min(MAX_GAP, gapStep, Math.max(1, Math.min(cargoLength, cargoWidth) * 0.25))
-        xs.add(Math.round(q.x + d.length + g))
-        xs.add(Math.round(q.x - cargoLength - g))
-        ys.add(Math.round(q.y + d.width + g))
-        ys.add(Math.round(q.y - cargoWidth - g))
-      }
     }
 
     for (const q of supports) {
@@ -192,14 +182,13 @@ function candidatePoints(
     for (const x of xs) {
       for (const y of ys) {
         add(x, y, z)
-        if (points.length >= 1800) return points
+        if (points.length >= 3500) return points
       }
     }
   }
 
   return points
 }
-
 function adjacencyScore(p: PlacedCargo, placed: PlacedCargo[]) {
   const A = footprint(p)
   let score = 0
@@ -214,67 +203,32 @@ function adjacencyScore(p: PlacedCargo, placed: PlacedCargo[]) {
   return score
 }
 
-function supportQuality(p: PlacedCargo, placed: PlacedCargo[]) {
-  if (p.z <= EPS) return 1
-  const s = supportMetrics(p, placed)
-  const overhangPenalty = Math.max(0, s.maxOverhangRatio - 0.05)
-  return s.ratio - overhangPenalty * 0.8
-}
-
-function score(
-  p: PlacedCargo,
-  placed: PlacedCargo[],
-  container: Container,
-  options: HeuristicOptions,
-) {
-  const support = supportQuality(p, placed)
+function score(p: PlacedCargo, placed: PlacedCargo[], container: Container) {
+  const support = supportInfo(p, placed).ratio
   const adjacency = adjacencyScore(p, placed)
   const d = footprint(p)
   const rightGap = Math.max(0, container.length - (p.x + d.length))
   const sideGap = Math.max(0, container.width - (p.y + d.width))
-
-  // Full support is still the default preference. Partial support is accepted
-  // only when it buys better layer continuity. Gap branches intentionally
-  // sacrifice a little adjacency so baseSolver can compare whole plans.
-  const zPenalty = p.z * 8
-  const gapPenalty = options.gapBias ?? 0
-  const adjacencyWeight = options.adjacencyWeight ?? 250
-  const edgePenalty = rightGap * 0.02 + sideGap * 0.01
-  return support * 1_000_000 +
-    adjacency * adjacencyWeight -
-    zPenalty -
-    edgePenalty -
-    p.x * 0.001 -
-    p.y * 0.0005 -
-    gapPenalty
+  // Support dominates, then edge-to-edge packing, then low levels and front/left
+  // anchors. This deliberately produces orderly rows instead of scattered points.
+  const layerReward = p.z > EPS ? p.z * 120 : 0
+  const stableSupport = p.z > EPS ? supportMetrics(p, placed).ratio : 1
+  return stableSupport * 1_000_000 + layerReward + adjacency * 250 - rightGap * 0.02 - sideGap * 0.01 - p.x * 0.001 - p.y * 0.0005
 }
 
-function sortUnits(units: Unit[], order: HeuristicOptions['order']) {
-  return units.sort((a, b) => {
-    const A = a.cargo.length * a.cargo.width
-    const B = b.cargo.length * b.cargo.width
-    const va = A * a.cargo.height
-    const vb = B * b.cargo.height
-    if (order === 'volume') return vb - va || B - A || b.cargo.height - a.cargo.height
-    if (order === 'height') return b.cargo.height - a.cargo.height || B - A || vb - va
-    if (order === 'footprint') return B - A || vb - va || b.cargo.height - a.cargo.height
-    const palletBias = (a.cargo.type === 'pallet' ? 1 : 0) - (b.cargo.type === 'pallet' ? 1 : 0)
-    return palletBias || B - A || vb - va || b.cargo.height - a.cargo.height
-  })
-}
-
-export function heuristicPack(
-  cargo: Cargo[],
-  container: Container,
-  locked: PlacedCargo[] = [],
-  progress?: (percent: number) => void,
-  options: HeuristicOptions = {},
-): { placed: PlacedCargo[]; unplaced: Cargo[] } {
+export function heuristicPack(cargo: Cargo[], container: Container, locked: PlacedCargo[] = [], progress?: (percent: number) => void): { placed: PlacedCargo[]; unplaced: Cargo[] } {
   const validLocked = locked.filter(p => fits(p, container))
   const placed = validLocked.map(p => ({ ...p }))
-  const units = sortUnits(expand(cargo).filter(u =>
-    !placed.some(p => p.cargoId === u.cargo.id && p.id === u.cargo.id + '#' + (u.index + 1))
-  ), options.order ?? 'pallet-first')
+  const units = expand(cargo)
+    .filter(u => !placed.some(p => p.cargoId === u.cargo.id && p.id === u.cargo.id + '#' + (u.index + 1)))
+    .sort((a, b) => {
+      const A = a.cargo.length * a.cargo.width
+      const B = b.cargo.length * b.cargo.width
+      const va = a.cargo.length * a.cargo.width * a.cargo.height
+      const vb = b.cargo.length * b.cargo.width * b.cargo.height
+      const palletBias = (a.cargo.type === 'pallet' ? 1 : 0) - (b.cargo.type === 'pallet' ? 1 : 0)
+      return palletBias || B - A || vb - va || b.cargo.height - a.cargo.height || a.cargo.id.localeCompare(b.cargo.id)
+    })
 
   let totalWeight = placed.reduce((s, p) => s + p.weight, 0)
   const unplaced: Cargo[] = []
@@ -290,15 +244,17 @@ export function heuristicPack(
       const d = rotation === 0
         ? { length: u.cargo.length, width: u.cargo.width }
         : { length: u.cargo.width, width: u.cargo.length }
-      const points = candidatePoints(placed, container, d.length, d.width, options.gapStep ?? 0)
+      const points = candidatePoints(placed, container, d.length, d.width)
+      const candidates: PlacedCargo[] = []
       for (const [x, y, z] of points) {
         const p = makePlaced(u.cargo, u.index, x, y, z, rotation)
-        if (!validCandidate(p, placed, container, totalWeight)) continue
-        const candidateScore = score(p, placed, container, options)
-        if (candidateScore > bestScore) {
-          best = p
-          bestScore = candidateScore
-        }
+        if (validCandidate(p, placed, container, totalWeight)) candidates.push(p)
+      }
+      const supported = candidates.filter(p => p.z > EPS)
+      const selected = supported.length > 0 ? supported.filter(p => p.z === Math.min(...supported.map(q => q.z))) : candidates
+      for (const p of selected) {
+        const candidateScore = score(p, placed, container)
+        if (candidateScore > bestScore) { best = p; bestScore = candidateScore }
       }
     }
 
@@ -312,14 +268,16 @@ export function heuristicPack(
     if ((i & 7) === 0) progress?.(Math.round((i / total) * 100))
   }
 
+  // Final audit is intentionally a single pass; the hot loop never calls the
+  // expensive application validator.
   const audit = validatePlan(placed, container, cargo)
   if (!audit.ok) {
     const bad = new Set(audit.errors.map(e => e.split(':', 1)[0]))
     for (let i = placed.length - 1; i >= 0; i -= 1) {
-      if (!placed[i].locked && bad.has(placed[i].id)) {
-        unplaced.push(cargo.find(c => c.id === placed[i].cargoId) ?? cargo[0])
-        placed.splice(i, 1)
-      }
+      if (!placed[i].locked && bad.has(placed[i].id)) unplaced.push(cargo.find(c => c.id === placed[i].cargoId) ?? cargo[0])
+    }
+    for (let i = placed.length - 1; i >= 0; i -= 1) {
+      if (!placed[i].locked && bad.has(placed[i].id)) placed.splice(i, 1)
     }
   }
 
