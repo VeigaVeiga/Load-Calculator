@@ -47,7 +47,7 @@ button,input,select{font-family:inherit!important}
 .scene-host{background:linear-gradient(180deg,#aeb8b7,#c8c3b7)}
 .viewer-foot{font-size:10px!important;background:#d4cec0!important}
 .packing-overlay{position:absolute;z-index:20;inset:0;display:grid;place-items:center;background:rgba(31,35,35,.28);backdrop-filter:blur(2px);pointer-events:none}
-.packing-panel{width:min(440px,78%);padding:22px 24px;background:rgba(238,233,222,.97);border:1px solid #6d716d;box-shadow:7px 7px 0 rgba(35,39,38,.18);text-align:left}
+.packing-panel{width:min(440px,78%);padding:22px 24px;background:rgba(238,233,222,.97);border:1px solid #6d716d;box-shadow:7px 7px 0 rgba(35,39,38,.18);text-align:left;pointer-events:auto}
 .packing-kicker{font-size:10px;letter-spacing:.13em;color:#9a5c2d;margin-bottom:5px;text-transform:uppercase}
 .packing-panel strong{font-size:32px;line-height:1;color:#252b2b}
 .packing-track{height:9px;margin:12px 0 8px;border:1px solid #747872;background:#c4beb1}
