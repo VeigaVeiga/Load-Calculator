@@ -159,9 +159,9 @@ export function supportMetrics(p: PlacedCargo, others: PlacedCargo[]): SupportMe
     backOverhang / Math.max(1, d.width),
   )
 
-  const stable = ratio + EPS >= SUPPORT_THRESHOLD &&
+  const stable = ratio + 1e-6 >= SUPPORT_THRESHOLD &&
     centerSupported &&
-    maxOverhangRatio <= MAX_OVERHANG_RATIO + EPS
+    maxOverhangRatio <= MAX_OVERHANG_RATIO + 1e-6
 
   return {
     ratio,
@@ -265,9 +265,9 @@ function validateStacking(p: PlacedCargo, others: PlacedCargo[], cargoById?: Map
 
   const metrics = supportMetrics(p, others)
   if (!metrics.stable) {
-    if (metrics.ratio + EPS < SUPPORT_THRESHOLD) errors.push('支撑面积不足')
+    if (metrics.ratio + 1e-6 < SUPPORT_THRESHOLD) errors.push('支撑面积不足')
     else if (!metrics.centerSupported) errors.push('货物重心投影未落在支撑区域')
-    else if (metrics.maxOverhangRatio > MAX_OVERHANG_RATIO + EPS) errors.push('悬空范围超过允许容差')
+    else if (metrics.maxOverhangRatio > MAX_OVERHANG_RATIO + 1e-6) errors.push('悬空范围超过允许容差')
   }
 
   for (const q of ss) {
