@@ -45,7 +45,7 @@ function loadBearing(p: PlacedCargo) {
 }
 
 function canSupport(lower: PlacedCargo, upper: PlacedCargo) {
-  return lower.cargoType === upper.cargoType
+  return lower.cargoId === upper.cargoId
     ? lower.stackable !== false
     : lower.loadBearing !== false
 }
@@ -97,10 +97,10 @@ function validCandidate(p: PlacedCargo, placed: PlacedCargo[], container: Contai
     const limit = topLoadLimit(q)
     // maxLoadOnTop is about supporting OTHER cargo. It must never disable
     // or constrain self-stacking; self-stacking is controlled by stackable.
-    if (q.cargoType !== p.cargoType && limit > 0 && transferredLoad(q, p, placed) > limit + EPS) return false
+    if (q.cargoId !== p.cargoId && limit > 0 && transferredLoad(q, p, placed) > limit + EPS) return false
     // maxStackLayers is a self-stacking limit. It must never restrict a
     // different cargo type merely because the lower cargo can support it.
-    if (q.cargoType === p.cargoType) {
+    if (q.cargoId === p.cargoId) {
       const maxLayers = q.maxStackLayers ?? 0
       if (maxLayers > 0) {
         const depth = stackDepth(q, placed)
