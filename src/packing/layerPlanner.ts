@@ -275,7 +275,7 @@ function sameLevelAdjacency(p: PlacedCargo, sameLevel: PlacedCargo[]) {
 }
 
 function canSupport(lower: PlacedCargo, upper: PlacedCargo) {
-  return lower.cargoId === upper.cargoId
+  return lower.cargoType === upper.cargoType
     ? lower.stackable !== false
     : lower.loadBearing !== false
 }
@@ -353,11 +353,11 @@ function validCandidate(
   if (!support.stable) return false
   // Explicitly validate every actual support relation: same-type stacking uses
   // stackable; different-type support uses loadBearing, never the other flag.
-  if (support.supporters.some(q => q.cargoId === p.cargoId ? q.stackable === false : q.loadBearing === false)) return false
+  if (support.supporters.some(q => q.cargoType === p.cargoType ? q.stackable === false : q.loadBearing === false)) return false
 
   for (const q of support.supporters) {
     const limit = q.maxLoadOnTop ?? 0
-    if (q.cargoId !== p.cargoId && limit > 0 && transferredLoad(q, p, state.placed) > limit + EPS) return false
+    if (q.cargoType !== p.cargoType && limit > 0 && transferredLoad(q, p, state.placed) > limit + EPS) return false
   }
 
   return true
@@ -455,7 +455,7 @@ function stateScore(state: State, z: number, supports: PlacedCargo[], container:
   const sameCargoAdjacency = level.reduce((sum, p) => {
     const d = footprint(p)
     return sum + level
-      .filter((q) => q.id !== p.id && q.cargoId === p.cargoId)
+      .filter((q) => q.id !== p.id && q.cargoType === p.cargoType)
       .reduce((inner, q) => {
         const qd = footprint(q)
         const yOverlap = Math.max(0, Math.min(p.y + d.width, q.y + qd.width) - Math.max(p.y, q.y))
