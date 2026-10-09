@@ -33,7 +33,6 @@ function planVolume(placed: PlacedCargo[]) {
 }
 
 function foundationCoverage(result: SolverResult, cargo: Cargo[]) {
-  const maxWeight = Math.max(0, ...cargo.map((c) => c.weight))
   const maxArea = Math.max(1, ...cargo.map((c) => c.length * c.width))
   const uniqueCargo = new Set(cargo.map((c) => c.id)).size
   if (uniqueCargo <= 1) return 0
@@ -42,8 +41,9 @@ function foundationCoverage(result: SolverResult, cargo: Cargo[]) {
     cargo
       .filter((c) => {
         const areaRatio = (c.length * c.width) / maxArea
-        const weightRatio = maxWeight > 0 ? c.weight / maxWeight : 0
-        return c.stackable === false || areaRatio >= 0.6 || weightRatio >= 0.6
+        // Weight alone does not make a cargo unit foundation material:
+        // a heavy but stackable carton must remain eligible for upper layers.
+        return c.stackable === false || areaRatio >= 0.6
       })
       .map((c) => c.id),
   )
