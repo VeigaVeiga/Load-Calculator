@@ -1,52 +1,75 @@
 import type { Cargo, Container, PlacedCargo } from '../types'
-import { smartPack } from './smartPack'
-
-type PackOptions = { signal?: AbortSignal }
-type Progress = (percent: number) => void
+import { basePack } from './baseSolver'
 
 export function expandCargo(cargo: Cargo[]) {
   const out: { cargo: Cargo; index: number }[] = []
   for (const c of cargo) {
     const n = Math.max(0, Math.floor(c.quantity))
-    for (let i = 0; i < n; i++) out.push({ cargo: c, index: i })
+    for (let i = 0; i < n; i += 1) out.push({ cargo: c, index: i })
   }
   return out
 }
 
-// Kept synchronous for callers that only need a lightweight preview. The main
-// automatic loading action uses autoPackAsync below, which runs the full
-// mixed-cargo optimizer with obstacle-aware placement and look-ahead.
-export function autoPack(cargo: Cargo[], container: Container, locked: PlacedCargo[] = []) {
-  const result = locked.slice()
-  const units = expandCargo(cargo)
-  let x = 0
-  let y = 0
-  let z = 0
-  let rowWidth = 0
-  for (const { cargo: c, index } of units) {
-    if (container.maxPayload > 0 && result.reduce((n, p) => n + p.weight, 0) + c.weight > container.maxPayload) break
-    const L = c.length
-    const W = c.width
-    if (x + L > container.length) { x = 0; y += rowWidth; rowWidth = 0 }
-    if (y + W > container.width) { x = 0; y = 0; z += c.height; rowWidth = 0 }
-    if (z + c.height > container.height) break
-    const rotation: 0 | 90 = c.rotatable && x + L > container.length && y + c.length <= container.width ? 90 : 0
-    const l = rotation === 90 ? c.width : c.length
-    const w = rotation === 90 ? c.length : c.width
-    if (x + l > container.length || y + w > container.width || z + c.height > container.height) break
-    result.push({ id: `${c.id}-${index + 1}`, cargoId: c.id, cargoType: c.type, x, y, z, length: c.length, width: c.width, height: c.height, weight: c.weight, color: c.color, rotation, placementMode: 'automatic', locked: false })
-    x += l
-    rowWidth = Math.max(rowWidth, w)
-  }
-  return result
-}
-
-export async function autoPackAsync(
+export function autoPack(
   cargo: Cargo[],
   container: Container,
   locked: PlacedCargo[] = [],
-  progress?: Progress,
-  options: PackOptions = {},
 ) {
-  return smartPack(cargo, container, locked, progress, options)
+  return basePack(cargo, container, locked).placed
+}
+
+export function autoPackAsync(
+  cargo: Cargo[],
+  container: Container,
+  locked: PlacedCargo[] = [],
+  progress?: (percent: number) => void,
+  options: { signal?: AbortSignal } = {},
+): Promise<PlacedCargo[]> {
+  return new Promise((resolve, reject) => {
+    if (options.signal?.aborted) {
+      reject(new Error('Packing cancelled'))
+      return
+    }
+
+    const worker = new Worker(new URL('./packing.worker.ts', import.meta.url), { type: 'module' })
+
+    const cleanup = () => {
+      worker.onmessage = null
+      worker.onerror = null
+      options.signal?.removeEventListener('abort', abort)
+      worker.terminate()
+    }
+
+    const abort = () => {
+      cleanup()
+      reject(new Error('Packing cancelled'))
+    }
+
+    options.signal?.addEventListener('abort', abort, { once: true })
+
+    worker.onmessage = (event: MessageEvent<any>) => {
+      const message = event.data
+      if (message?.type === 'progress') {
+        progress?.(message.percent)
+        return
+      }
+      if (message?.type === 'result') {
+        const result = message.result
+        cleanup()
+        resolve(result.placed)
+        return
+      }
+      if (message?.type === 'error') {
+        cleanup()
+        reject(new Error(message.message || 'Packing worker failed'))
+      }
+    }
+
+    worker.onerror = (event) => {
+      cleanup()
+      reject(event.error instanceof Error ? event.error : new Error(event.message || 'Packing worker failed'))
+    }
+
+    worker.postMessage({ cargo, container, locked })
+  })
 }

@@ -13,7 +13,7 @@ import type {
   SecuringItem,
   SecuringMaterialType,
 } from './types'
-import { autoPack, autoPackAsync } from './packing/packer'
+import { autoPackAsync } from './packing/packer'
 import { validatePlacement } from './packing/geometry'
 import { analyzeWeight } from './analysis/weight'
 import { cbm, mm } from './utils'
@@ -25,13 +25,15 @@ const MAX_CARGO_VOLUME_CBM = 120
 
 const T = {
   zh: {
-    title: '集装箱装载规划器',
+    title: '集装箱装载规划器 Beta',
     cargo: '货物列表',
     add: '添加货物',
     carton: '纸箱',
     pallet: '托盘',
     crate: '木箱',
     auto: '自动装柜',
+    opt: '⚖ 优化重量负载',
+    optimizing: '正在优化重量负载…',
     clear: '清除未锁定',
     properties: '货物属性',
     weight: '重量分析',
@@ -114,7 +116,7 @@ const T = {
   },
 
   en: {
-    title: 'Container Loading Planner',
+    title: 'Container Loading Planner Beta',
     cargo: 'Cargo List',
     add: 'Add Cargo',
     carton: 'Carton',
@@ -122,6 +124,7 @@ const T = {
     crate: 'Wood Crate',
     auto: 'Auto Pack',
     opt: 'Optimize Load',
+    optimizing: 'Optimizing load…',
     clear: 'Clear Unlocked',
     properties: 'Cargo',
     weight: 'Weight Analysis',
@@ -279,9 +282,8 @@ function App() {
     })),
   )
 
-  const [placed, setPlaced] = useState<PlacedCargo[]>(() =>
-    autoPack(cargoTemplates, base),
-  )
+  const [placed, setPlaced] = useState<PlacedCargo[]>([])
+
 
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [selectedIds, setSelectedIds] = useState<string[]>([])
@@ -296,11 +298,13 @@ function App() {
   const [freePlacement, setFreePlacement] = useState(false)
 
   const [message, setMessage] = useState('')
+  const [rawNumericInputs, setRawNumericInputs] = useState<Record<string, string>>({})
 
   const [securingMode, setSecuringMode] = useState(false)
   const [showDimensions, setShowDimensions] = useState(false)
   const [airBagStretch] = useState(false)
   const [packingProgress, setPackingProgress] = useState<number | null>(null)
+  const [optimizing, setOptimizing] = useState(false)
   const packingControllerRef = useRef<AbortController | null>(null)
 
 
@@ -429,10 +433,12 @@ function App() {
         placementMode: 'manual',
       }
 
+      const cargoById = new Map(cargo.map((c) => [c.id, c]))
       const validation = validatePlacement(
         next,
         container,
         items,
+        cargoById,
       )
 
       if (!validation.ok) {
@@ -506,10 +512,12 @@ function App() {
 
       for (const p of next) {
         if (!ids.has(p.id)) continue
+        const cargoById = new Map(cargo.map((c) => [c.id, c]))
         const validation = validatePlacement(
           p,
           container,
           next.filter((q) => q.id !== p.id),
+          cargoById,
         )
         if (!validation.ok) {
           const translated = validation.errors.map((error) => {
@@ -577,12 +585,25 @@ function App() {
     if (key === 'color') {
       setPlaced((items) =>
         items.map((p) =>
-          p.cargoId === id
-            ? {
-                ...p,
-                color: String(value),
-              }
-            : p,
+          p.cargoId === id ? { ...p, color: String(value) } : p,
+        ),
+      )
+    }
+
+    // Physical properties are shared cargo definitions. Keep the cached
+    // properties on already placed units synchronized so changing
+    // Stackable/Load-bearing immediately changes validation and manual moves.
+    if (key === 'stackable' || key === 'loadBearing' || key === 'maxStackLayers' || key === 'maxLoadOnTop' || key === 'rotatable') {
+      setPlaced((items) =>
+        items.map((p) =>
+          p.cargoId === id ? {
+            ...p,
+            ...(key === 'stackable' ? { stackable: Boolean(value) } : {}),
+            ...(key === 'loadBearing' ? { loadBearing: Boolean(value) } : {}),
+            ...(key === 'maxStackLayers' ? { maxStackLayers: Number(value) } : {}),
+            ...(key === 'maxLoadOnTop' ? { maxLoadOnTop: Number(value) } : {}),
+            ...(key === 'rotatable' ? { rotatable: Boolean(value) } : {}),
+          } : p,
         ),
       )
     }
@@ -614,20 +635,42 @@ function App() {
     }
   }
 
-  const updateNumber = (
-    id: string,
-    key: 'quantity'|'length'|'width'|'height'|'weight',
-    raw: number,
-  ) => {
-    const value = Math.max(key === 'quantity' || key === 'length' || key === 'width' || key === 'height' ? 1 : 0, Number.isFinite(raw) ? raw : 0)
-    setCargo(items => items.map(c => c.id === id ? { ...c, [key]: value } : c))
+  type NumericKey = 'quantity'|'length'|'width'|'height'|'weight'
+
+  const updateNumber = (id: string, key: NumericKey, raw: string | number) => {
+    const text = String(raw)
+    const isIntermediate = text === '' || text === '-' || text === '.'
+    const invalidFormat = /^0\d/.test(text) || /[^0-9.\-]/.test(text) || (text.match(/\./g) ?? []).length > 1
+    const value = Number(text)
+    if (isIntermediate || invalidFormat || !Number.isFinite(value)) {
+      setRawNumericInputs(items => ({ ...items, [id + ':' + key]: text }))
+      return
+    }
+    const min = key === 'weight' ? 0.001 : 1
+    if (value < min) {
+      setRawNumericInputs(items => ({ ...items, [id + ':' + key]: text }))
+      return
+    }
+    setRawNumericInputs(items => {
+      const next = { ...items }
+      delete next[id + ':' + key]
+      return next
+    })
+    setCargo(items => items.map(c => c.id === id ? { ...c, [key]: key === 'quantity' ? Math.floor(value) : value } : c))
   }
 
   const limitsFor=(c:Cargo)=>({maxQuantity:c.type==='pallet'?50:600,maxVolume:MAX_CARGO_VOLUME_CBM})
-  const inputInvalid=(c:Cargo,key:'quantity'|'length'|'width'|'height')=>{
+  const inputInvalid=(c:Cargo,key:'quantity'|'length'|'width'|'height'|'weight')=>{
+    const raw = rawNumericInputs[c.id + ':' + key]
+    if (raw !== undefined) return true
     const lim=limitsFor(c); const vol=cbm(c.length,c.width,c.height,c.quantity)
-    return key==='quantity' ? c.quantity>lim.maxQuantity || vol>lim.maxVolume : vol>lim.maxVolume
+    if (key === 'weight') return !Number.isFinite(c.weight) || c.weight <= 0
+    return !Number.isFinite(c[key]) || c[key] <= 0 || (key==='quantity' ? c.quantity>lim.maxQuantity || vol>lim.maxVolume : vol>lim.maxVolume)
   }
+
+  const hasInvalidCargoInput = cargo.some(c =>
+    (['quantity','length','width','height','weight'] as NumericKey[]).some(key => inputInvalid(c,key))
+  )
 
   const remove = (id: string) => {
     setCargo((items) =>
@@ -652,6 +695,10 @@ function App() {
 
   const runPacking = async (nextContainer = container) => {
     if (packingProgress !== null) return
+    if (hasInvalidCargoInput) {
+      setMessage(lang === 'zh' ? '货物数据无效，请检查红色输入框（重量、尺寸、数量必须为有效正数）' : 'Invalid cargo data. Check the red fields.')
+      return
+    }
     const locked = placed.filter((p) => p.locked)
     const controller = new AbortController()
     packingControllerRef.current = controller
@@ -688,6 +735,64 @@ function App() {
     setMessage(lang === 'zh' ? '已取消装柜计算' : 'Packing cancelled')
   }
 
+  const runLoadOptimization = async () => {
+    if (optimizing || packingProgress !== null || placed.length < 2) return
+    const controller = new AbortController()
+    packingControllerRef.current = controller
+    setOptimizing(true)
+    setPackingProgress(0)
+    setMessage('')
+
+    const worker = new Worker(new URL('./packing/loadOptimizer.worker.ts', import.meta.url), { type: 'module' })
+
+    const cleanup = () => {
+      worker.onmessage = null
+      worker.onerror = null
+      controller.signal.removeEventListener('abort', abort)
+      worker.terminate()
+    }
+    const abort = () => {
+      cleanup()
+      controller.abort()
+    }
+
+    controller.signal.addEventListener('abort', abort, { once: true })
+
+    try {
+      const result = await new Promise<any>((resolve, reject) => {
+        worker.onmessage = event => {
+          const message = event.data
+          if (message?.type === 'progress') {
+            setPackingProgress(Math.min(100, Math.max(0, Math.round(message.percent))))
+          } else if (message?.type === 'result') {
+            resolve(message.result)
+          } else if (message?.type === 'error') {
+            reject(new Error(message.message || 'Load optimization worker failed'))
+          }
+        }
+        worker.onerror = event => reject(event.error instanceof Error ? event.error : new Error(event.message || 'Load optimization worker failed'))
+        worker.postMessage({ items: placed, container, maxIterations: 700 })
+      })
+
+      if (controller.signal.aborted) return
+      setPlaced(result.placed)
+      setSelectedId(null)
+      setSelectedIds([])
+      setMessage(result.improved
+        ? (lang === 'zh' ? '重量负载优化完成' : 'Load balance optimization complete')
+        : (lang === 'zh' ? '当前方案已接近最佳重量分布，未作改动' : 'Current plan was already near the best load balance'))
+    } catch (error) {
+      if (!controller.signal.aborted) {
+        console.error(error)
+        setMessage(lang === 'zh' ? '重量负载优化失败，请重试' : 'Load optimization failed')
+      }
+    } finally {
+      cleanup()
+      if (packingControllerRef.current === controller) packingControllerRef.current = null
+      setOptimizing(false)
+      setPackingProgress(null)
+    }
+  }
 
   const addMaterial = (
     type: SecuringMaterialType,
@@ -1035,8 +1140,12 @@ function App() {
           </div>
 
           <div className="tool-row">
-            <button onClick={() => void runPacking(container)}>
+            <button disabled={packingProgress !== null || optimizing} onClick={() => void runPacking(container)}>
               {tr.auto}
+            </button>
+
+            <button disabled={packingProgress !== null || optimizing || placed.length < 2} onClick={() => void runLoadOptimization()}>
+              {optimizing ? tr.optimizing : tr.opt}
             </button>
 
             <button
@@ -1209,16 +1318,15 @@ function App() {
 
                       <input
                         className={inputInvalid(c,'quantity')?'input-limit-error':''}
-                        type="number"
+                        type="text"
+                        inputMode="decimal"
                         min="1"
-                        value={c.quantity}
+                        value={rawNumericInputs[c.id + ':quantity'] ?? c.quantity}
                         onChange={(e) =>
                           updateNumber(
                             c.id,
                             'quantity',
-                            Number(
-                              e.target.value,
-                            ),
+                            e.target.value,
                           )
                         }
                       />
@@ -1228,16 +1336,16 @@ function App() {
                       {tr.unitWeight} <small className="field-unit">(KG)</small>
 
                       <input
-                        type="number"
+                        className={inputInvalid(c,'weight')?'input-limit-error':''}
+                        type="text"
+                        inputMode="decimal"
                         min="0"
-                        value={c.weight}
+                        value={rawNumericInputs[c.id + ':weight'] ?? c.weight}
                         onChange={(e) =>
                           updateNumber(
                             c.id,
                             'weight',
-                            Number(
-                              e.target.value,
-                            ),
+                            e.target.value,
                           )
                         }
                       />
@@ -1250,16 +1358,15 @@ function App() {
 
                       <input
                         className={inputInvalid(c,'length')?'input-limit-error':''}
-                        type="number"
+                        type="text"
+                        inputMode="decimal"
                         min="1"
-                        value={c.length}
+                        value={rawNumericInputs[c.id + ':length'] ?? c.length}
                         onChange={(e) =>
                           updateNumber(
                             c.id,
                             'length',
-                            Number(
-                              e.target.value,
-                            ),
+                            e.target.value,
                           )
                         }
                       />
@@ -1270,16 +1377,15 @@ function App() {
 
                       <input
                         className={inputInvalid(c,'width')?'input-limit-error':''}
-                        type="number"
+                        type="text"
+                        inputMode="decimal"
                         min="1"
-                        value={c.width}
+                        value={rawNumericInputs[c.id + ':width'] ?? c.width}
                         onChange={(e) =>
                           updateNumber(
                             c.id,
                             'width',
-                            Number(
-                              e.target.value,
-                            ),
+                            e.target.value,
                           )
                         }
                       />
@@ -1290,16 +1396,15 @@ function App() {
 
                       <input
                         className={inputInvalid(c,'height')?'input-limit-error':''}
-                        type="number"
+                        type="text"
+                        inputMode="decimal"
                         min="1"
-                        value={c.height}
+                        value={rawNumericInputs[c.id + ':height'] ?? c.height}
                         onChange={(e) =>
                           updateNumber(
                             c.id,
                             'height',
-                            Number(
-                              e.target.value,
-                            ),
+                            e.target.value,
                           )
                         }
                       />
@@ -1393,8 +1498,8 @@ function App() {
                     </label>
                     <label>
                       {lang === 'zh' ? '最大顶部承重 (kg)' : 'Max Top Load (kg)'}
-                      <input type="number" min="0" value={c.maxLoadOnTop || 0} onChange={(e) => update(c.id, 'maxLoadOnTop', Math.max(0, Number(e.target.value) || 0))} />
-                      <small>{lang === 'zh' ? '0 = 不限制' : '0 = unlimited'}</small>
+                      <input type="number" min="0" disabled={!c.loadBearing} value={c.maxLoadOnTop || 0} onChange={(e) => update(c.id, 'maxLoadOnTop', Math.max(0, Number(e.target.value) || 0))} />
+                      <small>{c.loadBearing ? (lang === 'zh' ? '仅对其他类型货物生效；0 = 不限制' : 'Applies to other cargo types; 0 = unlimited') : (lang === 'zh' ? '需勾选“可承重”后生效' : 'Enable Load-bearing to use this limit')}</small>
                     </label>
                   </div>
 
