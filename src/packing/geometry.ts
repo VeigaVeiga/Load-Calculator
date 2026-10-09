@@ -126,7 +126,7 @@ export function supportMetrics(p: PlacedCargo, others: PlacedCargo[]): SupportMe
   const supporters = others.filter((q) =>
     q.id !== p.id &&
     Math.abs(q.z + q.height - p.z) <= EPS &&
-    ((q.cargoId === p.cargoId ? q.stackable !== false : q.loadBearing !== false)) &&
+    ((q.cargoType === p.cargoType ? q.stackable !== false : q.loadBearing !== false)) &&
     !!intersection(p, q)
   )
   const rects = supporters
@@ -209,7 +209,7 @@ function canSupport(lower: PlacedCargo, upper: PlacedCargo, cargoById?: Map<stri
   // Self-stacking and supporting other cargo are independent properties.
   // Same cargo type: only the lower unit's stackable flag matters.
   // Different cargo type: only the lower unit's load-bearing flag matters.
-  if (lower.cargoId === upper.cargoId) return isStackable(lower, cargoById)
+  if (lower.cargoType === upper.cargoType) return isStackable(lower, cargoById)
   return isLoadBearing(lower, cargoById)
 }
 
@@ -271,7 +271,7 @@ function validateStacking(p: PlacedCargo, others: PlacedCargo[], cargoById?: Map
   }
 
   for (const q of ss) {
-    const sameType = q.cargoId === p.cargoId
+    const sameType = q.cargoType === p.cargoType
     const limit = maxTopLoad(q, cargoById)
     if (!sameType && limit > 0 && transferredLoad(q, others.concat(p), cargoById) - q.weight > limit + EPS) {
       errors.push('超过下方货物允许的顶部承重')
