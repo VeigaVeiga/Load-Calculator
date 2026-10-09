@@ -232,7 +232,8 @@ function score(p: PlacedCargo, placed: PlacedCargo[], container: Container) {
   const sideGap = Math.max(0, container.width - (p.y + d.width))
   // Support dominates, then edge-to-edge packing, then low levels and front/left
   // anchors. This deliberately produces orderly rows instead of scattered points.
-  const layerReward = p.z > EPS ? p.z * 120 : 0
+  // Lower support planes are preferred; rewarding positive z creates a bias toward high, fragmented placements.
+  const layerReward = p.z > EPS ? -p.z * 120 : 0
   const stableSupport = p.z > EPS ? supportMetrics(p, placed).ratio : 1
   const centerX = p.x + d.length / 2
   const centerY = p.y + d.width / 2
