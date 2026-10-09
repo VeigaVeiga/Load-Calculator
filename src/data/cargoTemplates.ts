@@ -11,7 +11,7 @@ export const cargoTemplates: Cargo[] = [
     length: 1200,
     width: 1000,
     height: 150,
-    weight: 25,
+    weight: 500,
     color: '#b98a56',
     showName: false,
     locked: false,
