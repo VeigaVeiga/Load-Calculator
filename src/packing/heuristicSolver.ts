@@ -295,8 +295,9 @@ export function heuristicPack(cargo: Cargo[], container: Container, locked: Plac
         .filter((u) => {
           const c = u.cargo
           const areaRatio = (c.length * c.width) / maxArea
-          const weightRatio = maxWeight > 0 ? c.weight / maxWeight : 0
-          return c.stackable === false || areaRatio >= 0.6 || weightRatio >= 0.6
+          // Foundation role is geometric/physical, not a relative weight test.
+          // Otherwise medium-heavy cartons are incorrectly forced onto the floor.
+          return c.stackable === false || areaRatio >= 0.6
         })
         .sort((a, b) => foundationScore(b) - foundationScore(a))
   const foundationIds = new Set(foundationUnits.map(u => u.cargo.id + '#' + u.index))
