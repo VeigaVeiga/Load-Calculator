@@ -575,23 +575,6 @@ function beamLayer(
   return best
 }
 
-function layerFillScore(state: State, z: number, supports: PlacedCargo[]) {
-  const level = state.placed.filter((p) => Math.abs(p.z - z) <= EPS)
-  if (!level.length) return -Infinity
-  const supportArea = supports.reduce((sum, p) => {
-    const d = footprint(p)
-    return sum + d.length * d.width
-  }, 0)
-  const occupied = level.reduce((sum, p) => {
-    const d = footprint(p)
-    return sum + d.length * d.width
-  }, 0)
-  const count = level.length
-  const fragmentationPenalty = fragmentation(z, state.placed, supports)
-  return count * 1e7 + occupied * 10 - fragmentationPenalty * 2 + state.score * 0.01 +
-    Math.min(1, occupied / Math.max(1, supportArea)) * 1e6
-}
-
 export function packSupportedLayers(
   units: LayerUnit[],
   placed: PlacedCargo[],
@@ -631,11 +614,14 @@ export function packSupportedLayers(
       const result = beamLayer(remaining, current, z, supports, container, weight)
       if (result.placed.length <= current.length) continue
 
-      if (!chosenState ||
-          layerFillScore(result, z, supports) > layerFillScore(chosenState, chosenZ, current.filter((p) => Math.abs(p.z + p.height - chosenZ) <= EPS))) {
-        chosenState = result
-        chosenZ = z
-      }
+      // Fill the lowest viable support plane first. Comparing the raw score
+      // across heights lets a tall, compact "mountain" of cartons beat a
+      // partially filled lower pallet surface, stranding large regular gaps.
+      // The loop repeats at this same height until no further unit fits; only
+      // then may the solver advance to the next support plane.
+      chosenState = result
+      chosenZ = z
+      break
     }
 
     if (!chosenState || chosenZ < 0) break
