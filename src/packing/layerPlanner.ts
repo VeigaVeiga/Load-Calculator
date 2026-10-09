@@ -118,30 +118,57 @@ function splitRect(r: Rect, p: PlacedCargo): Rect[] {
   const y2 = Math.min(r.y + r.h, p.y + d.width)
   if (x2 <= x1 + EPS || y2 <= y1 + EPS) return [r]
 
+  // True MaxRects split: retain every maximal free rectangle around the
+  // occupied footprint. These rectangles may overlap by design; pruning
+  // contained rectangles below removes redundancy without losing usable space.
   const out: Rect[] = []
-  if (x1 - r.x > EPS) out.push({ x: r.x, y: r.y, w: x1 - r.x, h: r.h })
-  if (r.x + r.w - x2 > EPS) out.push({ x: x2, y: r.y, w: r.x + r.w - x2, h: r.h })
-  if (y1 - r.y > EPS) out.push({ x: x1, y: r.y, w: x2 - x1, h: y1 - r.y })
-  if (r.y + r.h - y2 > EPS) out.push({ x: x1, y: y2, w: x2 - x1, h: r.y + r.h - y2 })
-  return out
+  if (x1 > r.x + EPS) out.push({ x: r.x, y: r.y, w: x1 - r.x, h: r.h })
+  if (x2 < r.x + r.w - EPS) out.push({ x: x2, y: r.y, w: r.x + r.w - x2, h: r.h })
+  if (y1 > r.y + EPS) out.push({ x: r.x, y: r.y, w: r.w, h: y1 - r.y })
+  if (y2 < r.y + r.h - EPS) out.push({ x: r.x, y: y2, w: r.w, h: r.y + r.h - y2 })
+  return out.filter(q => q.w > EPS && q.h > EPS)
 }
 
+function pruneContained(rects: Rect[]): Rect[] {
+  const out: Rect[] = []
+  for (let i = 0; i < rects.length; i += 1) {
+    const a = rects[i]
+    let contained = false
+    for (let j = 0; j < rects.length; j += 1) {
+      if (i === j) continue
+      const b = rects[j]
+      if (a.x >= b.x - EPS && a.y >= b.y - EPS &&
+          a.x + a.w <= b.x + b.w + EPS &&
+          a.y + a.h <= b.y + b.h + EPS) {
+        if (b.w * b.h > a.w * a.h + EPS || j < i) {
+          contained = true
+          break
+        }
+      }
+    }
+    if (!contained) out.push(a)
+  }
+  const seen = new Set<string>()
+  return out.filter(r => {
+    const key = [r.x, r.y, r.w, r.h].map(Math.round).join('|')
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+}
 function freeRects(z: number, placed: PlacedCargo[], supports: PlacedCargo[]): Rect[] {
-  // Adjacent pallet/support surfaces become one continuous 2D packing
-  // surface. Physical support is still validated later by supportMetrics(),
-  // so this does not permit unsupported bridging.
+  // Each physically valid support surface is packed as its own 2D MaxRects
+  // region. Merge only edge-touching equal-height support footprints, then
+  // split the region against all cargo already occupying this exact layer.
   let rects = mergeRectangles(supportRects(supports))
-  const same = placed.filter((p) => Math.abs(p.z - z) <= EPS)
-
+  const same = placed.filter(p => Math.abs(p.z - z) <= EPS)
   for (const p of same) {
     const next: Rect[] = []
     for (const r of rects) next.push(...splitRect(r, p))
-    rects = next
+    rects = pruneContained(next)
   }
-
-  return rects.filter((r) => r.w > EPS && r.h > EPS)
+  return pruneContained(rects).filter(r => r.w > EPS && r.h > EPS)
 }
-
 function near(a: Rect, b: Rect, maxGap: number) {
   const horizontalGap = Math.max(b.x - (a.x + a.w), a.x - (b.x + b.w), 0)
   const verticalGap = Math.max(b.y - (a.y + a.h), a.y - (b.y + b.h), 0)
@@ -324,6 +351,9 @@ function validCandidate(
 
   const support = supportMetrics(p, state.placed)
   if (!support.stable) return false
+  // Explicitly validate every actual support relation: same-type stacking uses
+  // stackable; different-type support uses loadBearing, never the other flag.
+  if (support.supporters.some(q => q.cargoId === p.cargoId ? q.stackable === false : q.loadBearing === false)) return false
 
   for (const q of support.supporters) {
     const limit = q.maxLoadOnTop ?? 0
