@@ -7,8 +7,25 @@ const SUPPORT = 0.75
 
 type Unit = { cargo: Cargo; index: number }
 
+export type HeuristicOrder = 'area' | 'volume' | 'weight' | 'height' | 'longest-side' | 'density'
+
 export type HeuristicOptions = {
   gapStep?: number
+  order?: HeuristicOrder
+}
+
+function orderMetric(u: Unit, order: HeuristicOrder) {
+  const c = u.cargo
+  const area = c.length * c.width
+  const volume = area * c.height
+  switch (order) {
+    case 'area': return area
+    case 'weight': return c.weight
+    case 'height': return c.height
+    case 'longest-side': return Math.max(c.length, c.width)
+    case 'density': return c.weight / Math.max(1, volume)
+    case 'volume': return volume
+  }
 }
 
 function expand(cargo: Cargo[]): Unit[] {
@@ -281,26 +298,18 @@ function score(p: PlacedCargo, placed: PlacedCargo[], container: Container) {
 export function heuristicPack(cargo: Cargo[], container: Container, locked: PlacedCargo[] = [], progress?: (percent: number) => void, options: HeuristicOptions = {}): { placed: PlacedCargo[]; unplaced: Cargo[] } {
   const validLocked = locked.filter(p => fits(p, container))
   const placed = validLocked.map(p => ({ ...p }))
+  const order = options.order ?? 'volume'
   const units = expand(cargo)
     .filter(u => !placed.some(p => p.cargoId === u.cargo.id && p.id === u.cargo.id + '#' + (u.index + 1)))
     .sort((a, b) => {
-      const priority = (u: Unit) => {
-        const c = u.cargo
-        const area = c.length * c.width
-        const volume = area * c.height
-        const density = c.weight / Math.max(1, volume)
-        // Foundation priority is based on physical behaviour, not cargo type.
-        // Heavy, large-footprint and non-stackable cargo naturally belongs in
-        // the lower structure; light stackable cargo can be used as upper fill.
-        return (
-          (c.stackable === false ? 1_000_000 : 0) +
-          Math.min(300_000, c.weight * 500) +
-          Math.min(200_000, area * 0.5) +
-          Math.min(100_000, density * 10_000) +
-          Math.min(50_000, volume * 0.01)
-        )
-      }
-      return priority(b) - priority(a) || a.cargo.id.localeCompare(b.cargo.id)
+      // Keep physically non-stackable cargo ahead of fill cargo, but vary the
+      // ordering metric across deterministic runs so a single greedy sequence
+      // cannot dictate the whole mixed-cargo plan.
+      const nonStackable = Number(b.cargo.stackable === false) - Number(a.cargo.stackable === false)
+      if (nonStackable) return nonStackable
+      return orderMetric(b, order) - orderMetric(a, order) ||
+        (b.cargo.length * b.cargo.width - a.cargo.length * a.cargo.width) ||
+        a.cargo.id.localeCompare(b.cargo.id) || a.index - b.index
     })
 
   let totalWeight = placed.reduce((s, p) => s + p.weight, 0)
@@ -327,17 +336,20 @@ export function heuristicPack(cargo: Cargo[], container: Container, locked: Plac
   // non-stackable, or is among the materially heavier/larger pieces. The
   // thresholds are relative to the actual shipment, so the rule adapts to
   // different cargo mixes without knowing "pallet" or "carton" semantics.
-  const foundationUnits = uniqueCargo <= 1
+  const foundationUnits = (uniqueCargo <= 1
     ? [...units]
-    : [...units]
-        .filter((u) => {
-          const c = u.cargo
-          const areaRatio = (c.length * c.width) / maxArea
-          // Foundation role is geometric/physical, not a relative weight test.
-          // Otherwise medium-heavy cartons are incorrectly forced onto the floor.
-          return c.stackable === false || areaRatio >= 0.6
-        })
-        .sort((a, b) => foundationScore(b) - foundationScore(a))
+    : [...units].filter((u) => {
+        const c = u.cargo
+        const areaRatio = (c.length * c.width) / maxArea
+        // Foundation role is geometric/physical, not a relative weight test.
+        return c.stackable === false || areaRatio >= 0.6
+      }))
+    .sort((a, b) => {
+      const nonStackable = Number(b.cargo.stackable === false) - Number(a.cargo.stackable === false)
+      if (nonStackable) return nonStackable
+      return orderMetric(b, order) - orderMetric(a, order) ||
+        foundationScore(b) - foundationScore(a) || a.cargo.id.localeCompare(b.cargo.id)
+    })
   const foundationIds = new Set(foundationUnits.map(u => u.cargo.id + '#' + u.index))
   const groundUnits = foundationUnits
   const stackUnits = units.filter(u => !foundationIds.has(u.cargo.id + '#' + u.index) && u.cargo.stackable !== false)
