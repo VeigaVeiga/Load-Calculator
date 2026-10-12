@@ -14,6 +14,7 @@ export function openSourcePackCandidate(
   cargo: Cargo[],
   container: Container,
   locked: PlacedCargo[] = [],
+  order: 'volume' | 'footprint' | 'weight' = 'volume',
 ): PlacedCargo[] | null {
   try {
     const cargoById = new Map(cargo.map((item) => [item.id, item]))
@@ -42,6 +43,16 @@ export function openSourcePackCandidate(
         }]
       }).flat(),
     )
+
+    items.sort((a, b) => {
+      const score = (item: typeof a) => {
+        const [length, height, width] = item.whd
+        if (order === 'weight') return item.weight
+        if (order === 'footprint') return length * width
+        return length * height * width
+      }
+      return score(b) - score(a) || a.partno.localeCompare(b.partno)
+    })
 
     const obstacles = locked.map((item) => ({
       position: [item.x, item.z, item.y] as [number, number, number],
@@ -119,6 +130,7 @@ export function openSourcePackCandidate(
     }
 
     console.info('[packing:binpack3d] candidate audit', {
+      order,
       proposed: proposed.length,
       accepted: accepted.length - locked.length,
       rejected,
