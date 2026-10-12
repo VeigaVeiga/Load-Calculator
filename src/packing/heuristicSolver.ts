@@ -320,18 +320,6 @@ export function heuristicPack(cargo: Cargo[], container: Container, locked: Plac
 
   const maxArea = Math.max(1, ...units.map((u) => u.cargo.length * u.cargo.width))
 
-  const foundationScore = (u: Unit) => {
-    const c = u.cargo
-    const area = c.length * c.width
-    const weightRatio = maxWeight > 0 ? c.weight / maxWeight : 0
-    const areaRatio = area / maxArea
-    return (
-      (c.stackable === false ? 1_000_000 : 0) +
-      weightRatio * 500_000 +
-      areaRatio * 350_000
-    )
-  }
-
   // Mixed cargo is split by physical role rather than pallet/carton labels.
   // A cargo unit becomes foundation material when it is intrinsically
   // non-stackable, or is among the materially heavier/larger pieces. The
