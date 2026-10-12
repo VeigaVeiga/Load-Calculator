@@ -40,6 +40,7 @@ const plannerRuntimeFixes: Plugin = {
       })
       if (controller.signal.aborted) return
       setPlaced(result)
+      setHasAutoPacked(true)
       setSelectedId(null)
       setSelectedIds([])
       setMessage(lang === 'zh' ? '自动装柜完成' : 'Auto packing complete')
