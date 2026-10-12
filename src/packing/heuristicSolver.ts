@@ -270,8 +270,8 @@ function score(p: PlacedCargo, placed: PlacedCargo[], container: Container) {
   const cgX = totalWeight > EPS ? momentX / totalWeight : centerX
   const cgY = totalWeight > EPS ? momentY / totalWeight : centerY
   const balancePenalty =
-    Math.abs(cgX - container.length / 2) * 12 +
-    Math.abs(cgY - container.width / 2) * 55
+    Math.abs(cgX - container.length / 2) * 150 +
+    Math.abs(cgY - container.width / 2) * 320
 
   return stableSupport * 1_000_000 + layerReward + adjacency * 250 -
     orientationPenalty - balancePenalty - centerDistance * 0.08 -
