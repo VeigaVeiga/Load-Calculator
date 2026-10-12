@@ -99,9 +99,13 @@ function planQuality(result: SolverResult, container: Container, cargo: Cargo[])
   // Foundation completion is a hard strategic priority: an upper-layer
   // solution must not sacrifice physically important lower cargo merely to
   // gain more small cartons. This is derived from cargo attributes, not type.
-  return foundation * 5_000_000_000_000 +
-    placed.length * 1_000_000_000 +
+  // Lexicographic intent encoded with separated scales: loaded-unit count
+  // is always the primary objective, then cargo volume, then foundation
+  // completion and only then balance. A perfect foundation ratio must never
+  // beat a plan that safely loads more units.
+  return placed.length * 1_000_000_000_000 +
     volume * 10 +
+    foundation * 1_000_000_000 +
     totalWeight * 0.01 -
     centerPenalty * 100_000 -
     levelPenalty * 0.1 -
@@ -219,7 +223,17 @@ export function basePack(
   const mixed = signatures.size > 1
   // Do not deliberately introduce floor gaps while solving the foundation.
   // Real gaps should emerge only when cargo dimensions/constraints require them.
-  const strategies: HeuristicOptions[] = mixed ? [{ gapStep: 0 }] : [{ gapStep: 0 }]
+  // Deterministic multi-start portfolio: each run keeps the same hard
+  // constraints but changes the item ordering so mixed shipments are not
+  // locked into one greedy sequence. Candidate plans are compared globally.
+  const strategies: HeuristicOptions[] = [
+    { gapStep: 0, order: 'area' },
+    { gapStep: 0, order: 'volume' },
+    { gapStep: 0, order: 'weight' },
+    { gapStep: 0, order: 'height' },
+    { gapStep: 0, order: 'longest-side' },
+    { gapStep: 0, order: 'density' },
+  ]
   const results: Array<{ result: SolverResult; options: HeuristicOptions }> = []
 
   // Fast path before launching the general 3D search: a complete homogeneous
