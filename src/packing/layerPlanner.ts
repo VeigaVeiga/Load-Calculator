@@ -541,7 +541,6 @@ function beamLayer(
   z: number,
   supports: PlacedCargo[],
   container: Container,
-  totalWeight: number,
 ): State {
   let beam: State[] = [{
     placed: [...initial],
@@ -573,7 +572,7 @@ function beamLayer(
             score: 0,
             placedArea: state.placedArea + d.length * d.width,
           }
-          child.score = stateScore(child, z, supports, container, totalWeight + p.weight)
+          child.score = stateScore(child, z, supports, container, child.placed.reduce((sum, item) => sum + item.weight, 0))
           next.push(child)
           expanded = true
 
@@ -592,7 +591,7 @@ function beamLayer(
                 score: 0,
                 placedArea: state.placedArea + macroArea,
               }
-              macroChild.score = stateScore(macroChild, z, supports, container, totalWeight + macroWeight)
+              macroChild.score = stateScore(macroChild, z, supports, container, macroChild.placed.reduce((sum, item) => sum + item.weight, 0))
               next.push(macroChild)
               expanded = true
             }
@@ -671,7 +670,7 @@ export function packSupportedLayers(
       )
       if (!supports.length) continue
 
-      const result = beamLayer(remaining, current, z, supports, container, weight)
+      const result = beamLayer(remaining, current, z, supports, container)
       if (result.placed.length <= current.length) continue
 
       // Fill the lowest viable support plane first. Comparing the raw score
