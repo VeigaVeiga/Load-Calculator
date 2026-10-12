@@ -6,6 +6,7 @@ const MAX_OVERHANG_RATIO = 0.25
 const BEAM_WIDTH = 8
 const MAX_LAYER_STEPS = 72
 const MAX_CANDIDATES_PER_UNIT = 48
+const MAX_SUPERITEM_UNITS = 8
 
 export type LayerUnit = { cargo: Cargo; index: number }
 
@@ -498,6 +499,42 @@ function stateScore(state: State, z: number, supports: PlacedCargo[], container:
     centerPenalty * 0.8
 }
 
+function growSuperitem(
+  seedUnit: LayerUnit,
+  seedPlacement: PlacedCargo,
+  state: State,
+  z: number,
+  supports: PlacedCargo[],
+  container: Container,
+) {
+  const group: PlacedCargo[] = [seedPlacement]
+  const consumed: LayerUnit[] = [seedUnit]
+  const pool = state.remaining.filter(u => u !== seedUnit && u.cargo.id === seedUnit.cargo.id)
+
+  while (group.length < MAX_SUPERITEM_UNITS && pool.length) {
+    const groupArea = group.reduce((sum, p) => { const d = footprint(p); return sum + d.length * d.width }, 0)
+    const expandedState: State = { ...state, placed: [...state.placed, ...group], remaining: pool, placedArea: state.placedArea + groupArea }
+    const sameLevel = expandedState.placed.filter(p => Math.abs(p.z - z) <= EPS)
+    let best: { unit: LayerUnit; placement: PlacedCargo; adjacency: number } | null = null
+
+    for (const unit of pool) {
+      if (!canUseUnit(unit, expandedState.placed)) continue
+      const candidates = candidatePlacements(unit, z, expandedState, supports, container)
+      for (const placement of candidates) {
+        if (placement.rotation !== seedPlacement.rotation) continue
+        const adjacency = sameLevelAdjacency(placement, sameLevel)
+        if (adjacency <= EPS) continue
+        if (!best || adjacency > best.adjacency) best = { unit, placement, adjacency }
+        break
+      }
+    }
+    if (!best) break
+    group.push(best.placement)
+    consumed.push(best.unit)
+    pool.splice(pool.indexOf(best.unit), 1)
+  }
+  return { placed: group, units: consumed }
+}
 function beamLayer(
   units: LayerUnit[],
   initial: PlacedCargo[],
@@ -528,17 +565,36 @@ function beamLayer(
       for (const u of eligible) {
         const candidates = candidatePlacements(u, z, state, supports, container)
         for (const p of candidates) {
-          const remaining = state.remaining.filter((x) => x !== u)
           const d = footprint(p)
           const child: State = {
             placed: [...state.placed, p],
-            remaining,
+            remaining: state.remaining.filter((x) => x !== u),
             score: 0,
             placedArea: state.placedArea + d.length * d.width,
           }
           child.score = stateScore(child, z, supports, container, totalWeight + p.weight)
           next.push(child)
           expanded = true
+
+          // Also explore a compact adjacent block of identical units. Keep the
+          // single-unit branch for irregular gaps; the macro branch reduces
+          // search depth and discourages scattered same-SKU placements.
+          if (state.remaining.some(x => x !== u && x.cargo.id === u.cargo.id)) {
+            const macro = growSuperitem(u, p, state, z, supports, container)
+            if (macro.placed.length > 1) {
+              const macroArea = macro.placed.reduce((sum, item) => { const itemDims = footprint(item); return sum + itemDims.length * itemDims.width }, 0)
+              const macroWeight = macro.placed.reduce((sum, item) => sum + item.weight, 0)
+              const macroChild: State = {
+                placed: [...state.placed, ...macro.placed],
+                remaining: state.remaining.filter(x => !macro.units.includes(x)),
+                score: 0,
+                placedArea: state.placedArea + macroArea,
+              }
+              macroChild.score = stateScore(macroChild, z, supports, container, totalWeight + macroWeight)
+              next.push(macroChild)
+              expanded = true
+            }
+          }
         }
       }
     }
