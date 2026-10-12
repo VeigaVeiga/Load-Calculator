@@ -32,8 +32,6 @@ const T = {
     pallet: '托盘',
     crate: '木箱',
     auto: '自动装柜',
-    opt: '⚖ 优化重量负载',
-    optimizing: '正在优化重量负载…',
     clear: '清除未锁定',
     properties: '货物属性',
     weight: '重量分析',
@@ -123,8 +121,6 @@ const T = {
     pallet: 'Pallet',
     crate: 'Wood Crate',
     auto: 'Auto Pack',
-    opt: 'Optimize Load',
-    optimizing: 'Optimizing load…',
     clear: 'Clear Unlocked',
     properties: 'Cargo',
     weight: 'Weight Analysis',
@@ -304,7 +300,6 @@ function App() {
   const [showDimensions, setShowDimensions] = useState(false)
   const [airBagStretch] = useState(false)
   const [packingProgress, setPackingProgress] = useState<number | null>(null)
-  const [optimizing, setOptimizing] = useState(false)
   const packingControllerRef = useRef<AbortController | null>(null)
 
 
@@ -735,65 +730,6 @@ function App() {
     setMessage(lang === 'zh' ? '已取消装柜计算' : 'Packing cancelled')
   }
 
-  const runLoadOptimization = async () => {
-    if (optimizing || packingProgress !== null || placed.length < 2) return
-    const controller = new AbortController()
-    packingControllerRef.current = controller
-    setOptimizing(true)
-    setPackingProgress(0)
-    setMessage('')
-
-    const worker = new Worker(new URL('./packing/loadOptimizer.worker.ts', import.meta.url), { type: 'module' })
-
-    const cleanup = () => {
-      worker.onmessage = null
-      worker.onerror = null
-      controller.signal.removeEventListener('abort', abort)
-      worker.terminate()
-    }
-    const abort = () => {
-      cleanup()
-      controller.abort()
-    }
-
-    controller.signal.addEventListener('abort', abort, { once: true })
-
-    try {
-      const result = await new Promise<any>((resolve, reject) => {
-        worker.onmessage = event => {
-          const message = event.data
-          if (message?.type === 'progress') {
-            setPackingProgress(Math.min(100, Math.max(0, Math.round(message.percent))))
-          } else if (message?.type === 'result') {
-            resolve(message.result)
-          } else if (message?.type === 'error') {
-            reject(new Error(message.message || 'Load optimization worker failed'))
-          }
-        }
-        worker.onerror = event => reject(event.error instanceof Error ? event.error : new Error(event.message || 'Load optimization worker failed'))
-        worker.postMessage({ items: placed, container })
-      })
-
-      if (controller.signal.aborted) return
-      setPlaced(result.placed)
-      setSelectedId(null)
-      setSelectedIds([])
-      setMessage(result.improved
-        ? (lang === 'zh' ? '重量负载优化完成' : 'Load balance optimization complete')
-        : (lang === 'zh' ? '当前方案已接近最佳重量分布，未作改动' : 'Current plan was already near the best load balance'))
-    } catch (error) {
-      if (!controller.signal.aborted) {
-        console.error(error)
-        setMessage(lang === 'zh' ? '重量负载优化失败，请重试' : 'Load optimization failed')
-      }
-    } finally {
-      cleanup()
-      if (packingControllerRef.current === controller) packingControllerRef.current = null
-      setOptimizing(false)
-      setPackingProgress(null)
-    }
-  }
-
   const addMaterial = (
     type: SecuringMaterialType,
   ): string => {
@@ -1140,12 +1076,8 @@ function App() {
           </div>
 
           <div className="tool-row">
-            <button disabled={packingProgress !== null || optimizing} onClick={() => void runPacking(container)}>
+            <button disabled={packingProgress !== null} onClick={() => void runPacking(container)}>
               {tr.auto}
-            </button>
-
-            <button disabled={packingProgress !== null || optimizing || placed.length < 2} onClick={() => void runLoadOptimization()}>
-              {optimizing ? tr.optimizing : tr.opt}
             </button>
 
             <button
@@ -1566,7 +1498,7 @@ function App() {
                   <div className="packing-kicker">{lang === 'zh' ? '装载计算中' : 'PACKING IN PROGRESS'}</div>
                   <strong>{packingProgress}%</strong>
                   <div className="packing-track"><i style={{ width: `${packingProgress}%` }} /></div>
-                  <span>{lang === 'zh' ? '正在搜索摆放位置与旋转组合，请稍候…' : 'Searching placement and rotation combinations…'}</span>
+                  <span>{lang === 'zh' ? '正在生成并优化装柜方案，请稍候…' : 'Generating and optimizing the loading plan…'}</span>
                   <button className="packing-cancel" onClick={cancelPacking}>{lang === 'zh' ? '取消计算' : 'Cancel'}</button>
                 </div>
               </div>
