@@ -114,8 +114,11 @@ function refineBySequenceSearch(
   ).sort((a, b) =>
     b.volume - a.volume || b.footprint - a.footprint || b.weight - a.weight || a.key.localeCompare(b.key),
   )
-  let current = openSourcePackCandidate(cargo, container, locked, 'sequence', order.map(item => item.key))
-  if (!current || !validatePlan(current, container, cargo).ok) current = [...incumbent]
+  const seed = openSourcePackCandidate(cargo, container, locked, 'sequence', order.map(item => item.key))
+  if (!seed || !validatePlan(seed, container, cargo).ok) {
+    return { placed: [...incumbent], quality: annealingQuality(incumbent, container), iterations: 0 }
+  }
+  let current = seed
   let currentQuality = annealingQuality(current, container)
   let best = [...incumbent]
   let bestScore = score(best, container)
