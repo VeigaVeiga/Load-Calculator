@@ -161,34 +161,43 @@ function generateAnchors(
 ) {
   const p = items[index]
   const d = dims(p)
-  const xs = new Set<number>([
-    0,
-    Math.max(0, container.length - d.length),
-    Math.max(0, Math.round((container.length - d.length) / 2 / 10) * 10),
-    p.x,
-  ])
-  const ys = new Set<number>([
-    0,
-    Math.max(0, container.width - d.width),
-    Math.max(0, Math.round((container.width - d.width) / 2 / 10) * 10),
-    p.y,
-  ])
+  const candidates = new Map<string, [number, number]>()
+  const add = (x: number, y: number) => {
+    const nx = Math.round(x / 10) * 10
+    const ny = Math.round(y / 10) * 10
+    if (nx < -EPS || ny < -EPS || nx + d.length > container.length + EPS || ny + d.width > container.width + EPS) return
+    candidates.set(nx + '|' + ny, [nx, ny])
+  }
+
+  // A bounded set of meaningful anchors avoids the old Cartesian product of
+  // every X edge with every Y edge, which grew quadratically per item.
+  add(p.x, p.y)
+  add(0, p.y)
+  add(container.length - d.length, p.y)
+  add(p.x, 0)
+  add(p.x, container.width - d.width)
+  add((container.length - d.length) / 2, (container.width - d.width) / 2)
+  add(container.length / 2 - d.length / 2, p.y)
+  add(p.x, container.width / 2 - d.width / 2)
 
   for (const q of items) {
     if (q.id === p.id || q.z > EPS) continue
     const qd = dims(q)
-    xs.add(Math.round(q.x / 10) * 10)
-    xs.add(Math.round((q.x + qd.length - d.length) / 10) * 10)
-    xs.add(Math.round((q.x + qd.length) / 10) * 10)
-    ys.add(Math.round(q.y / 10) * 10)
-    ys.add(Math.round((q.y + qd.width - d.width) / 10) * 10)
-    ys.add(Math.round((q.y + qd.width) / 10) * 10)
+    // Edge-adjacent placements only: preserve one coordinate while aligning
+    // the other to a neighbour, plus a small set of corner combinations.
+    for (const x of [q.x - d.length, q.x + qd.length, q.x, q.x + qd.length - d.length]) {
+      add(x, q.y)
+      add(x, q.y + qd.width - d.width)
+    }
+    for (const y of [q.y - d.width, q.y + qd.width, q.y, q.y + qd.width - d.width]) {
+      add(q.x, y)
+      add(q.x + qd.length - d.length, y)
+    }
+    if (candidates.size >= 96) break
   }
 
-  return [...xs].filter((x) => x >= 0 && x + d.length <= container.length + EPS)
-    .flatMap((x) => [...ys].filter((y) => y >= 0 && y + d.width <= container.width + EPS).map((y) => [x, y] as [number, number]))
+  return [...candidates.values()]
 }
-
 export async function optimizeLoad(
   initial: PlacedCargo[],
   container: Container,
@@ -199,7 +208,7 @@ export async function optimizeLoad(
     return { placed: initial.map((p) => ({ ...p })), iterations: 0, improved: false, scoreBefore: score, scoreAfter: score }
   }
 
-  const maxIterations = Math.max(100, options.maxIterations ?? 700)
+  const maxIterations = Math.max(100, options.maxIterations ?? 320)
   const rng = seededRandom(
     Math.round(container.length * 31 + container.width * 17 + initial.length * 13),
   )
@@ -256,7 +265,7 @@ export async function optimizeLoad(
 
   // Start with deterministic physically meaningful anchors. This gives the
   // optimizer a useful basin before stochastic exploration begins.
-  for (const { i } of movable) {
+  for (const { i } of movable.slice(0, 28)) {
     const anchors = generateAnchors(current, i, container)
     let localBest = current
     let localScore = currentScore
