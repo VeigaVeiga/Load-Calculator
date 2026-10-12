@@ -425,18 +425,38 @@ export function heuristicPack(cargo: Cargo[], container: Container, locked: Plac
     else unplaced.push(u.cargo)
   }
 
-  // Final audit is intentionally a single pass; the hot loop never calls the
-  // expensive application validator.
-  const audit = validatePlan(placed, container, cargo)
-  if (!audit.ok) {
-    const bad = new Set(audit.errors.map(e => e.split(':', 1)[0]))
-    for (let i = placed.length - 1; i >= 0; i -= 1) {
-      if (!placed[i].locked && bad.has(placed[i].id)) unplaced.push(cargo.find(c => c.id === placed[i].cargoId) ?? cargo[0])
+  // Iterative final audit. Removing a bad support item can invalidate cargo
+  // above it, so a single validation pass is insufficient. Revalidate after
+  // every removal until the plan is feasible or only locked placements remain.
+  let audit = validatePlan(placed, container, cargo)
+  let repairBudget = placed.length + 1
+  while (!audit.ok && repairBudget-- > 0) {
+    const badIds = new Set(audit.errors
+      .filter(e => e.includes(':'))
+      .map(e => e.split(':', 1)[0]))
+    let removeIndexes = placed
+      .map((p, index) => ({ p, index }))
+      .filter(({ p }) => !p.locked && badIds.has(p.id))
+      .map(({ index }) => index)
+
+    // Global errors (for example total payload) may not name a cargo ID.
+    // In that case remove one automatic unit and audit again; never silently
+    // return an overloaded or geometrically invalid candidate.
+    if (!removeIndexes.length) {
+      const lastAutomatic = placed.map((p, index) => ({ p, index }))
+        .filter(({ p }) => !p.locked)
+        .pop()
+      if (lastAutomatic) removeIndexes = [lastAutomatic.index]
     }
+    if (!removeIndexes.length) break
+
+    const removeSet = new Set(removeIndexes)
     for (let i = placed.length - 1; i >= 0; i -= 1) {
-      if (!placed[i].locked && bad.has(placed[i].id)) placed.splice(i, 1)
+      if (removeSet.has(i)) placed.splice(i, 1)
     }
+    audit = validatePlan(placed, container, cargo)
   }
+
 
   progress?.(100)
   return { placed, unplaced }
