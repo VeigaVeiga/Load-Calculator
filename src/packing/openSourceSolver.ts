@@ -1,4 +1,5 @@
 import { pack } from 'binpack3d'
+import { pack3D, RotationType } from './binpackingjs/3d'
 import type { Cargo, Container, PlacedCargo } from '../types'
 import { validatePlan } from './geometry'
 
@@ -140,6 +141,87 @@ export function openSourcePackCandidate(
     return accepted
   } catch (error) {
     console.error('[packing:binpack3d] candidate generation failed', error)
+    return null
+  }
+}
+
+
+/**
+ * Second independent candidate generator using MIT-licensed binpackingjs
+ * (pivot-based 3D packing with best-fit rotation scoring). This implementation
+ * has no runtime dependencies and is used as a peer candidate to binpack3d.
+ * Locked placements are intentionally handled by binpack3d, which supports
+ * obstacles; this adapter is used only when no locked cargo exists.
+ */
+export function binpackingJsCandidate(
+  cargo: Cargo[],
+  container: Container,
+): PlacedCargo[] | null {
+  if (cargo.some(item => Math.floor(item.quantity) < 0)) return null
+  try {
+    const cargoById = new Map(cargo.map(item => [item.id, item]))
+    const items = cargo.flatMap(item =>
+      Array.from({ length: Math.max(0, Math.floor(item.quantity)) }, (_, index) => ({
+        name: item.id + '#' + (index + 1),
+        width: item.length,
+        height: item.height,
+        depth: item.width,
+        weight: Math.max(0, item.weight),
+        // Standard carton/pallet loading keeps the height axis upright.
+        allowedRotations: item.rotatable === false
+          ? [RotationType.WHD] as const
+          : [RotationType.WHD, RotationType.DHW] as const,
+      })),
+    )
+    const result = pack3D({
+      bins: [{
+        name: container.id,
+        width: container.length,
+        height: container.height,
+        depth: container.width,
+        maxWeight: container.maxPayload > 0 ? container.maxPayload : Number.MAX_SAFE_INTEGER,
+      }],
+      items,
+    })
+    const proposed: PlacedCargo[] = (result.packedBins[0]?.items ?? []).flatMap(item => {
+      const id = item.sourceItem.name
+      const cargoId = id.slice(0, id.lastIndexOf('#'))
+      const source = cargoById.get(cargoId)
+      if (!source) return []
+      const [x, z, y] = item.position
+      const [length, height, width] = item.dimension
+      return [{
+        id,
+        cargoId,
+        cargoType: source.type,
+        x, y, z, length, width, height,
+        rotation: Math.abs(length - source.length) <= 0.5 ? 0 : 90,
+        weight: source.weight,
+        color: source.color,
+        placementMode: 'automatic' as const,
+        locked: false,
+        stackable: source.stackable,
+        loadBearing: source.loadBearing,
+        maxStackLayers: source.maxStackLayers,
+        maxLoadOnTop: source.maxLoadOnTop,
+        rotatable: source.rotatable,
+      }]
+    })
+
+    let accepted: PlacedCargo[] = []
+    const ordered = proposed.sort((a, b) => a.z - b.z || b.length * b.width - a.length * a.width || a.y - b.y || a.x - b.x)
+    for (const item of ordered) {
+      const trial = [...accepted, item]
+      if (validatePlan(trial, container, cargo).ok) accepted = trial
+    }
+    console.info('[packing:binpackingjs] candidate audit', {
+      proposed: proposed.length,
+      accepted: accepted.length,
+      unfit: result.unfitItems.length,
+    })
+    return accepted
+  } catch (error) {
+    console.error('[packing:binpackingjs] candidate generation failed', error)
     return null
   }
 }
