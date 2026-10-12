@@ -253,7 +253,29 @@ function score(p: PlacedCargo, placed: PlacedCargo[], container: Container) {
   const centerX = p.x + d.length / 2
   const centerY = p.y + d.width / 2
   const centerDistance = Math.abs(centerX - container.length / 2) + Math.abs(centerY - container.width / 2)
-  return stableSupport * 1_000_000 + layerReward + adjacency * 250 - orientationPenalty - centerDistance * 0.08 - rightGap * 0.004 - sideGap * 0.004
+
+  // Score the weighted centre of the whole partial arrangement, not just the
+  // candidate item's own position. The old per-item centre preference could
+  // still build a dense block against one wall because adjacency dominated.
+  let totalWeight = Math.max(0, p.weight)
+  let momentX = centerX * Math.max(0, p.weight)
+  let momentY = centerY * Math.max(0, p.weight)
+  for (const q of placed) {
+    const qd = footprint(q)
+    const w = Math.max(0, q.weight)
+    totalWeight += w
+    momentX += (q.x + qd.length / 2) * w
+    momentY += (q.y + qd.width / 2) * w
+  }
+  const cgX = totalWeight > EPS ? momentX / totalWeight : centerX
+  const cgY = totalWeight > EPS ? momentY / totalWeight : centerY
+  const balancePenalty =
+    Math.abs(cgX - container.length / 2) * 12 +
+    Math.abs(cgY - container.width / 2) * 55
+
+  return stableSupport * 1_000_000 + layerReward + adjacency * 250 -
+    orientationPenalty - balancePenalty - centerDistance * 0.08 -
+    rightGap * 0.004 - sideGap * 0.004
 }
 
 export function heuristicPack(cargo: Cargo[], container: Container, locked: PlacedCargo[] = [], progress?: (percent: number) => void, options: HeuristicOptions = {}): { placed: PlacedCargo[]; unplaced: Cargo[] } {
