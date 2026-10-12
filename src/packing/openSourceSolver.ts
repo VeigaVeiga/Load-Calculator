@@ -73,7 +73,7 @@ export function openSourcePackCandidate(
         obstacles,
       }],
       items,
-      options: { biggerFirst: true, distributeItems: true, numberOfDecimals: 0 },
+      options: { biggerFirst: false, distributeItems: true, numberOfDecimals: 0 },
     })
 
     const fitted = result.bins[0]?.fittedItems ?? []
