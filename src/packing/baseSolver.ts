@@ -142,12 +142,14 @@ function homogeneousGridCandidate(cargo: Cargo[], container: Container, locked: 
     const rows = Math.floor((container.width + EPS) / o.width)
     if (cols < 1 || rows < 1 || c.height > container.height + EPS) continue
     const placed = locked.map(p => ({ ...p }))
-    const count = Math.max(0, Math.floor(c.quantity))
+    const lockedCount = placed.filter(p => p.cargoId === c.id).length
+    const count = Math.max(0, Math.floor(c.quantity) - lockedCount)
     let idx = 0
     // Fill a continuous, edge-anchored grid. Evaluate both orientations;
     // never rotate individual units inside a homogeneous row/column pattern.
     for (let row = 0; row < rows && idx < count; row++) {
       for (let col = 0; col < cols && idx < count; col++) {
+        while (placed.some(q => q.id === c.id + '#' + (idx + 1))) idx++
         const p: PlacedCargo = {
           id: c.id + '#' + (idx + 1), cargoId: c.id, cargoType: c.type,
           x: col * o.length, y: row * o.width, z: 0,
@@ -220,24 +222,30 @@ export function basePack(
   const strategies: HeuristicOptions[] = mixed ? [{ gapStep: 0 }] : [{ gapStep: 0 }]
   const results: Array<{ result: SolverResult; options: HeuristicOptions }> = []
 
+  // Fast path before launching the general 3D search: a complete homogeneous
+  // floor grid is already the best first-stage answer for this simple case.
+  // This prevents the expensive general heuristic from delaying a solution
+  // that can be constructed directly from the container dimensions.
+  const gridCandidate = homogeneousGridCandidate(cargo, container, validLocked)
+  if (gridCandidate) {
+    const requested = cargo.reduce((sum, c) => sum + Math.max(0, Math.floor(c.quantity)), 0)
+    const placedRequested = gridCandidate.placed.filter(p => cargo.some(c => c.id === p.cargoId)).length
+    const gridAudit = validatePlan(gridCandidate.placed, container, cargo)
+    if (placedRequested >= requested && gridAudit.ok) {
+      progress?.(100)
+      return gridCandidate
+    }
+  }
+
   for (let i = 0; i < strategies.length; i += 1) {
     const branchProgress = (p: number) => progress?.(Math.round((i * 100 + p) / strategies.length))
     const result = heuristicPack(cargo, container, validLocked, branchProgress, strategies[i])
     results.push({ result, options: strategies[i] })
   }
 
-  const gridCandidate = homogeneousGridCandidate(cargo, container, validLocked)
   if (gridCandidate) {
-    const requested = cargo.reduce((sum, c) => sum + Math.max(0, Math.floor(c.quantity)), 0)
-    const packedRequested = gridCandidate.placed.filter(p => !p.locked).length
-    const gridAudit = validatePlan(gridCandidate.placed, container, cargo)
-    // If a uniform floor grid fits every requested unit, preserve it as the
-    // deterministic first-stage answer instead of letting a score function
-    // replace it with a centered but fragmented arrangement.
-    if (packedRequested >= requested && gridAudit.ok) {
-      progress?.(100)
-      return gridCandidate
-    }
+    // If the fast path cannot fit everything, keep it as another candidate
+    // for comparison with the general 3D solvers.
     results.push({ result: gridCandidate, options: { gapStep: 0 } })
   }
 
