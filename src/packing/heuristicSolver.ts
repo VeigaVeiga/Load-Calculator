@@ -7,8 +7,28 @@ const SUPPORT = 0.75
 
 type Unit = { cargo: Cargo; index: number }
 
+export type HeuristicOrder = 'area' | 'volume' | 'weight' | 'height' | 'longest-side' | 'density'
+
+export type HeuristicLayoutMode = 'foundation-first' | 'floor-first' | 'mixed'
+
 export type HeuristicOptions = {
   gapStep?: number
+  order?: HeuristicOrder
+  layoutMode?: HeuristicLayoutMode
+}
+
+function orderMetric(u: Unit, order: HeuristicOrder) {
+  const c = u.cargo
+  const area = c.length * c.width
+  const volume = area * c.height
+  switch (order) {
+    case 'area': return area
+    case 'weight': return c.weight
+    case 'height': return c.height
+    case 'longest-side': return Math.max(c.length, c.width)
+    case 'density': return c.weight / Math.max(1, volume)
+    case 'volume': return volume
+  }
 }
 
 function expand(cargo: Cargo[]): Unit[] {
@@ -281,66 +301,52 @@ function score(p: PlacedCargo, placed: PlacedCargo[], container: Container) {
 export function heuristicPack(cargo: Cargo[], container: Container, locked: PlacedCargo[] = [], progress?: (percent: number) => void, options: HeuristicOptions = {}): { placed: PlacedCargo[]; unplaced: Cargo[] } {
   const validLocked = locked.filter(p => fits(p, container))
   const placed = validLocked.map(p => ({ ...p }))
+  const order = options.order ?? 'volume'
   const units = expand(cargo)
     .filter(u => !placed.some(p => p.cargoId === u.cargo.id && p.id === u.cargo.id + '#' + (u.index + 1)))
     .sort((a, b) => {
-      const priority = (u: Unit) => {
-        const c = u.cargo
-        const area = c.length * c.width
-        const volume = area * c.height
-        const density = c.weight / Math.max(1, volume)
-        // Foundation priority is based on physical behaviour, not cargo type.
-        // Heavy, large-footprint and non-stackable cargo naturally belongs in
-        // the lower structure; light stackable cargo can be used as upper fill.
-        return (
-          (c.stackable === false ? 1_000_000 : 0) +
-          Math.min(300_000, c.weight * 500) +
-          Math.min(200_000, area * 0.5) +
-          Math.min(100_000, density * 10_000) +
-          Math.min(50_000, volume * 0.01)
-        )
-      }
-      return priority(b) - priority(a) || a.cargo.id.localeCompare(b.cargo.id)
+      // Keep physically non-stackable cargo ahead of fill cargo, but vary the
+      // ordering metric across deterministic runs so a single greedy sequence
+      // cannot dictate the whole mixed-cargo plan.
+      const nonStackable = Number(b.cargo.stackable === false) - Number(a.cargo.stackable === false)
+      if (nonStackable) return nonStackable
+      return orderMetric(b, order) - orderMetric(a, order) ||
+        (b.cargo.length * b.cargo.width - a.cargo.length * a.cargo.width) ||
+        a.cargo.id.localeCompare(b.cargo.id) || a.index - b.index
     })
 
   let totalWeight = placed.reduce((s, p) => s + p.weight, 0)
   const unplaced: Cargo[] = []
-  const uniqueCargo = new Set(units.map(u => u.cargo.id)).size
 
-  const maxWeight = Math.max(0, ...units.map((u) => u.cargo.weight))
   const maxArea = Math.max(1, ...units.map((u) => u.cargo.length * u.cargo.width))
-
-  const foundationScore = (u: Unit) => {
-    const c = u.cargo
-    const area = c.length * c.width
-    const weightRatio = maxWeight > 0 ? c.weight / maxWeight : 0
-    const areaRatio = area / maxArea
-    return (
-      (c.stackable === false ? 1_000_000 : 0) +
-      weightRatio * 500_000 +
-      areaRatio * 350_000
-    )
-  }
 
   // Mixed cargo is split by physical role rather than pallet/carton labels.
   // A cargo unit becomes foundation material when it is intrinsically
   // non-stackable, or is among the materially heavier/larger pieces. The
   // thresholds are relative to the actual shipment, so the rule adapts to
   // different cargo mixes without knowing "pallet" or "carton" semantics.
-  const foundationUnits = uniqueCargo <= 1
-    ? [...units]
-    : [...units]
-        .filter((u) => {
-          const c = u.cargo
-          const areaRatio = (c.length * c.width) / maxArea
-          // Foundation role is geometric/physical, not a relative weight test.
-          // Otherwise medium-heavy cartons are incorrectly forced onto the floor.
-          return c.stackable === false || areaRatio >= 0.6
-        })
-        .sort((a, b) => foundationScore(b) - foundationScore(a))
-  const foundationIds = new Set(foundationUnits.map(u => u.cargo.id + '#' + u.index))
-  const groundUnits = foundationUnits
-  const stackUnits = units.filter(u => !foundationIds.has(u.cargo.id + '#' + u.index) && u.cargo.stackable !== false)
+  // Generate distinct loading philosophies, not just different sort orders.
+  // foundation-first leaves stackable cartons available for pallet-top layers;
+  // floor-first tries to maximize floor coverage before stacking leftovers;
+  // mixed reserves the floor for non-stackable and large-footprint cargo while
+  // allowing medium pieces to compete for foundation space.
+  const layoutMode = options.layoutMode ?? 'foundation-first'
+  const foundationUnits = units.filter((u) => {
+    const c = u.cargo
+    const areaRatio = (c.length * c.width) / maxArea
+    if (c.stackable === false) return true
+    if (layoutMode === 'floor-first') return true
+    if (layoutMode === 'mixed') return areaRatio >= 0.35
+    return areaRatio >= 0.6
+  })
+  const groundUnits = [...foundationUnits].sort((a, b) => {
+    const nonStackable = Number(b.cargo.stackable === false) - Number(a.cargo.stackable === false)
+    if (nonStackable) return nonStackable
+    return orderMetric(b, order) - orderMetric(a, order) ||
+      (b.cargo.length * b.cargo.width - a.cargo.length * a.cargo.width) ||
+      (b.cargo.length * b.cargo.width * b.cargo.height - a.cargo.length * a.cargo.width * a.cargo.height) ||
+      a.cargo.id.localeCompare(b.cargo.id) || a.index - b.index
+  })
   const total = Math.max(1, units.length)
 
   for (let i = 0; i < groundUnits.length; i += 1) {
@@ -353,7 +359,7 @@ export function heuristicPack(cargo: Cargo[], container: Container, locked: Plac
       const d = rotation === 0
         ? { length: u.cargo.length, width: u.cargo.width }
         : { length: u.cargo.width, width: u.cargo.length }
-      const points = candidatePoints(placed, container, d.length, d.width, options.gapStep ?? 0, true).filter(p => uniqueCargo <= 1 ? true : p[2] <= EPS)
+      const points = candidatePoints(placed, container, d.length, d.width, options.gapStep ?? 0, true).filter(p => p[2] <= EPS)
       const candidates: PlacedCargo[] = []
       for (const [x, y, z] of points) {
         const p = makePlaced(u.cargo, u.index, x, y, z, rotation)
@@ -370,12 +376,24 @@ export function heuristicPack(cargo: Cargo[], container: Container, locked: Plac
     if (best) {
       placed.push(best)
       totalWeight += best.weight
-    } else {
-      unplaced.push(u.cargo)
     }
 
     if ((i & 7) === 0) progress?.(Math.round((i / total) * 100))
   }
+
+  // Stack every unplaced stackable unit, including small cartons deliberately
+  // deferred by foundation-first/mixed modes. Never duplicate units already
+  // placed on the floor or present as locked manual placements.
+  const alreadyPlaced = new Set(placed.map(p => p.id))
+  const stackUnits = units.filter(u =>
+    u.cargo.stackable !== false &&
+    !alreadyPlaced.has(u.cargo.id + '#' + (u.index + 1))
+  )
+  const nonStackableMissing = units.filter(u =>
+    u.cargo.stackable === false &&
+    !alreadyPlaced.has(u.cargo.id + '#' + (u.index + 1))
+  )
+  for (const u of nonStackableMissing) unplaced.push(u.cargo)
 
   const layerResult = packSupportedLayers(
     stackUnits as LayerUnit[],
@@ -386,9 +404,9 @@ export function heuristicPack(cargo: Cargo[], container: Container, locked: Plac
   )
   totalWeight = layerResult.totalWeight
 
-  // Any stackable cargo that could not find a stable support plane gets a final
-  // ground fallback. This is deliberately after layer packing so boxes do not
-  // consume floor space before the pallet-top layers have been filled.
+  // Retry any stackable cargo that could not find a stable support plane on
+  // the floor. Most units have already had a floor attempt; this retry matters
+  // when the layer planner changed the remaining set or found a new placement.
   for (const u of layerResult.remaining) {
     const rotations: Array<0 | 90> = u.cargo.rotatable === false || u.cargo.length === u.cargo.width ? [0] : [0, 90]
     let best: PlacedCargo | null = null
@@ -407,18 +425,38 @@ export function heuristicPack(cargo: Cargo[], container: Container, locked: Plac
     else unplaced.push(u.cargo)
   }
 
-  // Final audit is intentionally a single pass; the hot loop never calls the
-  // expensive application validator.
-  const audit = validatePlan(placed, container, cargo)
-  if (!audit.ok) {
-    const bad = new Set(audit.errors.map(e => e.split(':', 1)[0]))
-    for (let i = placed.length - 1; i >= 0; i -= 1) {
-      if (!placed[i].locked && bad.has(placed[i].id)) unplaced.push(cargo.find(c => c.id === placed[i].cargoId) ?? cargo[0])
+  // Iterative final audit. Removing a bad support item can invalidate cargo
+  // above it, so a single validation pass is insufficient. Revalidate after
+  // every removal until the plan is feasible or only locked placements remain.
+  let audit = validatePlan(placed, container, cargo)
+  let repairBudget = placed.length + 1
+  while (!audit.ok && repairBudget-- > 0) {
+    const badIds = new Set(audit.errors
+      .filter(e => e.includes(':'))
+      .map(e => e.split(':', 1)[0]))
+    let removeIndexes = placed
+      .map((p, index) => ({ p, index }))
+      .filter(({ p }) => !p.locked && badIds.has(p.id))
+      .map(({ index }) => index)
+
+    // Global errors (for example total payload) may not name a cargo ID.
+    // In that case remove one automatic unit and audit again; never silently
+    // return an overloaded or geometrically invalid candidate.
+    if (!removeIndexes.length) {
+      const lastAutomatic = placed.map((p, index) => ({ p, index }))
+        .filter(({ p }) => !p.locked)
+        .pop()
+      if (lastAutomatic) removeIndexes = [lastAutomatic.index]
     }
+    if (!removeIndexes.length) break
+
+    const removeSet = new Set(removeIndexes)
     for (let i = placed.length - 1; i >= 0; i -= 1) {
-      if (!placed[i].locked && bad.has(placed[i].id)) placed.splice(i, 1)
+      if (removeSet.has(i)) placed.splice(i, 1)
     }
+    audit = validatePlan(placed, container, cargo)
   }
+
 
   progress?.(100)
   return { placed, unplaced }

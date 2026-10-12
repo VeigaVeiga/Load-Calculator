@@ -57,9 +57,9 @@ function foundationCoverage(result: SolverResult, cargo: Cargo[]) {
   return actual / Math.max(1, expected)
 }
 
-function planQuality(result: SolverResult, container: Container, cargo: Cargo[]) {
+function planRank(result: SolverResult, container: Container, cargo: Cargo[]) {
   const placed = result.placed
-  if (!placed.length) return -Infinity
+  if (!placed.length) return [0, 0, 0, 0, 0, 0, 0]
 
   const volume = planVolume(placed)
   const totalWeight = placed.reduce((sum, p) => sum + p.weight, 0)
@@ -75,55 +75,79 @@ function planQuality(result: SolverResult, container: Container, cargo: Cargo[])
 
   const cgX = totalWeight > 0 ? weighted.x / totalWeight : container.length / 2
   const cgY = totalWeight > 0 ? weighted.y / totalWeight : container.width / 2
-  const cgZ = totalWeight > 0 ? weighted.z / totalWeight : container.height / 2
-
+  const cgZ = totalWeight > 0 ? weighted.z / totalWeight : container.height * 0.25
   const centerPenalty =
     Math.abs(cgX - container.length / 2) / Math.max(1, container.length) +
     Math.abs(cgY - container.width / 2) / Math.max(1, container.width)
 
   const levelPenalty = placed.reduce((sum, p) => {
     const d = dimsFor(p)
-    const centerX = p.x + d.length / 2
-    const centerY = p.y + d.width / 2
     return sum +
-      Math.abs(centerX - container.length / 2) * p.weight +
-      Math.abs(centerY - container.width / 2) * p.weight
+      Math.abs(p.x + d.length / 2 - container.length / 2) * p.weight +
+      Math.abs(p.y + d.width / 2 - container.width / 2) * p.weight
   }, 0) / Math.max(1, totalWeight)
 
-  // Count remains the first objective. These terms only break ties or close
-  // candidates, so the solver never sacrifices a loaded unit merely to polish
-  // geometry. Weight balance is deliberately a secondary objective; a future
-  // explicit "optimize load" action can search this space more aggressively.
+  // A compact floor footprint is a tie-breaker, never a reason to unload cargo.
+  // Bounding-box waste exposes scattered "island" placements without assuming
+  // anything about cargo labels or requiring pallet/carton-specific rules.
+  const floor = placed.filter(p => p.z <= EPS)
+  const floorArea = floor.reduce((sum, p) => {
+    const d = dimsFor(p)
+    return sum + d.length * d.width
+  }, 0)
+  const minX = floor.length ? Math.min(...floor.map(p => p.x)) : 0
+  const minY = floor.length ? Math.min(...floor.map(p => p.y)) : 0
+  const maxX = floor.length ? Math.max(...floor.map(p => p.x + dimsFor(p).length)) : 0
+  const maxY = floor.length ? Math.max(...floor.map(p => p.y + dimsFor(p).width)) : 0
+  const floorBoundingWaste = Math.max(0, (maxX - minX) * (maxY - minY) - floorArea)
   const foundation = foundationCoverage(result, cargo)
 
-  // Foundation completion is a hard strategic priority: an upper-layer
-  // solution must not sacrifice physically important lower cargo merely to
-  // gain more small cartons. This is derived from cargo attributes, not type.
-  return foundation * 5_000_000_000_000 +
-    placed.length * 1_000_000_000 +
-    volume * 10 +
-    totalWeight * 0.01 -
-    centerPenalty * 100_000 -
-    levelPenalty * 0.1 -
-    Math.abs(cgZ - container.height * 0.25) * 0.001
+  // Explicit lexicographic ranking avoids unit-dependent magic weights:
+  // 1) maximize safely loaded units, 2) loaded volume, 3) foundation completion,
+  // 4) compact floor layout, 5) global CG balance, then lower vertical CG.
+  return [
+    placed.length,
+    volume,
+    foundation,
+    -floorBoundingWaste,
+    -centerPenalty,
+    -levelPenalty,
+    -Math.abs(cgZ - container.height * 0.25),
+  ]
 }
 
-function chooseBest(results: Array<{ result: SolverResult; options: HeuristicOptions }>, container: Container, cargo: Cargo[]) {
-  let best = results[0]?.result
-  let bestScore = best ? planQuality(best, container, cargo) : -Infinity
+function comparePlans(a: SolverResult, b: SolverResult, container: Container, cargo: Cargo[]) {
+  const ar = planRank(a, container, cargo)
+  const br = planRank(b, container, cargo)
+  for (let i = 0; i < Math.max(ar.length, br.length); i += 1) {
+    const delta = (ar[i] ?? 0) - (br[i] ?? 0)
+    if (Math.abs(delta) > 1e-7) return delta > 0 ? 1 : -1
+  }
+  return 0
+}
 
-  for (let i = 1; i < results.length; i += 1) {
-    const candidate = results[i].result
-    const candidateScore = planQuality(candidate, container, cargo)
-    if (candidateScore > bestScore) {
-      best = candidate
-      bestScore = candidateScore
-    }
+function chooseBest(
+  results: Array<{ result: SolverResult; options: HeuristicOptions }>,
+  container: Container,
+  cargo: Cargo[],
+) {
+  // Feasibility is a gate, not a penalty. Previously an invalid candidate
+  // could win the score comparison and only be stripped after selection,
+  // even when another candidate was fully valid and nearly as good.
+  let best: SolverResult | undefined
+
+  for (const entry of results) {
+    const candidate = entry.result
+    if (!validatePlan(candidate.placed, container, cargo).ok) continue
+    if (!best || comparePlans(candidate, best, container, cargo) > 0) best = candidate
   }
 
-  return best ?? { placed: [], unplaced: [] }
+  if (best) return best
+  // If every automatic candidate fails validation, preserve the user's locked
+  // placements rather than silently discarding their manual work.
+  const lockedFallback = results[0]?.result.placed.filter(p => p.locked) ?? []
+  return { placed: lockedFallback, unplaced: completeUnplaced(cargo, lockedFallback) }
 }
-
 
 function homogeneousGridCandidate(cargo: Cargo[], container: Container, locked: PlacedCargo[]): SolverResult | null {
   const active = cargo.filter(c => Math.floor(c.quantity) > 0)
@@ -211,15 +235,33 @@ export function basePack(
 
   // Strategy branching is based only on physical geometry/constraints. Cargo
   // labels such as pallet/carton/crate must never change solver behaviour.
-  const signatures = new Set(cargo.map(c => [
-    c.length, c.width, c.height,
-    c.stackable, c.loadBearing, c.rotatable,
-    c.maxStackLayers, c.maxLoadOnTop,
-  ].join('|')))
-  const mixed = signatures.size > 1
   // Do not deliberately introduce floor gaps while solving the foundation.
   // Real gaps should emerge only when cargo dimensions/constraints require them.
-  const strategies: HeuristicOptions[] = mixed ? [{ gapStep: 0 }] : [{ gapStep: 0 }]
+  // Deterministic multi-start portfolio: each run keeps the same hard
+  // constraints but changes the item ordering so mixed shipments are not
+  // locked into one greedy sequence. Candidate plans are compared globally.
+  const requestedUnits = cargo.reduce((sum, c) => sum + Math.max(0, Math.floor(c.quantity)), 0)
+  const strategies: HeuristicOptions[] = requestedUnits > 160
+    ? [
+        { gapStep: 0, order: 'area', layoutMode: 'foundation-first' },
+        { gapStep: 0, order: 'volume', layoutMode: 'floor-first' },
+        { gapStep: 0, order: 'weight', layoutMode: 'mixed' },
+      ]
+    : requestedUnits > 80
+      ? [
+          { gapStep: 0, order: 'area', layoutMode: 'foundation-first' },
+          { gapStep: 0, order: 'volume', layoutMode: 'floor-first' },
+          { gapStep: 0, order: 'weight', layoutMode: 'mixed' },
+          { gapStep: 0, order: 'longest-side', layoutMode: 'foundation-first' },
+        ]
+      : [
+          { gapStep: 0, order: 'area', layoutMode: 'foundation-first' },
+          { gapStep: 0, order: 'volume', layoutMode: 'floor-first' },
+          { gapStep: 0, order: 'weight', layoutMode: 'mixed' },
+          { gapStep: 0, order: 'height', layoutMode: 'foundation-first' },
+          { gapStep: 0, order: 'longest-side', layoutMode: 'mixed' },
+          { gapStep: 0, order: 'density', layoutMode: 'floor-first' },
+        ]
   const results: Array<{ result: SolverResult; options: HeuristicOptions }> = []
 
   // Fast path before launching the general 3D search: a complete homogeneous
@@ -266,7 +308,13 @@ export function basePack(
       placed: openSourceCandidate,
       unplaced: completeUnplaced(cargo, openSourceCandidate),
     }
-    if (planQuality(candidateResult, container, cargo) > planQuality(result, container, cargo)) {
+    // Never let an infeasible open-source layout displace a valid plan.
+    // Candidate generation is advisory; the application validator owns the
+    // final geometry, support, stacking and payload rules.
+    if (
+      validatePlan(candidateResult.placed, container, cargo).ok &&
+      comparePlans(candidateResult, result, container, cargo) > 0
+    ) {
       result = candidateResult
     }
     progress?.(Math.round(75 + ((i + 1) / candidateOrders.length) * 25))

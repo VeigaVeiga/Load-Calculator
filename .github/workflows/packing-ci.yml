@@ -1,0 +1,33 @@
+name: Packing engine CI
+
+on:
+  pull_request:
+    paths:
+      - 'src/packing/**'
+      - 'src/types.ts'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'tsconfig*.json'
+      - '.github/workflows/packing-ci.yml'
+  push:
+    branches:
+      - main
+      - feature/packing-engine-v2
+
+jobs:
+  typecheck-and-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Run packing regression fixtures
+        run: npm run test:packing
+      - name: Type-check and build production bundle
+        run: npm run build

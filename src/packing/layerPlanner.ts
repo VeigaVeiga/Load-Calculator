@@ -6,6 +6,7 @@ const MAX_OVERHANG_RATIO = 0.25
 const BEAM_WIDTH = 8
 const MAX_LAYER_STEPS = 72
 const MAX_CANDIDATES_PER_UNIT = 48
+const MAX_SUPERITEM_UNITS = 8
 
 export type LayerUnit = { cargo: Cargo; index: number }
 
@@ -337,7 +338,6 @@ function validCandidate(
   p: PlacedCargo,
   state: State,
   container: Container,
-  totalWeight: number,
 ) {
   const d = footprint(p)
   if (p.x < -EPS || p.y < -EPS || p.z < -EPS ||
@@ -346,7 +346,11 @@ function validCandidate(
       p.z + p.height > container.height + EPS) return false
 
   if (state.placed.some((q) => overlap(p, q))) return false
-  if (container.maxPayload > 0 && totalWeight + p.weight > container.maxPayload + EPS) return false
+  // Beam states can already contain several newly placed units. Recompute the
+  // actual state weight here; using the layer's initial weight under-counts
+  // payload during beam expansion and can admit an overloaded candidate.
+  const stateWeight = state.placed.reduce((sum, item) => sum + item.weight, 0)
+  if (container.maxPayload > 0 && stateWeight + p.weight > container.maxPayload + EPS) return false
   if (p.z <= EPS) return true
 
   const support = supportMetrics(p, state.placed)
@@ -369,7 +373,6 @@ function candidatePlacements(
   state: State,
   supports: PlacedCargo[],
   container: Container,
-  totalWeight: number,
 ): PlacedCargo[] {
   const rotations: Array<0 | 90> = u.cargo.rotatable === false || u.cargo.length === u.cargo.width
     ? [0]
@@ -421,7 +424,7 @@ function candidatePlacements(
       for (const [x, y] of candidatePositions(r, d.length, d.width, sameLevel)) {
         const p = makePlaced(u.cargo, u.index, x, y, z, rotation)
         const key = [Math.round(x), Math.round(y), rotation].join('|')
-        if (seen.has(key) || !validCandidate(p, state, container, totalWeight)) continue
+        if (seen.has(key) || !validCandidate(p, state, container)) continue
         seen.add(key)
         local.push(p)
       }
@@ -496,13 +499,48 @@ function stateScore(state: State, z: number, supports: PlacedCargo[], container:
     centerPenalty * 0.8
 }
 
+function growSuperitem(
+  seedUnit: LayerUnit,
+  seedPlacement: PlacedCargo,
+  state: State,
+  z: number,
+  supports: PlacedCargo[],
+  container: Container,
+) {
+  const group: PlacedCargo[] = [seedPlacement]
+  const consumed: LayerUnit[] = [seedUnit]
+  const pool = state.remaining.filter(u => u !== seedUnit && u.cargo.id === seedUnit.cargo.id).slice(0, MAX_SUPERITEM_UNITS - 1)
+
+  while (group.length < MAX_SUPERITEM_UNITS && pool.length) {
+    const groupArea = group.reduce((sum, p) => { const d = footprint(p); return sum + d.length * d.width }, 0)
+    const expandedState: State = { ...state, placed: [...state.placed, ...group], remaining: pool, placedArea: state.placedArea + groupArea }
+    const sameLevel = expandedState.placed.filter(p => Math.abs(p.z - z) <= EPS)
+    let best: { unit: LayerUnit; placement: PlacedCargo; adjacency: number } | null = null
+
+    for (const unit of pool) {
+      if (!canUseUnit(unit, expandedState.placed)) continue
+      const candidates = candidatePlacements(unit, z, expandedState, supports, container)
+      for (const placement of candidates) {
+        if (placement.rotation !== seedPlacement.rotation) continue
+        const adjacency = sameLevelAdjacency(placement, sameLevel)
+        if (adjacency <= EPS) continue
+        if (!best || adjacency > best.adjacency) best = { unit, placement, adjacency }
+        break
+      }
+    }
+    if (!best) break
+    group.push(best.placement)
+    consumed.push(best.unit)
+    pool.splice(pool.indexOf(best.unit), 1)
+  }
+  return { placed: group, units: consumed }
+}
 function beamLayer(
   units: LayerUnit[],
   initial: PlacedCargo[],
   z: number,
   supports: PlacedCargo[],
   container: Container,
-  totalWeight: number,
 ): State {
   let beam: State[] = [{
     placed: [...initial],
@@ -524,19 +562,40 @@ function beamLayer(
         .slice(0, 8)
 
       for (const u of eligible) {
-        const candidates = candidatePlacements(u, z, state, supports, container, totalWeight)
-        for (const p of candidates) {
-          const remaining = state.remaining.filter((x) => x !== u)
+        const candidates = candidatePlacements(u, z, state, supports, container)
+        for (let candidateIndex = 0; candidateIndex < candidates.length; candidateIndex += 1) {
+          const p = candidates[candidateIndex]
           const d = footprint(p)
           const child: State = {
             placed: [...state.placed, p],
-            remaining,
+            remaining: state.remaining.filter((x) => x !== u),
             score: 0,
             placedArea: state.placedArea + d.length * d.width,
           }
-          child.score = stateScore(child, z, supports, container, totalWeight + p.weight)
+          child.score = stateScore(child, z, supports, container, child.placed.reduce((sum, item) => sum + item.weight, 0))
           next.push(child)
           expanded = true
+
+          // Also explore a compact adjacent block of identical units. Keep the
+          // single-unit branch for irregular gaps; the macro branch reduces
+          // search depth and discourages scattered same-SKU placements.
+          if (step === 0 && state === beam[0] && u === eligible[0] && candidateIndex < 2 &&
+              state.remaining.some(x => x !== u && x.cargo.id === u.cargo.id)) {
+            const macro = growSuperitem(u, p, state, z, supports, container)
+            if (macro.placed.length > 1) {
+              const macroArea = macro.placed.reduce((sum, item) => { const itemDims = footprint(item); return sum + itemDims.length * itemDims.width }, 0)
+              const macroWeight = macro.placed.reduce((sum, item) => sum + item.weight, 0)
+              const macroChild: State = {
+                placed: [...state.placed, ...macro.placed],
+                remaining: state.remaining.filter(x => !macro.units.includes(x)),
+                score: 0,
+                placedArea: state.placedArea + macroArea,
+              }
+              macroChild.score = stateScore(macroChild, z, supports, container, macroChild.placed.reduce((sum, item) => sum + item.weight, 0))
+              next.push(macroChild)
+              expanded = true
+            }
+          }
         }
       }
     }
@@ -611,7 +670,7 @@ export function packSupportedLayers(
       )
       if (!supports.length) continue
 
-      const result = beamLayer(remaining, current, z, supports, container, weight)
+      const result = beamLayer(remaining, current, z, supports, container)
       if (result.placed.length <= current.length) continue
 
       // Fill the lowest viable support plane first. Comparing the raw score
