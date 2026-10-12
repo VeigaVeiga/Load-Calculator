@@ -1,6 +1,6 @@
 import type { Cargo, Container, PlacedCargo } from '../types'
 import { validatePlan } from './geometry'
-import { openSourcePackCandidate } from './openSourceSolver'
+import { binpackingJsCandidate, openSourcePackCandidate } from './openSourceSolver'
 
 export type SolverResult = {
   placed: PlacedCargo[]
@@ -76,6 +76,26 @@ export function basePack(
     }
     progress?.(Math.round(((i + 1) / orders.length) * 95))
   }
+
+  // A second, independent open-source pivot-based solver provides a
+  // genuinely different candidate for shipments without manually locked items.
+  if (locked.length === 0) {
+    const candidate = binpackingJsCandidate(cargo, container)
+    if (candidate && validatePlan(candidate, container, cargo).ok) {
+      const candidateScore = score(candidate, container)
+      let better = false
+      for (let j = 0; j < candidateScore.length; j += 1) {
+        if (candidateScore[j] === bestScore[j]) continue
+        better = candidateScore[j] > bestScore[j]
+        break
+      }
+      if (better) {
+        best = candidate
+        bestScore = candidateScore
+      }
+    }
+  }
+  progress?.(98)
 
   const result = { placed: best, unplaced: completeUnplaced(cargo, best) }
   // Never return a geometrically invalid automatic plan.
