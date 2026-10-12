@@ -215,12 +215,6 @@ export function basePack(
 
   // Strategy branching is based only on physical geometry/constraints. Cargo
   // labels such as pallet/carton/crate must never change solver behaviour.
-  const signatures = new Set(cargo.map(c => [
-    c.length, c.width, c.height,
-    c.stackable, c.loadBearing, c.rotatable,
-    c.maxStackLayers, c.maxLoadOnTop,
-  ].join('|')))
-  const mixed = signatures.size > 1
   // Do not deliberately introduce floor gaps while solving the foundation.
   // Real gaps should emerge only when cargo dimensions/constraints require them.
   // Deterministic multi-start portfolio: each run keeps the same hard
