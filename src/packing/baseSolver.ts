@@ -1,6 +1,7 @@
 import type { Cargo, Container, PlacedCargo } from '../types'
 import { validatePlan } from './geometry'
 import { heuristicPack, type HeuristicOptions } from './heuristicSolver'
+import { openSourcePackCandidate } from './openSourceSolver'
 
 const EPS = 0.5
 
@@ -169,7 +170,21 @@ export function basePack(
     results.push({ result, options: strategies[i] })
   }
 
-  const result = chooseBest(results, container, cargo)
+  let result = chooseBest(results, container, cargo)
+
+  // Run an independent open-source corner-point solver as a second candidate.
+  // It is accepted only when our stricter app-specific validator approves it;
+  // then the existing objective chooses the better of the two valid plans.
+  const openSourceCandidate = openSourcePackCandidate(cargo, container, validLocked)
+  if (openSourceCandidate) {
+    const candidateResult: SolverResult = {
+      placed: openSourceCandidate,
+      unplaced: completeUnplaced(cargo, openSourceCandidate),
+    }
+    if (planQuality(candidateResult, container, cargo) > planQuality(result, container, cargo)) {
+      result = candidateResult
+    }
+  }
 
   // Never expose an invalid automatic result. If the final audit rejects
   // anything, keep the valid locked state and let the unplaced list reflect
