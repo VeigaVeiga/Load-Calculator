@@ -63,12 +63,11 @@ function weightedDistributionScore(items: PlacedCargo[], container: Container) {
   }
   const endImbalance = Math.abs(front - rear) / total
 
-  // Lateral balance is a hard practical concern for container loading: a plan
-  // with nearly all weight on one side must score materially worse, even when
-  // the longitudinal CG and corner totals look acceptable.
-  const sideImbalance = Math.abs(a.left - a.right) / total
-  const endHalfImbalance = Math.abs(a.front - a.rear) / total
-  return cgX * 55 + cgY * 90 + sideImbalance * 45 + endHalfImbalance * 18 + quadrant * 12 + cgZ * 4 + endImbalance * 8
+  // Moment-based CG is continuous and remains correct when a single row sits
+  // exactly on the centreline. Half-container buckets are only a weak
+  // secondary signal because a centreline item must not be counted as an
+  // entire-side imbalance merely due to a strict < comparison.
+  return cgX * 55 + cgY * 110 + quadrant * 3 + cgZ * 4 + endImbalance * 8
 }
 
 function objective(items: PlacedCargo[], container: Container) {
