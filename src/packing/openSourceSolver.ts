@@ -46,14 +46,14 @@ export function openSourcePackCandidate(
       }).flat(),
     )
 
+    const sequenceRanks = new Map(sequenceOrder.map((id, index) => [id, index]))
     items.sort((a, b) => {
       // LoadZa-style sequence search supplies a deliberate item order. Keep it
       // intact instead of sorting it away; modern JS sort is stable, but an
       // explicit equality makes this contract clear.
       if (order === 'sequence') {
         if (sequenceOrder.length === 0) return 0
-        const rank = new Map(sequenceOrder.map((id, index) => [id, index]))
-        return (rank.get(a.partno) ?? Number.MAX_SAFE_INTEGER) - (rank.get(b.partno) ?? Number.MAX_SAFE_INTEGER)
+        return (sequenceRanks.get(a.partno) ?? Number.MAX_SAFE_INTEGER) - (sequenceRanks.get(b.partno) ?? Number.MAX_SAFE_INTEGER)
       }
       const score = (item: typeof a) => {
         const [length, height, width] = item.whd
