@@ -318,7 +318,6 @@ export function heuristicPack(cargo: Cargo[], container: Container, locked: Plac
   let totalWeight = placed.reduce((s, p) => s + p.weight, 0)
   const unplaced: Cargo[] = []
 
-  const maxWeight = Math.max(0, ...units.map((u) => u.cargo.weight))
   const maxArea = Math.max(1, ...units.map((u) => u.cargo.length * u.cargo.width))
 
   const foundationScore = (u: Unit) => {
@@ -360,7 +359,6 @@ export function heuristicPack(cargo: Cargo[], container: Container, locked: Plac
       (b.cargo.length * b.cargo.width * b.cargo.height - a.cargo.length * a.cargo.width * a.cargo.height) ||
       a.cargo.id.localeCompare(b.cargo.id) || a.index - b.index
   })
-  const groundFailed: Unit[] = []
   const total = Math.max(1, units.length)
 
   for (let i = 0; i < groundUnits.length; i += 1) {
@@ -390,8 +388,6 @@ export function heuristicPack(cargo: Cargo[], container: Container, locked: Plac
     if (best) {
       placed.push(best)
       totalWeight += best.weight
-    } else {
-      groundFailed.push(u)
     }
 
     if ((i & 7) === 0) progress?.(Math.round((i / total) * 100))
