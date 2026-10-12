@@ -1,229 +1,43 @@
 import type { Cargo, Container, PlacedCargo } from '../types'
 import { validatePlan } from './geometry'
-import { heuristicPack, type HeuristicOptions } from './heuristicSolver'
 import { openSourcePackCandidate } from './openSourceSolver'
-
-const EPS = 0.5
 
 export type SolverResult = {
   placed: PlacedCargo[]
   unplaced: Cargo[]
 }
 
-function dimsFor(p: PlacedCargo) {
-  return p.rotation % 180 === 0
-    ? { length: p.length, width: p.width }
-    : { length: p.width, width: p.length }
-}
-
-function fits(p: PlacedCargo, c: Container) {
-  const d = dimsFor(p)
-  return p.x >= -EPS && p.y >= -EPS && p.z >= -EPS &&
-    p.x + d.length <= c.length + EPS &&
-    p.y + d.width <= c.width + EPS &&
-    p.z + p.height <= c.height + EPS
-}
-
-
-
-function planVolume(placed: PlacedCargo[]) {
-  return placed.reduce((sum, p) => {
-    const d = dimsFor(p)
-    return sum + d.length * d.width * p.height
-  }, 0)
-}
-
-function foundationCoverage(result: SolverResult, cargo: Cargo[]) {
-  const maxArea = Math.max(1, ...cargo.map((c) => c.length * c.width))
-  const uniqueCargo = new Set(cargo.map((c) => c.id)).size
-  if (uniqueCargo <= 1) return 0
-
-  const foundationIds = new Set(
-    cargo
-      .filter((c) => {
-        const areaRatio = (c.length * c.width) / maxArea
-        // Weight alone does not make a cargo unit foundation material:
-        // a heavy but stackable carton must remain eligible for upper layers.
-        return c.stackable === false || areaRatio >= 0.6
-      })
-      .map((c) => c.id),
-  )
-  if (!foundationIds.size) return 0
-
-  const expected = cargo
-    .filter((c) => foundationIds.has(c.id))
-    .reduce((sum, c) => sum + Math.max(0, Math.floor(c.quantity)), 0)
-  const actual = result.placed.filter((p) => foundationIds.has(p.cargoId)).length
-  return actual / Math.max(1, expected)
-}
-
-function planRank(result: SolverResult, container: Container, cargo: Cargo[]) {
-  const placed = result.placed
-  if (!placed.length) return [0, 0, 0, 0, 0, 0, 0]
-
-  const volume = planVolume(placed)
-  const totalWeight = placed.reduce((sum, p) => sum + p.weight, 0)
-  const weighted = placed.reduce((acc, p) => {
-    const d = dimsFor(p)
-    const weight = Math.max(0, p.weight)
-    return {
-      x: acc.x + (p.x + d.length / 2) * weight,
-      y: acc.y + (p.y + d.width / 2) * weight,
-      z: acc.z + (p.z + p.height / 2) * weight,
-    }
-  }, { x: 0, y: 0, z: 0 })
-
-  const cgX = totalWeight > 0 ? weighted.x / totalWeight : container.length / 2
-  const cgY = totalWeight > 0 ? weighted.y / totalWeight : container.width / 2
-  const cgZ = totalWeight > 0 ? weighted.z / totalWeight : container.height * 0.25
-  const centerPenalty =
-    Math.abs(cgX - container.length / 2) / Math.max(1, container.length) +
-    Math.abs(cgY - container.width / 2) / Math.max(1, container.width)
-
-  const levelPenalty = placed.reduce((sum, p) => {
-    const d = dimsFor(p)
-    return sum +
-      Math.abs(p.x + d.length / 2 - container.length / 2) * p.weight +
-      Math.abs(p.y + d.width / 2 - container.width / 2) * p.weight
-  }, 0) / Math.max(1, totalWeight)
-
-  // A compact floor footprint is a tie-breaker, never a reason to unload cargo.
-  // Bounding-box waste exposes scattered "island" placements without assuming
-  // anything about cargo labels or requiring pallet/carton-specific rules.
-  const floor = placed.filter(p => p.z <= EPS)
-  const floorArea = floor.reduce((sum, p) => {
-    const d = dimsFor(p)
-    return sum + d.length * d.width
-  }, 0)
-  const minX = floor.length ? Math.min(...floor.map(p => p.x)) : 0
-  const minY = floor.length ? Math.min(...floor.map(p => p.y)) : 0
-  const maxX = floor.length ? Math.max(...floor.map(p => p.x + dimsFor(p).length)) : 0
-  const maxY = floor.length ? Math.max(...floor.map(p => p.y + dimsFor(p).width)) : 0
-  const floorBoundingWaste = Math.max(0, (maxX - minX) * (maxY - minY) - floorArea)
-  const foundation = foundationCoverage(result, cargo)
-
-  // Explicit lexicographic ranking avoids unit-dependent magic weights:
-  // 1) maximize safely loaded units, 2) loaded volume, 3) foundation completion,
-  // 4) compact floor layout, 5) global CG balance, then lower vertical CG.
-  return [
-    placed.length,
-    volume,
-    foundation,
-    -floorBoundingWaste,
-    -centerPenalty,
-    -levelPenalty,
-    -Math.abs(cgZ - container.height * 0.25),
-  ]
-}
-
-function comparePlans(a: SolverResult, b: SolverResult, container: Container, cargo: Cargo[]) {
-  const ar = planRank(a, container, cargo)
-  const br = planRank(b, container, cargo)
-  for (let i = 0; i < Math.max(ar.length, br.length); i += 1) {
-    const delta = (ar[i] ?? 0) - (br[i] ?? 0)
-    if (Math.abs(delta) > 1e-7) return delta > 0 ? 1 : -1
-  }
-  return 0
-}
-
-function chooseBest(
-  results: Array<{ result: SolverResult; options: HeuristicOptions }>,
-  container: Container,
-  cargo: Cargo[],
-) {
-  // Feasibility is a gate, not a penalty. Previously an invalid candidate
-  // could win the score comparison and only be stripped after selection,
-  // even when another candidate was fully valid and nearly as good.
-  let best: SolverResult | undefined
-
-  for (const entry of results) {
-    const candidate = entry.result
-    if (!validatePlan(candidate.placed, container, cargo).ok) continue
-    if (!best || comparePlans(candidate, best, container, cargo) > 0) best = candidate
-  }
-
-  if (best) return best
-  // If every automatic candidate fails validation, preserve the user's locked
-  // placements rather than silently discarding their manual work.
-  const lockedFallback = results[0]?.result.placed.filter(p => p.locked) ?? []
-  return { placed: lockedFallback, unplaced: completeUnplaced(cargo, lockedFallback) }
-}
-
-function homogeneousGridCandidate(cargo: Cargo[], container: Container, locked: PlacedCargo[]): SolverResult | null {
-  const active = cargo.filter(c => Math.floor(c.quantity) > 0)
-  if (active.length !== 1) return null
-  const c = active[0]
-  if (cargo.some(other => other.id !== c.id && Math.floor(other.quantity) > 0)) return null
-  const orientations = c.rotatable === false || c.length === c.width
-    ? [{ length: c.length, width: c.width, rotation: 0 }]
-    : [
-        { length: c.length, width: c.width, rotation: 0 },
-        { length: c.width, width: c.length, rotation: 90 },
-      ]
-  const candidates: PlacedCargo[][] = []
-  for (const o of orientations) {
-    const cols = Math.floor((container.length + EPS) / o.length)
-    const rows = Math.floor((container.width + EPS) / o.width)
-    if (cols < 1 || rows < 1 || c.height > container.height + EPS) continue
-    const placed = locked.map(p => ({ ...p }))
-    const lockedCount = placed.filter(p => p.cargoId === c.id).length
-    const count = Math.max(0, Math.floor(c.quantity) - lockedCount)
-    let idx = 0
-    // Fill a continuous, edge-anchored grid. Evaluate both orientations;
-    // never rotate individual units inside a homogeneous row/column pattern.
-    for (let row = 0; row < rows && idx < count; row++) {
-      for (let col = 0; col < cols && idx < count; col++) {
-        while (placed.some(q => q.id === c.id + '#' + (idx + 1))) idx++
-        const p: PlacedCargo = {
-          id: c.id + '#' + (idx + 1), cargoId: c.id, cargoType: c.type,
-          x: col * o.length, y: row * o.width, z: 0,
-          length: c.length, width: c.width, height: c.height, rotation: o.rotation,
-          weight: c.weight, color: c.color, placementMode: 'automatic', locked: false,
-          stackable: c.stackable, loadBearing: c.loadBearing,
-          maxStackLayers: c.maxStackLayers, maxLoadOnTop: c.maxLoadOnTop,
-          rotatable: c.rotatable,
-        }
-        if (!fits(p, container)) continue
-        if (placed.some(q => {
-          const a = dimsFor(p), b = dimsFor(q)
-          return p.x < q.x + b.length - EPS && p.x + a.length > q.x + EPS &&
-            p.y < q.y + b.width - EPS && p.y + a.width > q.y + EPS &&
-            p.z < q.z + q.height - EPS && p.z + p.height > q.z + EPS
-        })) continue
-        if (container.maxPayload > 0 &&
-          placed.reduce((sum, q) => sum + q.weight, 0) + p.weight > container.maxPayload + EPS) continue
-        placed.push(p)
-        idx++
-      }
-    }
-    const own = placed.filter(p => p.cargoId === c.id)
-    const audit = validatePlan(placed, container, cargo)
-    if (audit.ok || own.length > 0) candidates.push(placed)
-  }
-  if (!candidates.length) return null
-  candidates.sort((a, b) => b.filter(p => p.cargoId === c.id).length - a.filter(p => p.cargoId === c.id).length)
-  const placed = candidates[0]
-  return { placed, unplaced: completeUnplaced(cargo, placed) }
-}
-
-function completeUnplaced(cargo: Cargo[], placed: PlacedCargo[]) {
+function completeUnplaced(cargo: Cargo[], placed: PlacedCargo[]): Cargo[] {
   const counts = new Map<string, number>()
-  for (const p of placed) counts.set(p.cargoId, (counts.get(p.cargoId) ?? 0) + 1)
-  const result: Cargo[] = []
-  for (const c of cargo) {
-    const missing = Math.max(0, Math.floor(c.quantity) - (counts.get(c.id) ?? 0))
-    for (let i = 0; i < missing; i += 1) result.push(c)
+  for (const item of placed) counts.set(item.cargoId, (counts.get(item.cargoId) ?? 0) + 1)
+
+  const missing: Cargo[] = []
+  for (const item of cargo) {
+    const count = Math.max(0, Math.floor(item.quantity)) - (counts.get(item.id) ?? 0)
+    for (let i = 0; i < count; i += 1) missing.push(item)
   }
-  return result
+  return missing
+}
+
+function score(placed: PlacedCargo[], container: Container) {
+  const volume = placed.reduce((sum, p) => sum + p.length * p.width * p.height, 0)
+  const weight = placed.reduce((sum, p) => sum + Math.max(0, p.weight), 0)
+  const totalWeight = Math.max(1, weight)
+  const cgX = placed.reduce((sum, p) => sum + (p.x + p.length / 2) * p.weight, 0) / totalWeight
+  const cgY = placed.reduce((sum, p) => sum + (p.y + p.width / 2) * p.weight, 0) / totalWeight
+  const balance = Math.abs(cgX - container.length / 2) + Math.abs(cgY - container.width / 2)
+  return [placed.length, volume, -balance]
 }
 
 /**
- * First-stage production solver.
+ * Automatic packing is delegated to the MIT-licensed binpack3d library
+ * (a TypeScript port of py3dbp's corner-point heuristic). We run a small,
+ * deterministic portfolio of its supported item orderings, then apply this
+ * application's geometry/support validator as the final authority.
  *
- * This is deliberately a deterministic layered/extreme-point style heuristic:
- * physical foundation candidates are placed first, then support planes are
- * generated from existing cargo tops and edges. The hot loop uses cheap AABB
- * checks; the full application validator runs only once at the end.
+ * The former in-house beam/layer/multi-start search is intentionally no
+ * longer part of the automatic execution path. Product-specific rules can
+ * be layered around this adapter later without rewriting the core packer.
  */
 export function basePack(
   cargo: Cargo[],
@@ -231,119 +45,47 @@ export function basePack(
   locked: PlacedCargo[] = [],
   progress?: (percent: number) => void,
 ): SolverResult {
-  const validLocked = locked.filter(p => fits(p, container))
+  const requested = cargo.reduce((sum, item) => sum + Math.max(0, Math.floor(item.quantity)), 0)
+  const lockedValid = validatePlan(locked, container, cargo)
+  if (!lockedValid.ok) {
+    // Preserve user-authored placements; do not silently relocate or discard them.
+    return { placed: [...locked], unplaced: completeUnplaced(cargo, locked) }
+  }
 
-  // Strategy branching is based only on physical geometry/constraints. Cargo
-  // labels such as pallet/carton/crate must never change solver behaviour.
-  // Do not deliberately introduce floor gaps while solving the foundation.
-  // Real gaps should emerge only when cargo dimensions/constraints require them.
-  // Deterministic multi-start portfolio: each run keeps the same hard
-  // constraints but changes the item ordering so mixed shipments are not
-  // locked into one greedy sequence. Candidate plans are compared globally.
-  const requestedUnits = cargo.reduce((sum, c) => sum + Math.max(0, Math.floor(c.quantity)), 0)
-  const strategies: HeuristicOptions[] = requestedUnits > 160
-    ? [
-        { gapStep: 0, order: 'area', layoutMode: 'foundation-first' },
-        { gapStep: 0, order: 'volume', layoutMode: 'floor-first' },
-        { gapStep: 0, order: 'weight', layoutMode: 'mixed' },
-      ]
-    : requestedUnits > 80
-      ? [
-          { gapStep: 0, order: 'area', layoutMode: 'foundation-first' },
-          { gapStep: 0, order: 'volume', layoutMode: 'floor-first' },
-          { gapStep: 0, order: 'weight', layoutMode: 'mixed' },
-          { gapStep: 0, order: 'longest-side', layoutMode: 'foundation-first' },
-        ]
-      : [
-          { gapStep: 0, order: 'area', layoutMode: 'foundation-first' },
-          { gapStep: 0, order: 'volume', layoutMode: 'floor-first' },
-          { gapStep: 0, order: 'weight', layoutMode: 'mixed' },
-          { gapStep: 0, order: 'height', layoutMode: 'foundation-first' },
-          { gapStep: 0, order: 'longest-side', layoutMode: 'mixed' },
-          { gapStep: 0, order: 'density', layoutMode: 'floor-first' },
-        ]
-  const results: Array<{ result: SolverResult; options: HeuristicOptions }> = []
+  const orders = ['volume', 'footprint', 'weight'] as const
+  let best: PlacedCargo[] = [...locked]
+  let bestScore = score(best, container)
 
-  // Fast path before launching the general 3D search: a complete homogeneous
-  // floor grid is already the best first-stage answer for this simple case.
-  // This prevents the expensive general heuristic from delaying a solution
-  // that can be constructed directly from the container dimensions.
-  const gridCandidate = homogeneousGridCandidate(cargo, container, validLocked)
-  if (gridCandidate) {
-    const requested = cargo.reduce((sum, c) => sum + Math.max(0, Math.floor(c.quantity)), 0)
-    const placedRequested = gridCandidate.placed.filter(p => cargo.some(c => c.id === p.cargoId)).length
-    const gridAudit = validatePlan(gridCandidate.placed, container, cargo)
-    if (placedRequested >= requested && gridAudit.ok) {
-      progress?.(100)
-      return gridCandidate
+  for (let i = 0; i < orders.length; i += 1) {
+    const candidate = openSourcePackCandidate(cargo, container, locked, orders[i])
+    if (candidate) {
+      const audit = validatePlan(candidate, container, cargo)
+      if (audit.ok) {
+        const candidateScore = score(candidate, container)
+        let better = false
+        for (let j = 0; j < candidateScore.length; j += 1) {
+          if (candidateScore[j] === bestScore[j]) continue
+          better = candidateScore[j] > bestScore[j]
+          break
+        }
+        if (better) {
+          best = candidate
+          bestScore = candidateScore
+        }
+      }
     }
+    progress?.(Math.round(((i + 1) / orders.length) * 95))
   }
 
-  for (let i = 0; i < strategies.length; i += 1) {
-    const branchProgress = (p: number) => progress?.(Math.round((i * 100 + p) / strategies.length))
-    const result = heuristicPack(cargo, container, validLocked, branchProgress, strategies[i])
-    results.push({ result, options: strategies[i] })
+  const result = { placed: best, unplaced: completeUnplaced(cargo, best) }
+  // Never return a geometrically invalid automatic plan.
+  if (!validatePlan(result.placed, container, cargo).ok) {
+    return { placed: [...locked], unplaced: completeUnplaced(cargo, locked) }
   }
-
-  if (gridCandidate) {
-    // If the fast path cannot fit everything, keep it as another candidate
-    // for comparison with the general 3D solvers.
-    results.push({ result: gridCandidate, options: { gapStep: 0 } })
+  progress?.(100)
+  // Keep accounting deterministic even for duplicate cargo IDs or malformed quantities.
+  if (result.placed.length + result.unplaced.length !== requested) {
+    return { placed: result.placed, unplaced: completeUnplaced(cargo, result.placed) }
   }
-
-  let result = chooseBest(results, container, cargo)
-
-  // Run an independent open-source corner-point solver as a second candidate.
-  // It is accepted only when our stricter app-specific validator approves it;
-  // then the existing objective chooses the better of the two valid plans.
-  // Run a small, bounded portfolio of deterministic item orderings. The
-  // corner-point heuristic is order-sensitive; trying volume, floor footprint,
-  // and weight order catches different layouts without launching an unbounded
-  // search. Keep only the best candidate under the same app-owned objective.
-  const candidateOrders: Array<'volume' | 'footprint' | 'weight'> = ['volume', 'footprint', 'weight']
-  for (let i = 0; i < candidateOrders.length; i += 1) {
-    const openSourceCandidate = openSourcePackCandidate(cargo, container, validLocked, candidateOrders[i])
-    if (!openSourceCandidate) continue
-    const candidateResult: SolverResult = {
-      placed: openSourceCandidate,
-      unplaced: completeUnplaced(cargo, openSourceCandidate),
-    }
-    // Never let an infeasible open-source layout displace a valid plan.
-    // Candidate generation is advisory; the application validator owns the
-    // final geometry, support, stacking and payload rules.
-    if (
-      validatePlan(candidateResult.placed, container, cargo).ok &&
-      comparePlans(candidateResult, result, container, cargo) > 0
-    ) {
-      result = candidateResult
-    }
-    progress?.(Math.round(75 + ((i + 1) / candidateOrders.length) * 25))
-  }
-
-  // Never expose an invalid automatic result. If the final audit rejects
-  // anything, keep the valid locked state and let the unplaced list reflect
-  // the rejected units.
-  const audit = validatePlan(result.placed, container, cargo)
-  if (audit.ok) return { placed: result.placed, unplaced: completeUnplaced(cargo, result.placed) }
-
-  const bad = new Set(audit.errors.map(e => e.split(':', 1)[0]))
-  const placed = result.placed.filter(p => p.locked || !bad.has(p.id))
-  return { placed, unplaced: completeUnplaced(cargo, placed) }
-}
-
-export async function basePackAsync(
-  cargo: Cargo[],
-  container: Container,
-  locked: PlacedCargo[] = [],
-  progress?: (percent: number) => void,
-  signal?: AbortSignal,
-): Promise<SolverResult> {
-  if (signal?.aborted) throw new Error('Packing cancelled')
-  // Kept for callers that still use the synchronous compatibility API.
-  // The browser-facing path uses the worker in packer.ts.
-  const result = basePack(cargo, container, locked, p => {
-    if (!signal?.aborted) progress?.(p)
-  })
-  if (signal?.aborted) throw new Error('Packing cancelled')
   return result
 }
