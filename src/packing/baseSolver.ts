@@ -124,6 +124,62 @@ function chooseBest(results: Array<{ result: SolverResult; options: HeuristicOpt
   return best ?? { placed: [], unplaced: [] }
 }
 
+
+function homogeneousGridCandidate(cargo: Cargo[], container: Container, locked: PlacedCargo[]): SolverResult | null {
+  const active = cargo.filter(c => Math.floor(c.quantity) > 0)
+  if (active.length !== 1) return null
+  const c = active[0]
+  if (cargo.some(other => other.id !== c.id && Math.floor(other.quantity) > 0)) return null
+  const orientations = c.rotatable === false || c.length === c.width
+    ? [{ length: c.length, width: c.width, rotation: 0 }]
+    : [
+        { length: c.length, width: c.width, rotation: 0 },
+        { length: c.width, width: c.length, rotation: 90 },
+      ]
+  const candidates: PlacedCargo[][] = []
+  for (const o of orientations) {
+    const cols = Math.floor((container.length + EPS) / o.length)
+    const rows = Math.floor((container.width + EPS) / o.width)
+    if (cols < 1 || rows < 1 || c.height > container.height + EPS) continue
+    const placed = locked.map(p => ({ ...p }))
+    const count = Math.max(0, Math.floor(c.quantity))
+    let idx = 0
+    // Fill a continuous, edge-anchored grid. Evaluate both orientations;
+    // never rotate individual units inside a homogeneous row/column pattern.
+    for (let row = 0; row < rows && idx < count; row++) {
+      for (let col = 0; col < cols && idx < count; col++) {
+        const p: PlacedCargo = {
+          id: c.id + '#' + (idx + 1), cargoId: c.id, cargoType: c.type,
+          x: col * o.length, y: row * o.width, z: 0,
+          length: c.length, width: c.width, height: c.height, rotation: o.rotation,
+          weight: c.weight, color: c.color, placementMode: 'automatic', locked: false,
+          stackable: c.stackable, loadBearing: c.loadBearing,
+          maxStackLayers: c.maxStackLayers, maxLoadOnTop: c.maxLoadOnTop,
+          rotatable: c.rotatable,
+        }
+        if (!fits(p, container)) continue
+        if (placed.some(q => {
+          const a = dimsFor(p), b = dimsFor(q)
+          return p.x < q.x + b.length - EPS && p.x + a.length > q.x + EPS &&
+            p.y < q.y + b.width - EPS && p.y + a.width > q.y + EPS &&
+            p.z < q.z + q.height - EPS && p.z + p.height > q.z + EPS
+        })) continue
+        if (container.maxPayload > 0 &&
+          placed.reduce((sum, q) => sum + q.weight, 0) + p.weight > container.maxPayload + EPS) continue
+        placed.push(p)
+        idx++
+      }
+    }
+    const own = placed.filter(p => p.cargoId === c.id)
+    const audit = validatePlan(placed, container, cargo)
+    if (audit.ok || own.length > 0) candidates.push(placed)
+  }
+  if (!candidates.length) return null
+  candidates.sort((a, b) => b.filter(p => p.cargoId === c.id).length - a.filter(p => p.cargoId === c.id).length)
+  const placed = candidates[0]
+  return { placed, unplaced: completeUnplaced(cargo, placed) }
+}
+
 function completeUnplaced(cargo: Cargo[], placed: PlacedCargo[]) {
   const counts = new Map<string, number>()
   for (const p of placed) counts.set(p.cargoId, (counts.get(p.cargoId) ?? 0) + 1)
@@ -169,6 +225,9 @@ export function basePack(
     const result = heuristicPack(cargo, container, validLocked, branchProgress, strategies[i])
     results.push({ result, options: strategies[i] })
   }
+
+  const gridCandidate = homogeneousGridCandidate(cargo, container, validLocked)
+  if (gridCandidate) results.push({ result: gridCandidate, options: { gapStep: 0 } })
 
   let result = chooseBest(results, container, cargo)
 
