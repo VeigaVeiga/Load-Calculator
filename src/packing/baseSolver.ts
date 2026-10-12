@@ -59,7 +59,7 @@ function foundationCoverage(result: SolverResult, cargo: Cargo[]) {
 
 function planRank(result: SolverResult, container: Container, cargo: Cargo[]) {
   const placed = result.placed
-  if (!placed.length) return [-1, 0, 0, 0, 0, 0, 0]
+  if (!placed.length) return [0, 0, 0, 0, 0, 0, 0]
 
   const volume = planVolume(placed)
   const totalWeight = placed.reduce((sum, p) => sum + p.weight, 0)
