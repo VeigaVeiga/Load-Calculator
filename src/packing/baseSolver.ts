@@ -175,8 +175,14 @@ export function basePack(
   // Run an independent open-source corner-point solver as a second candidate.
   // It is accepted only when our stricter app-specific validator approves it;
   // then the existing objective chooses the better of the two valid plans.
-  const openSourceCandidate = openSourcePackCandidate(cargo, container, validLocked)
-  if (openSourceCandidate) {
+  // Run a small, bounded portfolio of deterministic item orderings. The
+  // corner-point heuristic is order-sensitive; trying volume, floor footprint,
+  // and weight order catches different layouts without launching an unbounded
+  // search. Keep only the best candidate under the same app-owned objective.
+  const candidateOrders: Array<'volume' | 'footprint' | 'weight'> = ['volume', 'footprint', 'weight']
+  for (let i = 0; i < candidateOrders.length; i += 1) {
+    const openSourceCandidate = openSourcePackCandidate(cargo, container, validLocked, candidateOrders[i])
+    if (!openSourceCandidate) continue
     const candidateResult: SolverResult = {
       placed: openSourceCandidate,
       unplaced: completeUnplaced(cargo, openSourceCandidate),
@@ -184,6 +190,7 @@ export function basePack(
     if (planQuality(candidateResult, container, cargo) > planQuality(result, container, cargo)) {
       result = candidateResult
     }
+    progress?.(Math.round(75 + ((i + 1) / candidateOrders.length) * 25))
   }
 
   // Never expose an invalid automatic result. If the final audit rejects
