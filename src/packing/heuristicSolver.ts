@@ -227,6 +227,21 @@ function adjacencyScore(p: PlacedCargo, placed: PlacedCargo[]) {
 function score(p: PlacedCargo, placed: PlacedCargo[], container: Container) {
   const support = supportInfo(p, placed).ratio
   const adjacency = adjacencyScore(p, placed)
+  // Keep identical cargo in one consistent floor-plane orientation. Without
+  // this preference, order-sensitive candidates can create visually isolated
+  // rotated islands among otherwise identical pallets.
+  const sameCargo = placed.filter(q => q.cargoId === p.cargoId)
+  const rotationCounts = sameCargo.reduce((counts, q) => {
+    const rotation = q.rotation % 180 === 0 ? 0 : 90
+    counts[rotation] = (counts[rotation] ?? 0) + 1
+    return counts
+  }, {} as Record<number, number>)
+  const preferredRotation = Object.entries(rotationCounts)
+    .sort((a, b) => Number(b[1]) - Number(a[1]) || Number(a[0]) - Number(b[0]))[0]?.[0]
+  const orientationPenalty = preferredRotation !== undefined &&
+    Number(preferredRotation) !== (p.rotation % 180 === 0 ? 0 : 90)
+    ? 500_000
+    : 0
   const d = footprint(p)
   const rightGap = Math.max(0, container.length - (p.x + d.length))
   const sideGap = Math.max(0, container.width - (p.y + d.width))
@@ -238,7 +253,7 @@ function score(p: PlacedCargo, placed: PlacedCargo[], container: Container) {
   const centerX = p.x + d.length / 2
   const centerY = p.y + d.width / 2
   const centerDistance = Math.abs(centerX - container.length / 2) + Math.abs(centerY - container.width / 2)
-  return stableSupport * 1_000_000 + layerReward + adjacency * 250 - centerDistance * 0.08 - rightGap * 0.004 - sideGap * 0.004
+  return stableSupport * 1_000_000 + layerReward + adjacency * 250 - orientationPenalty - centerDistance * 0.08 - rightGap * 0.004 - sideGap * 0.004
 }
 
 export function heuristicPack(cargo: Cargo[], container: Container, locked: PlacedCargo[] = [], progress?: (percent: number) => void, options: HeuristicOptions = {}): { placed: PlacedCargo[]; unplaced: Cargo[] } {
