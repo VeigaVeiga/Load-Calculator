@@ -27,5 +27,7 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
+      - name: Run packing regression fixtures
+        run: npm run test:packing
       - name: Type-check and build production bundle
         run: npm run build
