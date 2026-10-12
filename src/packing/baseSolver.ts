@@ -227,7 +227,19 @@ export function basePack(
   }
 
   const gridCandidate = homogeneousGridCandidate(cargo, container, validLocked)
-  if (gridCandidate) results.push({ result: gridCandidate, options: { gapStep: 0 } })
+  if (gridCandidate) {
+    const requested = cargo.reduce((sum, c) => sum + Math.max(0, Math.floor(c.quantity)), 0)
+    const packedRequested = gridCandidate.placed.filter(p => !p.locked).length
+    const gridAudit = validatePlan(gridCandidate.placed, container, cargo)
+    // If a uniform floor grid fits every requested unit, preserve it as the
+    // deterministic first-stage answer instead of letting a score function
+    // replace it with a centered but fragmented arrangement.
+    if (packedRequested >= requested && gridAudit.ok) {
+      progress?.(100)
+      return gridCandidate
+    }
+    results.push({ result: gridCandidate, options: { gapStep: 0 } })
+  }
 
   let result = chooseBest(results, container, cargo)
 
