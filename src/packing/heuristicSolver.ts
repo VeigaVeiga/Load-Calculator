@@ -314,7 +314,6 @@ export function heuristicPack(cargo: Cargo[], container: Container, locked: Plac
 
   let totalWeight = placed.reduce((s, p) => s + p.weight, 0)
   const unplaced: Cargo[] = []
-  const uniqueCargo = new Set(units.map(u => u.cargo.id)).size
 
   const maxWeight = Math.max(0, ...units.map((u) => u.cargo.weight))
   const maxArea = Math.max(1, ...units.map((u) => u.cargo.length * u.cargo.width))
@@ -336,23 +335,25 @@ export function heuristicPack(cargo: Cargo[], container: Container, locked: Plac
   // non-stackable, or is among the materially heavier/larger pieces. The
   // thresholds are relative to the actual shipment, so the rule adapts to
   // different cargo mixes without knowing "pallet" or "carton" semantics.
-  const foundationUnits = (uniqueCargo <= 1
-    ? [...units]
-    : [...units].filter((u) => {
-        const c = u.cargo
-        const areaRatio = (c.length * c.width) / maxArea
-        // Foundation role is geometric/physical, not a relative weight test.
-        return c.stackable === false || areaRatio >= 0.6
-      }))
-    .sort((a, b) => {
-      const nonStackable = Number(b.cargo.stackable === false) - Number(a.cargo.stackable === false)
-      if (nonStackable) return nonStackable
-      return orderMetric(b, order) - orderMetric(a, order) ||
-        foundationScore(b) - foundationScore(a) || a.cargo.id.localeCompare(b.cargo.id)
-    })
-  const foundationIds = new Set(foundationUnits.map(u => u.cargo.id + '#' + u.index))
-  const groundUnits = foundationUnits
-  const stackUnits = units.filter(u => !foundationIds.has(u.cargo.id + '#' + u.index) && u.cargo.stackable !== false)
+  // First build a coherent floor plan with every cargo unit, not only the
+  // large/non-stackable subset. The previous split sent all small stackable
+  // cartons directly to the upper-layer solver and only tried the floor after
+  // stacking had finished. That creates the exact failure mode we want to
+  // avoid: pallet towers on one side and a separate carton pyramid on the other.
+  // Place physically awkward and large-footprint units first, then use smaller
+  // stackable units to close floor gaps. Only units that genuinely fail on the
+  // floor are passed to the supported-layer planner.
+  const groundUnits = [...units].sort((a, b) => {
+    const nonStackable = Number(b.cargo.stackable === false) - Number(a.cargo.stackable === false)
+    if (nonStackable) return nonStackable
+    const areaA = a.cargo.length * a.cargo.width
+    const areaB = b.cargo.length * b.cargo.width
+    return areaB - areaA ||
+      orderMetric(b, order) - orderMetric(a, order) ||
+      (b.cargo.length * b.cargo.width * b.cargo.height - a.cargo.length * a.cargo.width * a.cargo.height) ||
+      a.cargo.id.localeCompare(b.cargo.id) || a.index - b.index
+  })
+  const groundFailed: Unit[] = []
   const total = Math.max(1, units.length)
 
   for (let i = 0; i < groundUnits.length; i += 1) {
@@ -365,7 +366,7 @@ export function heuristicPack(cargo: Cargo[], container: Container, locked: Plac
       const d = rotation === 0
         ? { length: u.cargo.length, width: u.cargo.width }
         : { length: u.cargo.width, width: u.cargo.length }
-      const points = candidatePoints(placed, container, d.length, d.width, options.gapStep ?? 0, true).filter(p => uniqueCargo <= 1 ? true : p[2] <= EPS)
+      const points = candidatePoints(placed, container, d.length, d.width, options.gapStep ?? 0, true).filter(p => p[2] <= EPS)
       const candidates: PlacedCargo[] = []
       for (const [x, y, z] of points) {
         const p = makePlaced(u.cargo, u.index, x, y, z, rotation)
@@ -383,11 +384,15 @@ export function heuristicPack(cargo: Cargo[], container: Container, locked: Plac
       placed.push(best)
       totalWeight += best.weight
     } else {
-      unplaced.push(u.cargo)
+      groundFailed.push(u)
     }
 
     if ((i & 7) === 0) progress?.(Math.round((i / total) * 100))
   }
+
+  const stackUnits = groundFailed.filter(u => u.cargo.stackable !== false)
+  // Cargo explicitly marked non-stackable cannot be rescued by the upper-layer solver.
+  for (const u of groundFailed) if (u.cargo.stackable === false) unplaced.push(u.cargo)
 
   const layerResult = packSupportedLayers(
     stackUnits as LayerUnit[],
