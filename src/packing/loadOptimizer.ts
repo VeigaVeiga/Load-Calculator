@@ -63,7 +63,12 @@ function weightedDistributionScore(items: PlacedCargo[], container: Container) {
   }
   const endImbalance = Math.abs(front - rear) / total
 
-  return cgX * 55 + cgY * 35 + quadrant * 12 + cgZ * 4 + endImbalance * 8
+  // Lateral balance is a hard practical concern for container loading: a plan
+  // with nearly all weight on one side must score materially worse, even when
+  // the longitudinal CG and corner totals look acceptable.
+  const sideImbalance = Math.abs(a.left - a.right) / total
+  const endHalfImbalance = Math.abs(a.front - a.rear) / total
+  return cgX * 55 + cgY * 90 + sideImbalance * 45 + endHalfImbalance * 18 + quadrant * 12 + cgZ * 4 + endImbalance * 8
 }
 
 function objective(items: PlacedCargo[], container: Container) {
@@ -206,6 +211,44 @@ export async function optimizeLoad(
   let currentScore = before
   let best = current.map((p) => ({ ...p }))
   let bestScore = before
+
+  // First try translating the complete arrangement as a rigid block. The old
+  // one-item-at-a-time search often cannot escape a side-packed arrangement:
+  // every useful move collides with its neighbour, although moving the whole
+  // arrangement toward the centre is collision-free and preserves stacking.
+  // Locked plans are left untouched by this phase.
+  if (!current.some(p => p.locked)) {
+    const analysis = analyzeWeight(current, container)
+    const minX = Math.min(...current.map(p => p.x))
+    const maxX = Math.max(...current.map(p => p.x + dims(p).length))
+    const minY = Math.min(...current.map(p => p.y))
+    const maxY = Math.max(...current.map(p => p.y + dims(p).width))
+    const shifts = [
+      [container.length / 2 - analysis.cg.x, container.width / 2 - analysis.cg.y],
+      [(container.length - (maxX - minX)) / 2 - minX, (container.width - (maxY - minY)) / 2 - minY],
+      [0, container.width / 2 - analysis.cg.y],
+      [container.length / 2 - analysis.cg.x, 0],
+    ] as const
+    for (const [dx, dy] of shifts) {
+      if (Math.abs(dx) < EPS && Math.abs(dy) < EPS) continue
+      const candidate = current.map(p => ({
+        ...p,
+        x: p.x + dx,
+        y: p.y + dy,
+        placementMode: 'automatic' as const,
+      }))
+      if (!validateCandidate(candidate, container, expectedCount)) continue
+      const score = objective(candidate, container)
+      if (score + 1e-9 < bestScore) {
+        best = candidate.map(p => ({ ...p }))
+        bestScore = score
+      }
+      if (score + 1e-9 < currentScore) {
+        current = candidate
+        currentScore = score
+      }
+    }
+  }
 
   const movable = floorMovable(current)
   if (movable.length === 0) {
