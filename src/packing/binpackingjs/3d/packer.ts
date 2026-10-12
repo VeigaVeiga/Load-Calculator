@@ -113,7 +113,7 @@ function packToBin(
     let fitted = false;
 
     if (b.weighItem(item.weight)) {
-      lookup: for (let pt = 0; pt < 3; pt++) {
+      lookup: for (const pt of [Axis.Width, Axis.Depth, Axis.Height]) {
         for (const ib of b.items) {
           let pv: [number, number, number];
           const d = ib.dimension;
