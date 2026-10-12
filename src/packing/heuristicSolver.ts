@@ -9,9 +9,12 @@ type Unit = { cargo: Cargo; index: number }
 
 export type HeuristicOrder = 'area' | 'volume' | 'weight' | 'height' | 'longest-side' | 'density'
 
+export type HeuristicLayoutMode = 'foundation-first' | 'floor-first' | 'mixed'
+
 export type HeuristicOptions = {
   gapStep?: number
   order?: HeuristicOrder
+  layoutMode?: HeuristicLayoutMode
 }
 
 function orderMetric(u: Unit, order: HeuristicOrder) {
@@ -335,19 +338,23 @@ export function heuristicPack(cargo: Cargo[], container: Container, locked: Plac
   // non-stackable, or is among the materially heavier/larger pieces. The
   // thresholds are relative to the actual shipment, so the rule adapts to
   // different cargo mixes without knowing "pallet" or "carton" semantics.
-  // First build a coherent floor plan with every cargo unit, not only the
-  // large/non-stackable subset. The previous split sent all small stackable
-  // cartons directly to the upper-layer solver and only tried the floor after
-  // stacking had finished. That creates the exact failure mode we want to
-  // avoid: pallet towers on one side and a separate carton pyramid on the other.
-  // Place physically awkward and large-footprint units first, then use smaller
-  // stackable units to close floor gaps. Only units that genuinely fail on the
-  // floor are passed to the supported-layer planner.
-  const groundUnits = [...units].sort((a, b) => {
+  // Generate distinct loading philosophies, not just different sort orders.
+  // foundation-first leaves stackable cartons available for pallet-top layers;
+  // floor-first tries to maximize floor coverage before stacking leftovers;
+  // mixed reserves the floor for non-stackable and large-footprint cargo while
+  // allowing medium pieces to compete for foundation space.
+  const layoutMode = options.layoutMode ?? 'foundation-first'
+  const foundationUnits = units.filter((u) => {
+    const c = u.cargo
+    const areaRatio = (c.length * c.width) / maxArea
+    if (c.stackable === false) return true
+    if (layoutMode === 'floor-first') return true
+    if (layoutMode === 'mixed') return areaRatio >= 0.35
+    return areaRatio >= 0.6
+  })
+  const groundUnits = [...foundationUnits].sort((a, b) => {
     const nonStackable = Number(b.cargo.stackable === false) - Number(a.cargo.stackable === false)
     if (nonStackable) return nonStackable
-    // Keep independent multi-start runs genuinely different: area-first,
-    // volume-first, weight-first, etc. share only the non-stackable priority.
     return orderMetric(b, order) - orderMetric(a, order) ||
       (b.cargo.length * b.cargo.width - a.cargo.length * a.cargo.width) ||
       (b.cargo.length * b.cargo.width * b.cargo.height - a.cargo.length * a.cargo.width * a.cargo.height) ||
@@ -390,9 +397,19 @@ export function heuristicPack(cargo: Cargo[], container: Container, locked: Plac
     if ((i & 7) === 0) progress?.(Math.round((i / total) * 100))
   }
 
-  const stackUnits = groundFailed.filter(u => u.cargo.stackable !== false)
-  // Cargo explicitly marked non-stackable cannot be rescued by the upper-layer solver.
-  for (const u of groundFailed) if (u.cargo.stackable === false) unplaced.push(u.cargo)
+  // Stack every unplaced stackable unit, including small cartons deliberately
+  // deferred by foundation-first/mixed modes. Never duplicate units already
+  // placed on the floor or present as locked manual placements.
+  const alreadyPlaced = new Set(placed.map(p => p.id))
+  const stackUnits = units.filter(u =>
+    u.cargo.stackable !== false &&
+    !alreadyPlaced.has(u.cargo.id + '#' + (u.index + 1))
+  )
+  const nonStackableMissing = units.filter(u =>
+    u.cargo.stackable === false &&
+    !alreadyPlaced.has(u.cargo.id + '#' + (u.index + 1))
+  )
+  for (const u of nonStackableMissing) unplaced.push(u.cargo)
 
   const layerResult = packSupportedLayers(
     stackUnits as LayerUnit[],
