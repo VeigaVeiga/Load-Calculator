@@ -60,7 +60,7 @@ const plannerRuntimeFixes: Plugin = {
           code = code.slice(0, runStart) + replacement + code.slice(runEnd)
         }
       }
-      const progressNeedle = "<span>{lang === 'zh' ? '正在搜索摆放位置与旋转组合，请稍候…' : 'Searching placement and rotation combinations…'}</span>"
+      const progressNeedle = "<span>{lang === 'zh' ? '正在生成并优化装柜方案，请稍候…' : 'Generating and optimizing the loading plan…'}</span>"
       if (!code.includes('packing-cancel')) {
         code = code.replace(progressNeedle, progressNeedle + "\n                  <button className=\"packing-cancel\" onClick={cancelPacking}>{lang === 'zh' ? '取消计算' : 'Cancel'}</button>")
       }
