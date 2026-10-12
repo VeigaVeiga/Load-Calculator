@@ -15,7 +15,7 @@ export function openSourcePackCandidate(
   cargo: Cargo[],
   container: Container,
   locked: PlacedCargo[] = [],
-  order: 'volume' | 'footprint' | 'weight' = 'volume',
+  order: 'volume' | 'footprint' | 'weight' | 'sequence' = 'volume',
 ): PlacedCargo[] | null {
   try {
     const cargoById = new Map(cargo.map((item) => [item.id, item]))
@@ -46,6 +46,10 @@ export function openSourcePackCandidate(
     )
 
     items.sort((a, b) => {
+      // LoadZa-style sequence search supplies a deliberate item order. Keep it
+      // intact instead of sorting it away; modern JS sort is stable, but an
+      // explicit equality makes this contract clear.
+      if (order === 'sequence') return 0
       const score = (item: typeof a) => {
         const [length, height, width] = item.whd
         if (order === 'weight') return item.weight
