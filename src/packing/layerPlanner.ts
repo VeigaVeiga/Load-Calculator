@@ -423,7 +423,7 @@ function candidatePlacements(
       for (const [x, y] of candidatePositions(r, d.length, d.width, sameLevel)) {
         const p = makePlaced(u.cargo, u.index, x, y, z, rotation)
         const key = [Math.round(x), Math.round(y), rotation].join('|')
-        if (seen.has(key) || !validCandidate(p, state, container, totalWeight)) continue
+        if (seen.has(key) || !validCandidate(p, state, container)) continue
         seen.add(key)
         local.push(p)
       }
