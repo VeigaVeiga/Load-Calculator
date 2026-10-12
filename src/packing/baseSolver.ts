@@ -133,7 +133,11 @@ function chooseBest(
     }
   }
 
-  return best ?? { placed: [], unplaced: completeUnplaced(cargo, []) }
+  if (best) return best
+  // If every automatic candidate fails validation, preserve the user's locked
+  // placements rather than silently discarding their manual work.
+  const lockedFallback = results[0]?.result.placed.filter(p => p.locked) ?? []
+  return { placed: lockedFallback, unplaced: completeUnplaced(cargo, lockedFallback) }
 }
 
 function homogeneousGridCandidate(cargo: Cargo[], container: Container, locked: PlacedCargo[]): SolverResult | null {
