@@ -32,7 +32,7 @@ const T = {
     pallet: '托盘',
     crate: '木箱',
     auto: '自动装柜',
-    opt: '⚖ 优化重量负载',
+    opt: '优化负载均衡',
     optimizing: '正在优化重量负载…',
     clear: '清除未锁定',
     properties: '货物属性',
@@ -123,7 +123,7 @@ const T = {
     pallet: 'Pallet',
     crate: 'Wood Crate',
     auto: 'Auto Pack',
-    opt: 'Optimize Load',
+    opt: 'Optimize Load Balance',
     optimizing: 'Optimizing load…',
     clear: 'Clear Unlocked',
     properties: 'Cargo',
@@ -305,10 +305,15 @@ function App() {
   const [airBagStretch] = useState(false)
   const [packingProgress, setPackingProgress] = useState<number | null>(null)
   const [optimizing, setOptimizing] = useState(false)
+  const [hasAutoPacked, setHasAutoPacked] = useState(false)
   const packingControllerRef = useRef<AbortController | null>(null)
 
 
   const [materials, setMaterials] = useState<SecuringItem[]>([])
+
+  useEffect(() => {
+    setHasAutoPacked(false)
+  }, [cargo, containerId, custom.length, custom.width, custom.height])
 
   useEffect(() => {
     if (!message) return
@@ -715,6 +720,7 @@ function App() {
       }, { signal: controller.signal })
       if (controller.signal.aborted) return
       setPlaced(result)
+      setHasAutoPacked(true)
       setSelectedId(null)
       setSelectedIds([])
       setMessage(lang === 'zh' ? '自动装柜完成' : 'Auto packing complete')
@@ -1144,7 +1150,7 @@ function App() {
               {tr.auto}
             </button>
 
-            <button disabled={packingProgress !== null || optimizing || placed.length < 2} onClick={() => void runLoadOptimization()}>
+            <button disabled={!hasAutoPacked || packingProgress !== null || optimizing || placed.length < 2} onClick={() => void runLoadOptimization()} title={!hasAutoPacked ? (lang === 'zh' ? '请先完成自动装柜' : 'Run auto packing first') : undefined}>
               {optimizing ? tr.optimizing : tr.opt}
             </button>
 
