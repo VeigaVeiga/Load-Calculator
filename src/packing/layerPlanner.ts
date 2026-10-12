@@ -3,9 +3,9 @@ import { dims, supportMetrics } from './geometry'
 
 const EPS = 0.5
 const MAX_OVERHANG_RATIO = 0.25
-const BEAM_WIDTH = 4
-const MAX_LAYER_STEPS = 64
-const MAX_CANDIDATES_PER_UNIT = 12
+const BEAM_WIDTH = 32
+const MAX_LAYER_STEPS = 120
+const MAX_CANDIDATES_PER_UNIT = 160
 
 export type LayerUnit = { cargo: Cargo; index: number }
 
@@ -426,7 +426,7 @@ function candidatePlacements(
         local.push(p)
       }
       local.sort((a, b) => candidateScore(b, r) - candidateScore(a, r))
-      candidates.push(...local.slice(0, 6))
+      candidates.push(...local.slice(0, 18))
     }
   }
 
@@ -521,7 +521,7 @@ function beamLayer(
       const eligible = state.remaining
         .filter((u) => canUseUnit(u, state.placed))
         .sort((a, b) => unitUrgency(b) - unitUrgency(a))
-        .slice(0, 4)
+        .slice(0, 20)
 
       for (const u of eligible) {
         const candidates = candidatePlacements(u, z, state, supports, container, totalWeight)
