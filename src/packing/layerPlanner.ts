@@ -337,7 +337,6 @@ function validCandidate(
   p: PlacedCargo,
   state: State,
   container: Container,
-  totalWeight: number,
 ) {
   const d = footprint(p)
   if (p.x < -EPS || p.y < -EPS || p.z < -EPS ||
@@ -346,7 +345,11 @@ function validCandidate(
       p.z + p.height > container.height + EPS) return false
 
   if (state.placed.some((q) => overlap(p, q))) return false
-  if (container.maxPayload > 0 && totalWeight + p.weight > container.maxPayload + EPS) return false
+  // Beam states can already contain several newly placed units. Recompute the
+  // actual state weight here; using the layer's initial weight under-counts
+  // payload during beam expansion and can admit an overloaded candidate.
+  const stateWeight = state.placed.reduce((sum, item) => sum + item.weight, 0)
+  if (container.maxPayload > 0 && stateWeight + p.weight > container.maxPayload + EPS) return false
   if (p.z <= EPS) return true
 
   const support = supportMetrics(p, state.placed)
@@ -369,7 +372,6 @@ function candidatePlacements(
   state: State,
   supports: PlacedCargo[],
   container: Container,
-  totalWeight: number,
 ): PlacedCargo[] {
   const rotations: Array<0 | 90> = u.cargo.rotatable === false || u.cargo.length === u.cargo.width
     ? [0]
@@ -524,7 +526,7 @@ function beamLayer(
         .slice(0, 8)
 
       for (const u of eligible) {
-        const candidates = candidatePlacements(u, z, state, supports, container, totalWeight)
+        const candidates = candidatePlacements(u, z, state, supports, container)
         for (const p of candidates) {
           const remaining = state.remaining.filter((x) => x !== u)
           const d = footprint(p)
