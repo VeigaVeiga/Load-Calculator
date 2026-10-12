@@ -112,22 +112,29 @@ function planQuality(result: SolverResult, container: Container, cargo: Cargo[])
     Math.abs(cgZ - container.height * 0.25) * 0.001
 }
 
-function chooseBest(results: Array<{ result: SolverResult; options: HeuristicOptions }>, container: Container, cargo: Cargo[]) {
-  let best = results[0]?.result
-  let bestScore = best ? planQuality(best, container, cargo) : -Infinity
+function chooseBest(
+  results: Array<{ result: SolverResult; options: HeuristicOptions }>,
+  container: Container,
+  cargo: Cargo[],
+) {
+  // Feasibility is a gate, not a penalty. Previously an invalid candidate
+  // could win the score comparison and only be stripped after selection,
+  // even when another candidate was fully valid and nearly as good.
+  let best: SolverResult | undefined
+  let bestScore = -Infinity
 
-  for (let i = 1; i < results.length; i += 1) {
-    const candidate = results[i].result
+  for (const entry of results) {
+    const candidate = entry.result
+    if (!validatePlan(candidate.placed, container, cargo).ok) continue
     const candidateScore = planQuality(candidate, container, cargo)
-    if (candidateScore > bestScore) {
+    if (!best || candidateScore > bestScore) {
       best = candidate
       bestScore = candidateScore
     }
   }
 
-  return best ?? { placed: [], unplaced: [] }
+  return best ?? { placed: [], unplaced: completeUnplaced(cargo, []) }
 }
-
 
 function homogeneousGridCandidate(cargo: Cargo[], container: Container, locked: PlacedCargo[]): SolverResult | null {
   const active = cargo.filter(c => Math.floor(c.quantity) > 0)
@@ -273,7 +280,13 @@ export function basePack(
       placed: openSourceCandidate,
       unplaced: completeUnplaced(cargo, openSourceCandidate),
     }
-    if (planQuality(candidateResult, container, cargo) > planQuality(result, container, cargo)) {
+    // Never let an infeasible open-source layout displace a valid plan.
+    // Candidate generation is advisory; the application validator owns the
+    // final geometry, support, stacking and payload rules.
+    if (
+      validatePlan(candidateResult.placed, container, cargo).ok &&
+      planQuality(candidateResult, container, cargo) > planQuality(result, container, cargo)
+    ) {
       result = candidateResult
     }
     progress?.(Math.round(75 + ((i + 1) / candidateOrders.length) * 25))
