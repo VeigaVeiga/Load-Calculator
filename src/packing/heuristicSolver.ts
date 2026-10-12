@@ -161,7 +161,7 @@ function makePlaced(c: Cargo, index: number, x: number, y: number, z: number, ro
   }
 }
 
-function candidatePoints(placed: PlacedCargo[], container: Container, cargoLength: number, cargoWidth: number, gapStep = 0, allowFloorGap = false) {
+function candidatePoints(placed: PlacedCargo[], container: Container, cargoLength: number, cargoWidth: number, gapStep = 0, allowFloorGap = false, floorOnly = false) {
   const points: Array<[number, number, number]> = []
   const seen = new Set<string>()
   const add = (x: number, y: number, z: number) => {
@@ -187,6 +187,10 @@ function candidatePoints(placed: PlacedCargo[], container: Container, cargoLengt
   }
 
   for (const z of levels) {
+    // Floor-placement passes must not enumerate every upper support plane only
+    // to discard those candidates afterwards. This was the main source of
+    // quadratic candidate growth for large homogeneous carton batches.
+    if (floorOnly && z > EPS) continue
     const samePlane = placed.filter(q => Math.abs(q.z - z) <= EPS)
     const supports = placed.filter(q =>
       Math.abs(q.z + q.height - z) <= EPS && (q.loadBearing !== false || q.stackable !== false)
@@ -223,7 +227,7 @@ function candidatePoints(placed: PlacedCargo[], container: Container, cargoLengt
     for (const x of xs) {
       for (const y of ys) {
         add(x, y, z)
-        if (points.length >= 3500) return points
+        if (points.length >= 700) return points
       }
     }
   }
@@ -359,7 +363,7 @@ export function heuristicPack(cargo: Cargo[], container: Container, locked: Plac
       const d = rotation === 0
         ? { length: u.cargo.length, width: u.cargo.width }
         : { length: u.cargo.width, width: u.cargo.length }
-      const points = candidatePoints(placed, container, d.length, d.width, options.gapStep ?? 0, true).filter(p => p[2] <= EPS)
+      const points = candidatePoints(placed, container, d.length, d.width, options.gapStep ?? 0, true, true).filter(p => p[2] <= EPS)
       const candidates: PlacedCargo[] = []
       for (const [x, y, z] of points) {
         const p = makePlaced(u.cargo, u.index, x, y, z, rotation)
@@ -413,7 +417,7 @@ export function heuristicPack(cargo: Cargo[], container: Container, locked: Plac
     let bestScore = -Infinity
     for (const rotation of rotations) {
       const d = rotation === 0 ? { length: u.cargo.length, width: u.cargo.width } : { length: u.cargo.width, width: u.cargo.length }
-      const points = candidatePoints(placed, container, d.length, d.width, 0, false).filter(p => p[2] <= EPS)
+      const points = candidatePoints(placed, container, d.length, d.width, 0, false, true).filter(p => p[2] <= EPS)
       for (const [x, y, z] of points) {
         const p = makePlaced(u.cargo, u.index, x, y, z, rotation)
         if (!validCandidate(p, placed, container, totalWeight)) continue

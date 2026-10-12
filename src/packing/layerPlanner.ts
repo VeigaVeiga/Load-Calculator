@@ -6,6 +6,10 @@ const MAX_OVERHANG_RATIO = 0.25
 const BEAM_WIDTH = 8
 const MAX_LAYER_STEPS = 72
 const MAX_CANDIDATES_PER_UNIT = 48
+// Large shipments need a bounded, shallow search. The previous fixed beam
+// expanded thousands of expensive states while repeatedly rebuilding free
+// rectangles; on 100+ remaining cartons this made the UI appear frozen.
+const LARGE_BATCH_THRESHOLD = 40
 const MAX_SUPERITEM_UNITS = 8
 
 export type LayerUnit = { cargo: Cargo; index: number }
@@ -541,6 +545,7 @@ function beamLayer(
   z: number,
   supports: PlacedCargo[],
   container: Container,
+  onProgress?: (fraction: number) => void,
 ): State {
   let beam: State[] = [{
     placed: [...initial],
@@ -550,8 +555,14 @@ function beamLayer(
   }]
 
   let best = beam[0]
+  const largeBatch = units.length > LARGE_BATCH_THRESHOLD
+  const beamWidth = largeBatch ? 3 : BEAM_WIDTH
+  const maxSteps = Math.min(largeBatch ? 36 : MAX_LAYER_STEPS, units.length + 12)
+  const eligibleLimit = largeBatch ? 3 : 8
+  const candidateLimit = largeBatch ? 12 : MAX_CANDIDATES_PER_UNIT
 
-  for (let step = 0; step < Math.min(MAX_LAYER_STEPS, units.length + 12); step += 1) {
+  for (let step = 0; step < maxSteps; step += 1) {
+    onProgress?.((step + 1) / maxSteps)
     const next: State[] = []
     let expanded = false
 
@@ -559,10 +570,10 @@ function beamLayer(
       const eligible = state.remaining
         .filter((u) => canUseUnit(u, state.placed))
         .sort((a, b) => unitUrgency(b) - unitUrgency(a))
-        .slice(0, 8)
+        .slice(0, eligibleLimit)
 
       for (const u of eligible) {
-        const candidates = candidatePlacements(u, z, state, supports, container)
+        const candidates = candidatePlacements(u, z, state, supports, container).slice(0, candidateLimit)
         for (let candidateIndex = 0; candidateIndex < candidates.length; candidateIndex += 1) {
           const p = candidates[candidateIndex]
           const d = footprint(p)
@@ -621,7 +632,7 @@ function beamLayer(
       if (dedup.has(signature)) continue
       dedup.add(signature)
       beam.push(state)
-      if (beam.length >= BEAM_WIDTH) break
+      if (beam.length >= beamWidth) break
     }
 
     const candidateBest = beam[0]
@@ -670,7 +681,12 @@ export function packSupportedLayers(
       )
       if (!supports.length) continue
 
-      const result = beamLayer(remaining, current, z, supports, container)
+      const result = beamLayer(remaining, current, z, supports, container, fraction => {
+        // Keep the progress indicator alive while a layer is being searched,
+        // rather than leaving it at ~one third until the beam completes.
+        const estimated = Math.min(remaining.length, units.length > LARGE_BATCH_THRESHOLD ? 36 : MAX_LAYER_STEPS)
+        progress?.(Math.min(99, Math.round(((added.length + fraction * estimated) / Math.max(1, units.length)) * 100)))
+      })
       if (result.placed.length <= current.length) continue
 
       // Fill the lowest viable support plane first. Comparing the raw score
