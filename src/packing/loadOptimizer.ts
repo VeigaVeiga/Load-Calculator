@@ -208,7 +208,7 @@ export async function optimizeLoad(
     return { placed: initial.map((p) => ({ ...p })), iterations: 0, improved: false, scoreBefore: score, scoreAfter: score }
   }
 
-  const maxIterations = Math.max(100, options.maxIterations ?? 320)
+  const maxIterations = Math.max(100, options.maxIterations ?? (initial.length > 150 ? 100 : initial.length > 80 ? 180 : 320))
   const rng = seededRandom(
     Math.round(container.length * 31 + container.width * 17 + initial.length * 13),
   )
@@ -265,7 +265,7 @@ export async function optimizeLoad(
 
   // Start with deterministic physically meaningful anchors. This gives the
   // optimizer a useful basin before stochastic exploration begins.
-  for (const { i } of movable.slice(0, 28)) {
+  for (const { i } of movable.slice(0, current.length > 120 ? 0 : current.length > 60 ? 8 : 16)) {
     const anchors = generateAnchors(current, i, container)
     let localBest = current
     let localScore = currentScore
