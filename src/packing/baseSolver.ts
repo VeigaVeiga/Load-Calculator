@@ -1,6 +1,7 @@
 import type { Cargo, Container, PlacedCargo } from '../types'
 import { validatePlan } from './geometry'
 import { heuristicPack, type HeuristicOptions } from './heuristicSolver'
+import { openSourcePackCandidate } from './openSourceSolver'
 
 const EPS = 0.5
 
@@ -123,6 +124,64 @@ function chooseBest(results: Array<{ result: SolverResult; options: HeuristicOpt
   return best ?? { placed: [], unplaced: [] }
 }
 
+
+function homogeneousGridCandidate(cargo: Cargo[], container: Container, locked: PlacedCargo[]): SolverResult | null {
+  const active = cargo.filter(c => Math.floor(c.quantity) > 0)
+  if (active.length !== 1) return null
+  const c = active[0]
+  if (cargo.some(other => other.id !== c.id && Math.floor(other.quantity) > 0)) return null
+  const orientations = c.rotatable === false || c.length === c.width
+    ? [{ length: c.length, width: c.width, rotation: 0 }]
+    : [
+        { length: c.length, width: c.width, rotation: 0 },
+        { length: c.width, width: c.length, rotation: 90 },
+      ]
+  const candidates: PlacedCargo[][] = []
+  for (const o of orientations) {
+    const cols = Math.floor((container.length + EPS) / o.length)
+    const rows = Math.floor((container.width + EPS) / o.width)
+    if (cols < 1 || rows < 1 || c.height > container.height + EPS) continue
+    const placed = locked.map(p => ({ ...p }))
+    const lockedCount = placed.filter(p => p.cargoId === c.id).length
+    const count = Math.max(0, Math.floor(c.quantity) - lockedCount)
+    let idx = 0
+    // Fill a continuous, edge-anchored grid. Evaluate both orientations;
+    // never rotate individual units inside a homogeneous row/column pattern.
+    for (let row = 0; row < rows && idx < count; row++) {
+      for (let col = 0; col < cols && idx < count; col++) {
+        while (placed.some(q => q.id === c.id + '#' + (idx + 1))) idx++
+        const p: PlacedCargo = {
+          id: c.id + '#' + (idx + 1), cargoId: c.id, cargoType: c.type,
+          x: col * o.length, y: row * o.width, z: 0,
+          length: c.length, width: c.width, height: c.height, rotation: o.rotation,
+          weight: c.weight, color: c.color, placementMode: 'automatic', locked: false,
+          stackable: c.stackable, loadBearing: c.loadBearing,
+          maxStackLayers: c.maxStackLayers, maxLoadOnTop: c.maxLoadOnTop,
+          rotatable: c.rotatable,
+        }
+        if (!fits(p, container)) continue
+        if (placed.some(q => {
+          const a = dimsFor(p), b = dimsFor(q)
+          return p.x < q.x + b.length - EPS && p.x + a.length > q.x + EPS &&
+            p.y < q.y + b.width - EPS && p.y + a.width > q.y + EPS &&
+            p.z < q.z + q.height - EPS && p.z + p.height > q.z + EPS
+        })) continue
+        if (container.maxPayload > 0 &&
+          placed.reduce((sum, q) => sum + q.weight, 0) + p.weight > container.maxPayload + EPS) continue
+        placed.push(p)
+        idx++
+      }
+    }
+    const own = placed.filter(p => p.cargoId === c.id)
+    const audit = validatePlan(placed, container, cargo)
+    if (audit.ok || own.length > 0) candidates.push(placed)
+  }
+  if (!candidates.length) return null
+  candidates.sort((a, b) => b.filter(p => p.cargoId === c.id).length - a.filter(p => p.cargoId === c.id).length)
+  const placed = candidates[0]
+  return { placed, unplaced: completeUnplaced(cargo, placed) }
+}
+
 function completeUnplaced(cargo: Cargo[], placed: PlacedCargo[]) {
   const counts = new Map<string, number>()
   for (const p of placed) counts.set(p.cargoId, (counts.get(p.cargoId) ?? 0) + 1)
@@ -163,13 +222,55 @@ export function basePack(
   const strategies: HeuristicOptions[] = mixed ? [{ gapStep: 0 }] : [{ gapStep: 0 }]
   const results: Array<{ result: SolverResult; options: HeuristicOptions }> = []
 
+  // Fast path before launching the general 3D search: a complete homogeneous
+  // floor grid is already the best first-stage answer for this simple case.
+  // This prevents the expensive general heuristic from delaying a solution
+  // that can be constructed directly from the container dimensions.
+  const gridCandidate = homogeneousGridCandidate(cargo, container, validLocked)
+  if (gridCandidate) {
+    const requested = cargo.reduce((sum, c) => sum + Math.max(0, Math.floor(c.quantity)), 0)
+    const placedRequested = gridCandidate.placed.filter(p => cargo.some(c => c.id === p.cargoId)).length
+    const gridAudit = validatePlan(gridCandidate.placed, container, cargo)
+    if (placedRequested >= requested && gridAudit.ok) {
+      progress?.(100)
+      return gridCandidate
+    }
+  }
+
   for (let i = 0; i < strategies.length; i += 1) {
     const branchProgress = (p: number) => progress?.(Math.round((i * 100 + p) / strategies.length))
     const result = heuristicPack(cargo, container, validLocked, branchProgress, strategies[i])
     results.push({ result, options: strategies[i] })
   }
 
-  const result = chooseBest(results, container, cargo)
+  if (gridCandidate) {
+    // If the fast path cannot fit everything, keep it as another candidate
+    // for comparison with the general 3D solvers.
+    results.push({ result: gridCandidate, options: { gapStep: 0 } })
+  }
+
+  let result = chooseBest(results, container, cargo)
+
+  // Run an independent open-source corner-point solver as a second candidate.
+  // It is accepted only when our stricter app-specific validator approves it;
+  // then the existing objective chooses the better of the two valid plans.
+  // Run a small, bounded portfolio of deterministic item orderings. The
+  // corner-point heuristic is order-sensitive; trying volume, floor footprint,
+  // and weight order catches different layouts without launching an unbounded
+  // search. Keep only the best candidate under the same app-owned objective.
+  const candidateOrders: Array<'volume' | 'footprint' | 'weight'> = ['volume', 'footprint', 'weight']
+  for (let i = 0; i < candidateOrders.length; i += 1) {
+    const openSourceCandidate = openSourcePackCandidate(cargo, container, validLocked, candidateOrders[i])
+    if (!openSourceCandidate) continue
+    const candidateResult: SolverResult = {
+      placed: openSourceCandidate,
+      unplaced: completeUnplaced(cargo, openSourceCandidate),
+    }
+    if (planQuality(candidateResult, container, cargo) > planQuality(result, container, cargo)) {
+      result = candidateResult
+    }
+    progress?.(Math.round(75 + ((i + 1) / candidateOrders.length) * 25))
+  }
 
   // Never expose an invalid automatic result. If the final audit rejects
   // anything, keep the valid locked state and let the unplaced list reflect

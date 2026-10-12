@@ -63,7 +63,11 @@ function weightedDistributionScore(items: PlacedCargo[], container: Container) {
   }
   const endImbalance = Math.abs(front - rear) / total
 
-  return cgX * 55 + cgY * 35 + quadrant * 12 + cgZ * 4 + endImbalance * 8
+  // Moment-based CG is continuous and remains correct when a single row sits
+  // exactly on the centreline. Half-container buckets are only a weak
+  // secondary signal because a centreline item must not be counted as an
+  // entire-side imbalance merely due to a strict < comparison.
+  return cgX * 55 + cgY * 110 + quadrant * 3 + cgZ * 4 + endImbalance * 8
 }
 
 function objective(items: PlacedCargo[], container: Container) {
@@ -157,34 +161,43 @@ function generateAnchors(
 ) {
   const p = items[index]
   const d = dims(p)
-  const xs = new Set<number>([
-    0,
-    Math.max(0, container.length - d.length),
-    Math.max(0, Math.round((container.length - d.length) / 2 / 10) * 10),
-    p.x,
-  ])
-  const ys = new Set<number>([
-    0,
-    Math.max(0, container.width - d.width),
-    Math.max(0, Math.round((container.width - d.width) / 2 / 10) * 10),
-    p.y,
-  ])
+  const candidates = new Map<string, [number, number]>()
+  const add = (x: number, y: number) => {
+    const nx = Math.round(x / 10) * 10
+    const ny = Math.round(y / 10) * 10
+    if (nx < -EPS || ny < -EPS || nx + d.length > container.length + EPS || ny + d.width > container.width + EPS) return
+    candidates.set(nx + '|' + ny, [nx, ny])
+  }
+
+  // A bounded set of meaningful anchors avoids the old Cartesian product of
+  // every X edge with every Y edge, which grew quadratically per item.
+  add(p.x, p.y)
+  add(0, p.y)
+  add(container.length - d.length, p.y)
+  add(p.x, 0)
+  add(p.x, container.width - d.width)
+  add((container.length - d.length) / 2, (container.width - d.width) / 2)
+  add(container.length / 2 - d.length / 2, p.y)
+  add(p.x, container.width / 2 - d.width / 2)
 
   for (const q of items) {
     if (q.id === p.id || q.z > EPS) continue
     const qd = dims(q)
-    xs.add(Math.round(q.x / 10) * 10)
-    xs.add(Math.round((q.x + qd.length - d.length) / 10) * 10)
-    xs.add(Math.round((q.x + qd.length) / 10) * 10)
-    ys.add(Math.round(q.y / 10) * 10)
-    ys.add(Math.round((q.y + qd.width - d.width) / 10) * 10)
-    ys.add(Math.round((q.y + qd.width) / 10) * 10)
+    // Edge-adjacent placements only: preserve one coordinate while aligning
+    // the other to a neighbour, plus a small set of corner combinations.
+    for (const x of [q.x - d.length, q.x + qd.length, q.x, q.x + qd.length - d.length]) {
+      add(x, q.y)
+      add(x, q.y + qd.width - d.width)
+    }
+    for (const y of [q.y - d.width, q.y + qd.width, q.y, q.y + qd.width - d.width]) {
+      add(q.x, y)
+      add(q.x + qd.length - d.length, y)
+    }
+    if (candidates.size >= 96) break
   }
 
-  return [...xs].filter((x) => x >= 0 && x + d.length <= container.length + EPS)
-    .flatMap((x) => [...ys].filter((y) => y >= 0 && y + d.width <= container.width + EPS).map((y) => [x, y] as [number, number]))
+  return [...candidates.values()]
 }
-
 export async function optimizeLoad(
   initial: PlacedCargo[],
   container: Container,
@@ -195,7 +208,7 @@ export async function optimizeLoad(
     return { placed: initial.map((p) => ({ ...p })), iterations: 0, improved: false, scoreBefore: score, scoreAfter: score }
   }
 
-  const maxIterations = Math.max(100, options.maxIterations ?? 700)
+  const maxIterations = Math.max(100, options.maxIterations ?? (initial.length > 150 ? 100 : initial.length > 80 ? 180 : 320))
   const rng = seededRandom(
     Math.round(container.length * 31 + container.width * 17 + initial.length * 13),
   )
@@ -207,6 +220,44 @@ export async function optimizeLoad(
   let best = current.map((p) => ({ ...p }))
   let bestScore = before
 
+  // First try translating the complete arrangement as a rigid block. The old
+  // one-item-at-a-time search often cannot escape a side-packed arrangement:
+  // every useful move collides with its neighbour, although moving the whole
+  // arrangement toward the centre is collision-free and preserves stacking.
+  // Locked plans are left untouched by this phase.
+  if (!current.some(p => p.locked)) {
+    const analysis = analyzeWeight(current, container)
+    const minX = Math.min(...current.map(p => p.x))
+    const maxX = Math.max(...current.map(p => p.x + dims(p).length))
+    const minY = Math.min(...current.map(p => p.y))
+    const maxY = Math.max(...current.map(p => p.y + dims(p).width))
+    const shifts = [
+      [container.length / 2 - analysis.cg.x, container.width / 2 - analysis.cg.y],
+      [(container.length - (maxX - minX)) / 2 - minX, (container.width - (maxY - minY)) / 2 - minY],
+      [0, container.width / 2 - analysis.cg.y],
+      [container.length / 2 - analysis.cg.x, 0],
+    ] as const
+    for (const [dx, dy] of shifts) {
+      if (Math.abs(dx) < EPS && Math.abs(dy) < EPS) continue
+      const candidate = current.map(p => ({
+        ...p,
+        x: p.x + dx,
+        y: p.y + dy,
+        placementMode: 'automatic' as const,
+      }))
+      if (!validateCandidate(candidate, container, expectedCount)) continue
+      const score = objective(candidate, container)
+      if (score + 1e-9 < bestScore) {
+        best = candidate.map(p => ({ ...p }))
+        bestScore = score
+      }
+      if (score + 1e-9 < currentScore) {
+        current = candidate
+        currentScore = score
+      }
+    }
+  }
+
   const movable = floorMovable(current)
   if (movable.length === 0) {
     return { placed: best, iterations: 0, improved: false, scoreBefore: before, scoreAfter: before }
@@ -214,7 +265,7 @@ export async function optimizeLoad(
 
   // Start with deterministic physically meaningful anchors. This gives the
   // optimizer a useful basin before stochastic exploration begins.
-  for (const { i } of movable) {
+  for (const { i } of movable.slice(0, current.length > 120 ? 0 : current.length > 60 ? 8 : 16)) {
     const anchors = generateAnchors(current, i, container)
     let localBest = current
     let localScore = currentScore
