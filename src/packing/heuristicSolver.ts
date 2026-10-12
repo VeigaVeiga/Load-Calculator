@@ -346,10 +346,10 @@ export function heuristicPack(cargo: Cargo[], container: Container, locked: Plac
   const groundUnits = [...units].sort((a, b) => {
     const nonStackable = Number(b.cargo.stackable === false) - Number(a.cargo.stackable === false)
     if (nonStackable) return nonStackable
-    const areaA = a.cargo.length * a.cargo.width
-    const areaB = b.cargo.length * b.cargo.width
-    return areaB - areaA ||
-      orderMetric(b, order) - orderMetric(a, order) ||
+    // Keep independent multi-start runs genuinely different: area-first,
+    // volume-first, weight-first, etc. share only the non-stackable priority.
+    return orderMetric(b, order) - orderMetric(a, order) ||
+      (b.cargo.length * b.cargo.width - a.cargo.length * a.cargo.width) ||
       (b.cargo.length * b.cargo.width * b.cargo.height - a.cargo.length * a.cargo.width * a.cargo.height) ||
       a.cargo.id.localeCompare(b.cargo.id) || a.index - b.index
   })
@@ -403,9 +403,9 @@ export function heuristicPack(cargo: Cargo[], container: Container, locked: Plac
   )
   totalWeight = layerResult.totalWeight
 
-  // Any stackable cargo that could not find a stable support plane gets a final
-  // ground fallback. This is deliberately after layer packing so boxes do not
-  // consume floor space before the pallet-top layers have been filled.
+  // Retry any stackable cargo that could not find a stable support plane on
+  // the floor. Most units have already had a floor attempt; this retry matters
+  // when the layer planner changed the remaining set or found a new placement.
   for (const u of layerResult.remaining) {
     const rotations: Array<0 | 90> = u.cargo.rotatable === false || u.cargo.length === u.cargo.width ? [0] : [0, 90]
     let best: PlacedCargo | null = null
