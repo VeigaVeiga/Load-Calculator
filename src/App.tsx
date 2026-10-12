@@ -1499,7 +1499,7 @@ function App() {
                   <div className="packing-kicker">{lang === 'zh' ? '装载计算中' : 'PACKING IN PROGRESS'}</div>
                   <strong>{packingProgress}%</strong>
                   <div className="packing-track"><i style={{ width: `${packingProgress}%` }} /></div>
-                  <span>{lang === 'zh' ? '正在搜索摆放位置与旋转组合，请稍候…' : 'Searching placement and rotation combinations…'}</span>
+                  <span>{lang === 'zh' ? '正在生成并优化装柜方案，请稍候…' : 'Generating and optimizing the loading plan…'}</span>
                   <button className="packing-cancel" onClick={cancelPacking}>{lang === 'zh' ? '取消计算' : 'Cancel'}</button>
                 </div>
               </div>
