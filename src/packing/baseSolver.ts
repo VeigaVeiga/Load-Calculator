@@ -27,7 +27,7 @@ function seededRandom(seed: number) {
   }
 }
 
-function score(placed: PlacedCargo[], container: Container) {
+function score(placed: PlacedCargo[], container: Container): [number, number, number] {
   const volume = placed.reduce((sum, p) => sum + p.length * p.width * p.height, 0)
   const weight = placed.reduce((sum, p) => sum + Math.max(0, p.weight), 0)
   const totalWeight = Math.max(1, weight)
@@ -56,7 +56,9 @@ function annealingQuality(items: PlacedCargo[], container: Container) {
   return count * 1_000_000_000 + normalizedVolume * 1_000_000 - normalizedBalance * 100
 }
 
-function mutateOrder(items: Cargo[], random: () => number): Cargo[] {
+type SequenceUnit = { key: string; volume: number; footprint: number; weight: number }
+
+function mutateOrder(items: SequenceUnit[], random: () => number): SequenceUnit[] {
   const next = [...items]
   if (next.length < 2) return next
   const a = Math.floor(random() * next.length)
@@ -100,11 +102,19 @@ function refineBySequenceSearch(
   const random = seededRandom(
     Math.round(container.length * 31 + container.width * 17 + totalUnits * 13 + cargo.length * 7),
   )
-  let order = [...cargo].sort((a, b) =>
-    b.length * b.width * b.height * Math.max(0, Math.floor(b.quantity)) -
-    a.length * a.width * a.height * Math.max(0, Math.floor(a.quantity)),
+  // Search physical instances, not just SKU groups. This mirrors LoadZa's
+  // item-permutation search while retaining the app's cargo IDs and constraints.
+  let order: SequenceUnit[] = cargo.flatMap(item =>
+    Array.from({ length: Math.max(0, Math.floor(item.quantity)) }, (_, index) => ({
+      key: item.id + '#' + (index + 1),
+      volume: item.length * item.width * item.height,
+      footprint: item.length * item.width,
+      weight: Math.max(0, item.weight),
+    })),
+  ).sort((a, b) =>
+    b.volume - a.volume || b.footprint - a.footprint || b.weight - a.weight || a.key.localeCompare(b.key),
   )
-  let current = openSourcePackCandidate(order, container, locked, 'sequence')
+  let current = openSourcePackCandidate(cargo, container, locked, 'sequence', order.map(item => item.key))
   if (!current || !validatePlan(current, container, cargo).ok) current = [...incumbent]
   let currentQuality = annealingQuality(current, container)
   let best = [...incumbent]
@@ -120,7 +130,7 @@ function refineBySequenceSearch(
   const cooling = iterations > 0 ? Math.pow(0.001 / temperature, 1 / iterations) : 1
   for (let iteration = 0; iteration < iterations; iteration += 1) {
     const candidateOrder = mutateOrder(order, random)
-    const candidate = openSourcePackCandidate(candidateOrder, container, locked, 'sequence')
+    const candidate = openSourcePackCandidate(cargo, container, locked, 'sequence', candidateOrder.map(item => item.key))
     if (candidate && validatePlan(candidate, container, cargo).ok) {
       const candidateQuality = annealingQuality(candidate, container)
       const delta = candidateQuality - currentQuality
