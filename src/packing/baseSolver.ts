@@ -226,14 +226,13 @@ export function basePack(
   // Deterministic multi-start portfolio: each run keeps the same hard
   // constraints but changes the item ordering so mixed shipments are not
   // locked into one greedy sequence. Candidate plans are compared globally.
-  const strategies: HeuristicOptions[] = [
-    { gapStep: 0, order: 'area' },
-    { gapStep: 0, order: 'volume' },
-    { gapStep: 0, order: 'weight' },
-    { gapStep: 0, order: 'height' },
-    { gapStep: 0, order: 'longest-side' },
-    { gapStep: 0, order: 'density' },
-  ]
+  const requestedUnits = cargo.reduce((sum, c) => sum + Math.max(0, Math.floor(c.quantity)), 0)
+  const orderPortfolio: HeuristicOptions['order'][] = requestedUnits > 160
+    ? ['area', 'volume', 'weight']
+    : requestedUnits > 80
+      ? ['area', 'volume', 'weight', 'longest-side']
+      : ['area', 'volume', 'weight', 'height', 'longest-side', 'density']
+  const strategies: HeuristicOptions[] = orderPortfolio.map(order => ({ gapStep: 0, order }))
   const results: Array<{ result: SolverResult; options: HeuristicOptions }> = []
 
   // Fast path before launching the general 3D search: a complete homogeneous
