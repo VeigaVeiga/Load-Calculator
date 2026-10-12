@@ -771,7 +771,7 @@ function App() {
           }
         }
         worker.onerror = event => reject(event.error instanceof Error ? event.error : new Error(event.message || 'Load optimization worker failed'))
-        worker.postMessage({ items: placed, container, maxIterations: 320 })
+        worker.postMessage({ items: placed, container })
       })
 
       if (controller.signal.aborted) return
