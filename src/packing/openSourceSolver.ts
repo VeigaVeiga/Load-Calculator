@@ -26,8 +26,8 @@ export function openSourcePackCandidate(
     const items = cargo.flatMap((item) =>
       Array.from({ length: Math.max(0, Math.floor(item.quantity)) }, (_, index) => {
         const id = item.id + '#' + (index + 1)
-        if (lockedIds.has(id)) return null
-        return {
+        if (lockedIds.has(id)) return []
+        return [{
           partno: id,
           name: item.name,
           whd: [item.length, item.height, item.width] as [number, number, number],
@@ -40,8 +40,8 @@ export function openSourcePackCandidate(
           fragile: false,
           nonStackable: false,
           color: item.color,
-        }
-      }).filter((item): item is NonNullable<typeof item> => item !== null),
+        }]
+      }).flat(),
     )
 
     const obstacles = locked.map((item) => ({
