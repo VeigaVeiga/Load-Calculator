@@ -1764,11 +1764,11 @@ function App() {
                   loading="lazy"
                 />
               </div>
-              <p className="kfc-copy" aria-live="polite">{kfcCopy}</p>
-              <button className="kfc-random-btn" type="button" onClick={() => void refreshKfcCopy()} disabled={kfcLoading}>
+              <button className="kfc-random-btn" type="button" onClick={() => void refreshKfcCopy()} disabled={kfcLoading} aria-label={lang === 'zh' ? '再来一条文案' : 'Get another copy'}>
                 <span className="kfc-drumstick" aria-hidden="true">🍗</span>
-                <span>{kfcLoading ? (lang === 'zh' ? '正在获取文案…' : 'Fetching copy…') : (lang === 'zh' ? '再来一条' : 'Another one')}</span>
+                <span className="kfc-random-label">{kfcLoading ? (lang === 'zh' ? '获取中' : 'Loading') : (lang === 'zh' ? '再来一条' : 'Another one')}</span>
               </button>
+              <p className="kfc-copy" aria-live="polite">{kfcCopy}</p>
             </section>
             <footer className="app-footer">
               <button type="button" onClick={() => setShowAcknowledgements(true)}>
