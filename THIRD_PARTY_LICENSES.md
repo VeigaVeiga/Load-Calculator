@@ -70,3 +70,25 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+
+## Meme image and copy dataset attribution
+
+### Sidebar meme image
+
+- Asset URL supplied for this project: https://r2.vme.im/memes/1769666983755-8bc2f86c1eed.png
+- Hosting/source context: VME50 — https://github.com/vikiboss/v50
+- The image is stored locally as `public/kfc-meme.jpg`, composited onto a white background and cropped for the sidebar.
+- The original image creator and the asset's specific license are not identified by the supplied asset URL. Attribution here identifies the source/host, not a claim of original authorship or a representation that the image is licensed for redistribution.
+
+### Copy data
+
+- Dataset project: [vikiboss/v50](https://github.com/vikiboss/v50), file `static/v50.json`.
+- This app fetches the public JSON through jsDelivr CDN, with GitHub Raw as a fallback, and selects a random line locally.
+- The V50 repository's disclaimer says its copy data was collected from the public internet and invites rights holders to contact the maintainer for removal: https://github.com/vikiboss/v50/blob/main/hi%40viki.moe
+- V50 specifically acknowledges these major upstream sources:
+  - [zkl2333/vme](https://github.com/zkl2333/vme)
+  - [whitescent/KFC-Crazy-Thursday](https://github.com/whitescent/KFC-Crazy-Thursday)
+  - [FriedRiceNoodles/AyachiNene](https://github.com/FriedRiceNoodles/AyachiNene)
+- V50 does not provide a reliable per-entry source map, so this project cannot attribute each displayed line to a specific upstream project.
+- Public availability does not itself establish a license to redistribute copyrighted content. This notice is source attribution, not a claim that all image/copy content is covered by the MIT license of V50's code. Rights holders may contact the project maintainer to request review or removal.
