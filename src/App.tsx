@@ -1515,6 +1515,8 @@ function App() {
             <div className="cg-hud" aria-label={lang === 'zh' ? '装载重心摘要' : 'Loading center of gravity'}>
               <svg className="cg-hud-map" viewBox="0 0 96 58" role="img" aria-label={lang === 'zh' ? '重心相对集装箱中心的偏移' : 'Cargo center relative to container center'}>
                 <rect x="9" y="5" width="78" height="48" rx="2" />
+                <line className="cg-hud-door" x1="87" y1="5" x2="95" y2="0" />
+                <line className="cg-hud-door" x1="87" y1="53" x2="95" y2="58" />
                 <line x1="48" y1="5" x2="48" y2="53" />
                 <line x1="9" y1="29" x2="87" y2="29" />
                 <line className="cg-hud-vector" x1="48" y1="29"
