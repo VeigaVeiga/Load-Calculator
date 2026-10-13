@@ -27,18 +27,27 @@ function seededRandom(seed: number) {
   }
 }
 
-function score(placed: PlacedCargo[], container: Container): [number, number, number] {
+function score(placed: PlacedCargo[], container: Container): [number, number, number, number] {
   const volume = placed.reduce((sum, p) => sum + p.length * p.width * p.height, 0)
   const weight = placed.reduce((sum, p) => sum + Math.max(0, p.weight), 0)
   const totalWeight = Math.max(1, weight)
-  const cgX = placed.reduce((sum, p) => { const d = dims(p); return sum + (p.x + d.length / 2) * p.weight }, 0) / totalWeight
-  const cgY = placed.reduce((sum, p) => { const d = dims(p); return sum + (p.y + d.width / 2) * p.weight }, 0) / totalWeight
-  const balance = Math.abs(cgX - container.length / 2) + Math.abs(cgY - container.width / 2)
-  // Keep the maximum cargo count first, then prioritize the total CG being near the
-  // geometric center, and use occupied volume as the final tie-breaker.
-  return [placed.length, -balance, volume]
-}
+  const cgX = placed.reduce((sum, p) => { const d = dims(p); return sum + (p.x + d.length / 2) * Math.max(0, p.weight) }, 0) / totalWeight
+  const cgY = placed.reduce((sum, p) => { const d = dims(p); return sum + (p.y + d.width / 2) * Math.max(0, p.weight) }, 0) / totalWeight
+  const massBalance = Math.abs(cgX - container.length / 2) + Math.abs(cgY - container.width / 2)
 
+  // Balance the complete cargo footprint as well as its mass. This makes layouts
+  // with similar weight centres prefer more even front/back and left/right edge gaps.
+  const minX = placed.length ? Math.min(...placed.map(p => p.x)) : 0
+  const minY = placed.length ? Math.min(...placed.map(p => p.y)) : 0
+  const maxX = placed.length ? Math.max(...placed.map(p => p.x + dims(p).length)) : 0
+  const maxY = placed.length ? Math.max(...placed.map(p => p.y + dims(p).width)) : 0
+  const footprintBalance = Math.abs((minX + maxX) / 2 - container.length / 2)
+    + Math.abs((minY + maxY) / 2 - container.width / 2)
+
+  // Priority: place as many units as possible, centre the total mass, balance
+  // the overall footprint/edge clearances, then use occupied volume as tie-breaker.
+  return [placed.length, -massBalance, -footprintBalance, volume]
+}
 
 function compareScores(a: number[], b: number[]) {
   for (let i = 0; i < Math.max(a.length, b.length); i += 1) {
@@ -50,12 +59,12 @@ function compareScores(a: number[], b: number[]) {
 }
 
 function annealingQuality(items: PlacedCargo[], container: Container) {
-  const [count, negativeBalance, volume] = score(items, container)
+  const [count, negativeMassBalance, negativeFootprintBalance, volume] = score(items, container)
   const containerVolume = Math.max(1, container.length * container.width * container.height)
   const normalizedVolume = volume / containerVolume
-  const normalizedBalance = negativeBalance / Math.max(1, container.length + container.width)
-  // Unit count is a hard priority; centering the mass is next; volume is a tie-breaker.
-  return count * 1_000_000_000 + normalizedBalance * 1_000_000 + normalizedVolume * 1_000
+  const massBalance = negativeMassBalance / Math.max(1, container.length + container.width)
+  const footprintBalance = negativeFootprintBalance / Math.max(1, container.length + container.width)
+  return count * 1_000_000_000 + massBalance * 1_000_000 + footprintBalance * 10_000 + normalizedVolume * 1_000
 }
 
 type SequenceUnit = { key: string; volume: number; footprint: number; weight: number }
@@ -158,25 +167,51 @@ function refineBySequenceSearch(
 }
 
 function nudgeTowardCenter(items: PlacedCargo[], cargo: Cargo[], container: Container, locked: PlacedCargo[]): PlacedCargo[] {
-  let result = [...items]
-  const fixed = new Set(locked.map(p => p.id))
-  const movable = [...result].filter(p => !p.locked && !fixed.has(p.id)).sort((a, b) => b.weight - a.weight).slice(0, 60)
-  for (const step of [100, 50]) {
-    for (const item of movable) {
-      const original = result.find(p => p.id === item.id)
-      if (!original) continue
-      let best = result
-      let bestScore = score(result, container)
-      for (const d of [{x:-step,y:0},{x:step,y:0},{x:0,y:-step},{x:0,y:step}]) {
-        const next = result.map(p => p.id === item.id ? {...p,x:p.x+d.x,y:p.y+d.y} : p)
-        if (validatePlan(next, container, cargo).ok && compareScores(score(next, container), bestScore) > 0) { best = next; bestScore = score(next, container) }
+  if (items.length < 2) return items
+  const fixedIds = new Set(locked.map(p => p.id))
+  const movableIds = new Set(items.filter(p => !p.locked && !fixedIds.has(p.id)).map(p => p.id))
+  if (!movableIds.size) return items
+
+  const weight = items.reduce((sum, p) => sum + Math.max(0, p.weight), 0)
+  if (weight <= 0) return items
+  const cgX = items.reduce((sum, p) => { const d = dims(p); return sum + (p.x + d.length / 2) * Math.max(0, p.weight) }, 0) / weight
+  const cgY = items.reduce((sum, p) => { const d = dims(p); return sum + (p.y + d.width / 2) * Math.max(0, p.weight) }, 0) / weight
+  const minX = Math.min(...items.map(p => p.x))
+  const minY = Math.min(...items.map(p => p.y))
+  const maxX = Math.max(...items.map(p => p.x + dims(p).length))
+  const maxY = Math.max(...items.map(p => p.y + dims(p).width))
+  const cgDx = container.length / 2 - cgX
+  const cgDy = container.width / 2 - cgY
+  const footprintDx = container.length / 2 - (minX + maxX) / 2
+  const footprintDy = container.width / 2 - (minY + maxY) / 2
+  const blendDx = cgDx * 0.7 + footprintDx * 0.3
+  const blendDy = cgDy * 0.7 + footprintDy * 0.3
+  const snap = (n: number) => Math.round(n / 50) * 50
+  const shifts = (target: number, cg: number, footprint: number) => [...new Set([
+    0, snap(target), snap(cg), snap(footprint),
+    ...[-800, -400, -200, -100, -50, 50, 100, 200, 400, 800].map(delta => snap(target) + delta),
+  ])]
+  const dxs = shifts(blendDx, cgDx, footprintDx)
+  const dys = shifts(blendDy, cgDy, footprintDy)
+
+  let best = items
+  let bestScore = score(items, container)
+  // Treat the unlocked shipment as one rigid arrangement: every movable unit
+  // receives exactly the same translation, so layers/stacking are not torn apart.
+  for (const dx of dxs) {
+    for (const dy of dys) {
+      if (dx === 0 && dy === 0) continue
+      const candidate = items.map(p => movableIds.has(p.id) ? { ...p, x: p.x + dx, y: p.y + dy } : p)
+      if (!validatePlan(candidate, container, cargo).ok) continue
+      const candidateScore = score(candidate, container)
+      if (compareScores(candidateScore, bestScore) > 0) {
+        best = candidate
+        bestScore = candidateScore
       }
-      result = best
     }
   }
-  return validatePlan(result, container, cargo).ok ? result : items
+  return best
 }
-
 
 /**
  * Automatic packing is delegated to the MIT-licensed binpack3d library
