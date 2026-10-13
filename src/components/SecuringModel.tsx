@@ -45,6 +45,26 @@ function DashedDoorNet({ width, height, selected }: { width: number; height: num
       segments.push(<Rope key={`door-net-${index++}`} a={p0.clone().addScaledVector(unit, d)} b={p0.clone().addScaledVector(unit, e)} radius={.006} color={color} />)
     }
   }
+  
+  // Add the opposite diagonal family so the net forms a complete cross-hatch.
+  for (let b = minB; b <= maxB + 1e-7; b += pitch) {
+    const y0 = Math.max(-w / 2, b - h / 2)
+    const y1 = Math.min(w / 2, b + h / 2)
+    if (y1 <= y0 + 1e-7) continue
+
+    const p0 = new THREE.Vector3(0, y0, b - y0)
+    const p1 = new THREE.Vector3(0, y1, b - y1)
+    const direction = p1.clone().sub(p0)
+    const length = direction.length()
+    if (length < 0.001) continue
+    const unit = direction.normalize()
+
+    for (let d = 0; d < length - 1e-7; d += dash + gap) {
+      const e = Math.min(length, d + dash)
+      if (e - d < 0.008) continue
+      segments.push(<Rope key={`door-net-reverse-${index++}`} a={p0.clone().addScaledVector(unit, d)} b={p0.clone().addScaledVector(unit, e)} radius={.006} color={color} />)
+    }
+  }
 
   return <group>{segments}</group>
 }
