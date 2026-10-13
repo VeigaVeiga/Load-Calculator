@@ -1488,3 +1488,57 @@ body{overflow:hidden}
   .theme-portal .kfc-meme-image{width:170%!important}
   .theme-portal .kfc-random-btn{width:44px!important;height:64px!important;min-height:64px!important}
 }
+
+
+/* V39 — compact top strip: enlarged meme + narrow vertical refresh button; copy gets lower half */
+.theme-portal .kfc-card{
+  grid-template-columns:minmax(0,1fr) 40px!important;
+  grid-template-rows: minmax(0,1fr) minmax(150px,1fr)!important;
+  grid-template-areas:"image action" "copy copy"!important;
+  gap:6px 8px!important;
+  min-height:340px!important;
+  align-content:stretch!important;
+}
+.theme-portal .kfc-meme-frame{
+  height:100%!important;
+  min-height:0!important;
+  overflow:hidden!important;
+  align-self:stretch!important;
+}
+.theme-portal .kfc-meme-image{
+  width:200%!important;
+  max-width:none!important;
+  height:auto!important;
+  max-height:none!important;
+  object-fit:contain!important;
+  transform:scale(1.12)!important;
+  transform-origin:center center!important;
+}
+.theme-portal .kfc-random-btn{
+  width:40px!important;
+  height:100%!important;
+  min-height:0!important;
+  align-self:stretch!important;
+  justify-self:stretch!important;
+  padding:4px 2px!important;
+  gap:5px!important;
+  border-radius:7px!important;
+}
+.theme-portal .kfc-drumstick{font-size:21px!important}
+.theme-portal .kfc-random-label{font-size:9px!important;line-height:1.25!important}
+.theme-portal .kfc-copy{
+  min-height:150px!important;
+  max-height:260px!important;
+  align-self:stretch!important;
+}
+@media(max-width:780px){
+  .theme-portal .kfc-card{
+    grid-template-columns:minmax(0,1fr) 40px!important;
+    grid-template-rows: minmax(150px,1fr) minmax(150px,1fr)!important;
+    min-height:340px!important;
+  }
+  .theme-portal .kfc-meme-frame{height:100%!important}
+  .theme-portal .kfc-meme-image{width:200%!important}
+  .theme-portal .kfc-random-btn{width:40px!important;height:100%!important}
+  .theme-portal .kfc-copy{min-height:150px!important;max-height:260px!important}
+}
