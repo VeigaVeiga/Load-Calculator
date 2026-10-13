@@ -1,5 +1,5 @@
 import type { Cargo, Container, PlacedCargo } from '../types'
-import { validatePlan } from './geometry'
+import { dims, validatePlan } from './geometry'
 import { binpackingJsCandidate, openSourcePackCandidate } from './openSourceSolver'
 
 export type SolverResult = {
@@ -31,8 +31,8 @@ function score(placed: PlacedCargo[], container: Container): [number, number, nu
   const volume = placed.reduce((sum, p) => sum + p.length * p.width * p.height, 0)
   const weight = placed.reduce((sum, p) => sum + Math.max(0, p.weight), 0)
   const totalWeight = Math.max(1, weight)
-  const cgX = placed.reduce((sum, p) => sum + (p.x + p.length / 2) * p.weight, 0) / totalWeight
-  const cgY = placed.reduce((sum, p) => sum + (p.y + p.width / 2) * p.weight, 0) / totalWeight
+  const cgX = placed.reduce((sum, p) => { const d = dims(p); return sum + (p.x + d.length / 2) * p.weight }, 0) / totalWeight
+  const cgY = placed.reduce((sum, p) => { const d = dims(p); return sum + (p.y + d.width / 2) * p.weight }, 0) / totalWeight
   const balance = Math.abs(cgX - container.length / 2) + Math.abs(cgY - container.width / 2)
   // Keep the maximum cargo count first, then prioritize the total CG being near the
   // geometric center, and use occupied volume as the final tie-breaker.
@@ -53,7 +53,7 @@ function annealingQuality(items: PlacedCargo[], container: Container) {
   const [count, negativeBalance, volume] = score(items, container)
   const containerVolume = Math.max(1, container.length * container.width * container.height)
   const normalizedVolume = volume / containerVolume
-  const normalizedBalance = Math.max(0, negativeBalance) / Math.max(1, container.length + container.width)
+  const normalizedBalance = negativeBalance / Math.max(1, container.length + container.width)
   // Unit count is a hard priority; centering the mass is next; volume is a tie-breaker.
   return count * 1_000_000_000 + normalizedBalance * 1_000_000 + normalizedVolume * 1_000
 }
@@ -157,6 +157,27 @@ function refineBySequenceSearch(
   return { placed: best, quality: bestQuality, iterations }
 }
 
+function nudgeTowardCenter(items: PlacedCargo[], cargo: Cargo[], container: Container, locked: PlacedCargo[]): PlacedCargo[] {
+  let result = [...items]
+  const fixed = new Set(locked.map(p => p.id))
+  const movable = [...result].filter(p => !p.locked && !fixed.has(p.id)).sort((a, b) => b.weight - a.weight).slice(0, 60)
+  for (const step of [100, 50]) {
+    for (const item of movable) {
+      const original = result.find(p => p.id === item.id)
+      if (!original) continue
+      let best = result
+      let bestScore = score(result, container)
+      for (const d of [{x:-step,y:0},{x:step,y:0},{x:0,y:-step},{x:0,y:step}]) {
+        const next = result.map(p => p.id === item.id ? {...p,x:p.x+d.x,y:p.y+d.y} : p)
+        if (validatePlan(next, container, cargo).ok && compareScores(score(next, container), bestScore) > 0) { best = next; bestScore = score(next, container) }
+      }
+      result = best
+    }
+  }
+  return validatePlan(result, container, cargo).ok ? result : items
+}
+
+
 /**
  * Automatic packing is delegated to the MIT-licensed binpack3d library
  * (a TypeScript port of py3dbp's corner-point heuristic). We run a small,
@@ -232,6 +253,7 @@ export function basePack(
       bestScore = score(best, container)
     }
   }
+  best = nudgeTowardCenter(best, cargo, container, locked)
   progress?.(98)
 
   const result = { placed: best, unplaced: completeUnplaced(cargo, best) }

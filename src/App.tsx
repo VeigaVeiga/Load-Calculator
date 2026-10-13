@@ -16,7 +16,7 @@ import type {
 import { autoPackAsync } from './packing/packer'
 import { validatePlacement } from './packing/geometry'
 import { analyzeWeight } from './analysis/weight'
-import { cbm, mm } from './utils'
+import { cbm } from './utils'
 import { createDocxWithPlanImages, extractZipEntry } from './utils/docxTemplate'
 
 type Lang = 'zh' | 'en'
@@ -1019,49 +1019,6 @@ function App() {
         </div>
       )}
 
-      <section className="summary">
-        <div>
-          <span>{tr.internal}</span>
-          <strong>
-            {mm(container.length)} ×{' '}
-            {mm(container.width)} ×{' '}
-            {mm(container.height)}
-          </strong>
-        </div>
-
-        <div>
-          <span>{tr.external}</span>
-          <strong>
-            {mm(container.outerLength)} ×{' '}
-            {mm(container.outerWidth)} ×{' '}
-            {mm(container.outerHeight)}
-          </strong>
-        </div>
-
-        <div>
-          <span>{tr.door}</span>
-          <strong>
-            {mm(container.doorWidth)} ×{' '}
-            {mm(container.doorHeight)}
-          </strong>
-        </div>
-
-        <div>
-          <span>{tr.payload}</span>
-
-          <strong>
-            {container.maxPayload.toLocaleString()}{' '}
-            kg
-          </strong>
-
-          <small>
-            {totals.q} {tr.units} ·{' '}
-            {totals.v.toFixed(2)} m³ ·{' '}
-            {totals.w.toFixed(1)} kg
-          </small>
-        </div>
-      </section>
-
       <main className="workspace">
         <aside className="sidebar">
           <div className="sidebar-head">
@@ -1475,9 +1432,14 @@ function App() {
               </span>
             </div>
 
-            <div className="view-badge">
-              {placed.length}/
-              {totals.q} {tr.placed}
+            <div className="viewer-status">
+              <div className="view-badge">
+                {placed.length}/{totals.q} {tr.placed}
+              </div>
+              <div className="payload-badge">
+                <span>{tr.payload}</span>
+                <strong>{container.maxPayload.toLocaleString()} kg</strong>
+              </div>
             </div>
           </div>
 
@@ -1664,7 +1626,7 @@ function App() {
                   <b>{(analysis.longitudinalOffset / 1000).toFixed(2)} t</b>
                 </div>
               </div>
-              <p className="analysis-note">{lang === 'zh' ? '以上数据仅供参考，仅在参考值达到相应条件时标红，不作为铁路安全判定。前后偏重为估算值。' : 'Reference only. Values are highlighted in red when the reference threshold is reached; this is not a railway safety determination. Longitudinal imbalance is estimated.'}</p>
+              <p className="analysis-note">{lang === 'zh' ? '以上数据仅供参考' : 'For reference only.'}</p>
               <CenterOfGravity analysis={analysis} container={container} lang={lang}/>
             </div>
           )}
