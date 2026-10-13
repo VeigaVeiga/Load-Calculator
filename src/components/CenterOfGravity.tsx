@@ -11,16 +11,12 @@ export default function CenterOfGravity({analysis,container,lang='zh'}:{analysis
     <div className="cg-box cg-vertical-box">
       <svg viewBox="0 0 120 220" aria-label={lang==='zh'?'集装箱重心图':'Container center of gravity'}>
         <rect x="18" y="10" width="84" height="200" rx="1"/>
-        <line x1="60" y1="10" x2="60" y2="210" className="cg-longitudinal"/>
-        <line x1="18" y1="110" x2="102" y2="110" className="cg-transverse"/>
+        <line x1="60" y1="10" x2="60" y2="210" style={{stroke:"#2674c8",strokeWidth:1.8,strokeDasharray:"none"}}/>
+        <line x1="18" y1="110" x2="102" y2="110" style={{stroke:"#e58a2d",strokeWidth:1.8,strokeDasharray:"4 3"}}/>
         <line x1="60" y1="110" x2={x} y2={y} className="cg-vector"/>
         <circle cx={x} cy={y} r="5"/>
         <text x="60" y="219" textAnchor="middle">{lang==='zh'?'柜门':'DOOR'}</text>
       </svg>
-      <div className="cg-legend">
-        <span><i className="cg-legend-blue" /> {lang==='zh'?'纵向中心线（蓝色实线）':'Longitudinal centerline (blue solid)'}</span>
-        <span><i className="cg-legend-orange" /> {lang==='zh'?'横向中心线（橙色虚线）':'Transverse centerline (orange dashed)'}</span>
-      </div>
     </div>
   </div>
 }
