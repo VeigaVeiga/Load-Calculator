@@ -27,15 +27,14 @@ export default function OpenSourceAcknowledgements({ lang, onBack }: Props) {
         </section>
         <section className="ack-section">
           <div className="ack-section-label">DATA & IMAGE SOURCES</div>
-          <h2>{zh ? '数据和图片来源，感谢以下作者' : 'Data & image sources — thanks to these authors'}</h2>
-          <p className="ack-lead">{zh ? '侧边梗图来自 VME 梗图页面，页面标注作者为 zkl2333；随机文案数据来自 V50 仓库。' : 'The sidebar meme image comes from its VME joke page, which credits <a href="https://vme.im/authors/zkl2333" target="_blank" rel="noreferrer">zkl2333</a>. Random copy data comes from the V50 repository.'}</p>
-          <ul className="ack-source-list">
-            <li><a href="https://github.com/zkl2333/vme" target="_blank" rel="noreferrer">zkl2333/vme ↗</a></li>
-            <li><a href="https://github.com/whitescent/KFC-Crazy-Thursday" target="_blank" rel="noreferrer">whitescent/KFC-Crazy-Thursday ↗</a></li>
-            <li><a href="https://github.com/FriedRiceNoodles/AyachiNene" target="_blank" rel="noreferrer">FriedRiceNoodles/AyachiNene ↗</a></li>
-            <li><a href="https://github.com/vikiboss/v50" target="_blank" rel="noreferrer">vikiboss/v50 ↗</a></li>
-            <li><a href="https://vme.im/jokes/I_kwDOLrzjj87mnH0a" target="_blank" rel="noreferrer">vme.im/jokes/I_kwDOLrzjj87mnH0a — 作者 zkl2333 ↗</a></li>
-          </ul>
+          <h2>{zh ? '文案版块的数据和图片来源，感谢以下作者' : 'Copy section data & image sources — thanks to these authors'}</h2>
+          <div className="ack-table-wrap"><table className="ack-table"><thead><tr><th>{zh ? '来源' : 'Source'}</th><th>{zh ? '引用链接' : 'Reference'}</th></tr></thead><tbody>
+            <tr><td><b>zkl2333/vme</b></td><td><a href="https://github.com/zkl2333/vme" target="_blank" rel="noreferrer">GitHub ↗</a></td></tr>
+            <tr><td><b>KFC-Crazy-Thursday</b></td><td><a href="https://github.com/whitescent/KFC-Crazy-Thursday" target="_blank" rel="noreferrer">GitHub ↗</a></td></tr>
+            <tr><td><b>AyachiNene</b></td><td><a href="https://github.com/FriedRiceNoodles/AyachiNene" target="_blank" rel="noreferrer">GitHub ↗</a></td></tr>
+            <tr><td><b>V50</b></td><td><a href="https://github.com/vikiboss/v50" target="_blank" rel="noreferrer">GitHub ↗</a></td></tr>
+            <tr><td><b>{zh ? '梗图来源（作者：zkl2333）' : 'Meme image (credited to zkl2333)'}</b></td><td><a href="https://vme.im/jokes/I_kwDOLrzjj87mnH0a" target="_blank" rel="noreferrer">{zh ? '原始页面 ↗' : 'Original page ↗'}</a> · <a href="https://vme.im/authors/zkl2333" target="_blank" rel="noreferrer">{zh ? '作者主页 ↗' : 'Author profile ↗'}</a></td></tr>
+          </tbody></table></div>
         </section>
         <footer className="ack-footer"><span>LOAD CALCULATOR</span><span>{zh ? '感谢开源社区' : 'THANK YOU, OPEN-SOURCE COMMUNITY'}</span></footer>
       </main>
