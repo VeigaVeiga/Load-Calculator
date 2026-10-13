@@ -251,6 +251,7 @@ function App() {
   const [lang, setLang] = useState<Lang>('zh')
   const [showAcknowledgements, setShowAcknowledgements] = useState(false)
   const [kfcCopy, setKfcCopy] = useState('正在获取文案…')
+  const [kfcCopies, setKfcCopies] = useState<string[]>([])
   const [kfcLoading, setKfcLoading] = useState(false)
   const tr = T[lang]
 
@@ -312,14 +313,39 @@ function App() {
   const refreshKfcCopy = async () => {
     setKfcLoading(true)
     try {
-      // The V50 README documents /random as a text/plain endpoint.
-      const response = await fetch('https://v50.viki.moe/random', { cache: 'no-store' })
-      if (!response.ok) throw new Error('V50 request failed')
-      const copy = (await response.text()).trim()
-      if (!copy) throw new Error('V50 returned an empty copy')
-      setKfcCopy(copy)
+      let copies = kfcCopies
+
+      // The V50 README also documents using its JSON file directly via CDN
+      // or GitHub Raw. This avoids the rate-limited /random API entirely.
+      if (copies.length === 0) {
+        const sources = [
+          'https://cdn.jsdelivr.net/gh/vikiboss/v50@main/static/v50.json',
+          'https://raw.githubusercontent.com/vikiboss/v50/refs/heads/main/static/v50.json',
+        ]
+
+        for (const source of sources) {
+          try {
+            const response = await fetch(source)
+            if (!response.ok) continue
+            const data: unknown = await response.json()
+            if (!Array.isArray(data)) continue
+            copies = data.filter(
+              (entry): entry is string =>
+                typeof entry === 'string' && entry.trim().length > 0,
+            )
+            if (copies.length > 0) break
+          } catch {
+            // Try the next documented source if this CDN is unavailable.
+          }
+        }
+
+        if (copies.length === 0) throw new Error('V50 copy list unavailable')
+        setKfcCopies(copies)
+      }
+
+      setKfcCopy(copies[Math.floor(Math.random() * copies.length)])
     } catch {
-      setKfcCopy('文案获取失败，请点击鸡腿重试。')
+      setKfcCopy('文案加载失败，请稍后点击鸡腿重试。')
     } finally {
       setKfcLoading(false)
     }
