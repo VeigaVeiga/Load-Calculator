@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
+import OpenSourceAcknowledgements from './OpenSourceAcknowledgements'
 import ContainerScene, { type View } from './components/ContainerScene'
 import CargoProperties from './components/CargoProperties'
 import CenterOfGravity from './components/CenterOfGravity'
@@ -248,6 +249,7 @@ function makeCustom(
 
 function App() {
   const [lang, setLang] = useState<Lang>('zh')
+  const [showAcknowledgements, setShowAcknowledgements] = useState(false)
   const tr = T[lang]
 
   const [containerId, setContainerId] = useState('40HQ')
@@ -864,6 +866,10 @@ function App() {
       const infoRows=Array.from(infoTable.getElementsByTagNameNS(w,'tr'));if(infoRows[2]){const c=Array.from(infoRows[2].getElementsByTagNameNS(w,'tc'));if(c[1])setCellText(c[1],lang==='zh'?`根据当前3D视图内货物的实际位置、尺寸、旋转及堆叠状态生成装箱方案，共装载 ${placed.length} 件货物。`:`The loading plan is generated from the current 3D cargo arrangement; ${placed.length} units are loaded.`)}if(infoRows[3]){const c=Array.from(infoRows[3].getElementsByTagNameNS(w,'tc'));if(c[1])setCellText(c[1],lang==='zh'?`1、箱内货物紧密码靠，装载均匀、稳定、对称、配载合理。\n2、货物装箱后不影响箱门关闭。`:`1. Cargo is compact and stable.\n2. Cargo must not obstruct the doors.`)}if(infoRows[4]){const c=Array.from(infoRows[4].getElementsByTagNameNS(w,'tc'));if(c[1])setCellText(c[1],lang==='zh'?'按当前装载结果配置三角木、紧固带、气袋及其他需要的加固材料，防止运输过程中位移。':'Place securing materials at gaps and required positions to prevent movement.')}if(infoRows[5]){const c=Array.from(infoRows[5].getElementsByTagNameNS(w,'tc'));const materialText=Object.entries(materialCounts).map(([k,v])=>`${materialNames[k as SecuringMaterialType][lang]} × ${v}`).join('、')|| (lang==='zh'?'暂无加固材料':'No securing materials');if(c[1])setCellText(c[1],materialText)}
       const updatedXml=new XMLSerializer().serializeToString(doc);const top=await svgToPng(makeTopViewSvg(1000,420),1000,420);const sf=await svgToPng(makeSideFrontSvg(1000,430),1000,430);const output=await createDocxWithPlanImages(template,updatedXml,top,sf);const blob=new Blob([output],{type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'});const u=URL.createObjectURL(blob);const a=document.createElement('a');a.href=u;a.download=`${container.name}-装箱方案.docx`;a.click();setTimeout(()=>URL.revokeObjectURL(u),1500);setMessage(lang==='zh'?'已按 Word 模板导出装箱方案':'Loading plan exported from Word template')
     }catch(error){console.error(error);setMessage(lang==='zh'?'装箱方案模板导出失败，请检查模板文件':'Loading plan template export failed')}
+  }
+
+  if (showAcknowledgements) {
+    return <OpenSourceAcknowledgements lang={lang} onBack={() => setShowAcknowledgements(false)} />
   }
 
   return (
@@ -1702,6 +1708,13 @@ function App() {
           )}
         </aside>
       </main>
+      <footer className="app-footer">
+        <span>LOAD CALCULATOR</span>
+        <button type="button" onClick={() => setShowAcknowledgements(true)}>
+          {lang === 'zh' ? '开源致谢与许可证' : 'Open-source acknowledgements & licenses'}
+          <span aria-hidden="true"> ↗</span>
+        </button>
+      </footer>
     </div>
   )
 }
