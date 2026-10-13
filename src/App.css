@@ -1318,3 +1318,63 @@ body{overflow:hidden}
   .theme-portal .kfc-meme-frame{height:140px}
   .theme-portal .kfc-copy{max-height:180px}
 }
+
+
+/* V35 — compact copy card: square image, action beside it, copy in remaining column */
+.theme-portal .kfc-card{
+  display:grid!important;
+  grid-template-columns:88px 62px minmax(0,1fr)!important;
+  grid-template-areas:"image action copy"!important;
+  align-items:stretch!important;
+  gap:8px!important;
+  min-height:108px!important;
+}
+.theme-portal .kfc-meme-frame{
+  grid-area:image!important;
+  width:88px!important;
+  height:88px!important;
+  min-width:0!important;
+  align-self:start!important;
+  border-radius:3px!important;
+}
+.theme-portal .kfc-meme-image{
+  width:100%!important;
+  height:100%!important;
+  object-fit:cover!important;
+  object-position:center center!important;
+  background:#fff!important;
+}
+.theme-portal .kfc-random-btn{
+  grid-area:action!important;
+  width:62px!important;
+  min-width:0!important;
+  height:88px!important;
+  min-height:88px!important;
+  align-self:start!important;
+  flex-direction:column!important;
+  gap:5px!important;
+  padding:5px 3px!important;
+  border-radius:8px!important;
+  white-space:normal!important;
+}
+.theme-portal .kfc-drumstick{font-size:24px!important;line-height:1.1!important}
+.theme-portal .kfc-random-label{font-size:10px!important;line-height:1.25!important;text-align:center!important;overflow-wrap:anywhere}
+.theme-portal .kfc-copy{
+  grid-area:copy!important;
+  align-self:stretch!important;
+  min-width:0!important;
+  max-height:108px!important;
+  margin:0!important;
+  padding:0 2px 0 0!important;
+  overflow:auto!important;
+  font-size:11px!important;
+  line-height:1.5!important;
+  white-space:pre-wrap!important;
+  overflow-wrap:anywhere!important;
+}
+@media(max-width:780px){
+  .theme-portal .kfc-card{grid-template-columns:96px 62px minmax(0,1fr)!important;min-height:116px!important}
+  .theme-portal .kfc-meme-frame{width:96px!important;height:96px!important}
+  .theme-portal .kfc-random-btn{width:62px!important;height:96px!important;min-height:96px!important}
+  .theme-portal .kfc-copy{max-height:116px!important}
+}
