@@ -1512,6 +1512,22 @@ function App() {
               onMaterialScale={scaleMaterial}
               onDeleteMaterial={deleteMaterial}
             />
+            <div className="cg-hud" aria-label={lang === 'zh' ? '装载重心摘要' : 'Loading center of gravity'}>
+              <svg className="cg-hud-map" viewBox="0 0 96 58" role="img" aria-label={lang === 'zh' ? '重心相对集装箱中心的偏移' : 'Cargo center relative to container center'}>
+                <rect x="9" y="5" width="78" height="48" rx="2" />
+                <line x1="48" y1="5" x2="48" y2="53" />
+                <line x1="9" y1="29" x2="87" y2="29" />
+                <line className="cg-hud-vector" x1="48" y1="29"
+                  x2={Math.max(13, Math.min(83, 48 + ((analysis.cg.y - container.width / 2) / Math.max(1, container.width)) * 68))}
+                  y2={Math.max(9, Math.min(49, 29 - ((analysis.cg.x - container.length / 2) / Math.max(1, container.length)) * 38))} />
+                <circle className="cg-hud-dot" cx={Math.max(13, Math.min(83, 48 + ((analysis.cg.y - container.width / 2) / Math.max(1, container.width)) * 68))}
+                  cy={Math.max(9, Math.min(49, 29 - ((analysis.cg.x - container.length / 2) / Math.max(1, container.length)) * 38))} r="3.5" />
+              </svg>
+              <div className="cg-hud-values">
+                <span>{lang === 'zh' ? '左右偏移' : 'L/R OFFSET'} <b>{analysis.transverseOffsetMm.toFixed(0)} mm</b></span>
+                <span>{lang === 'zh' ? '前后偏重' : 'F/R IMBAL.'} <b>{(analysis.longitudinalOffset / 1000).toFixed(2)} t</b></span>
+              </div>
+            </div>
           </div>
 
           <div className="viewer-foot">
