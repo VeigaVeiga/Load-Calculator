@@ -1561,3 +1561,29 @@ body{overflow:hidden}
   line-height:1.2!important;
   overflow-wrap:normal!important;
 }
+
+
+/* V41 — keep the drumstick above the vertically written label */
+.theme-portal .kfc-random-btn{
+  writing-mode:horizontal-tb!important;
+  text-orientation:mixed!important;
+  flex-direction:column!important;
+  align-items:center!important;
+  justify-content:center!important;
+  gap:5px!important;
+}
+.theme-portal .kfc-drumstick{
+  writing-mode:horizontal-tb!important;
+  text-orientation:mixed!important;
+  display:block!important;
+  flex:0 0 auto!important;
+}
+.theme-portal .kfc-random-label{
+  writing-mode:vertical-rl!important;
+  text-orientation:upright!important;
+  display:block!important;
+  flex:0 0 auto!important;
+  letter-spacing:1px!important;
+  line-height:1.2!important;
+  white-space:nowrap!important;
+}
