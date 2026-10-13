@@ -952,3 +952,48 @@ body{overflow:hidden}
   .theme-portal .custom-bar label{flex:1 1 auto!important;justify-content:space-between!important}
   .theme-portal .custom-bar input{width:86px!important;min-width:86px!important}
 }
+
+
+/* V28 — preserve the existing workspace geometry; correct only local contrast. */
+/* Restore the compact title bar while retaining the dark shell and single gold Beta badge. */
+.theme-portal .topbar{
+  min-height:72px!important;
+  padding:8px 10px 9px!important;
+  gap:12px!important;
+}
+.theme-portal .hero-title{
+  min-width:300px!important;
+  width:auto!important;
+  height:54px!important;
+  min-height:0!important;
+  padding:0!important;
+  border-left:0!important;
+}
+.theme-portal .hero-title h1{
+  font-size:25px!important;
+  line-height:1.25!important;
+  white-space:nowrap!important;
+}
+/* Keep the central 3D viewport flexible instead of forcing a 420px minimum
+   that can squeeze/overflow the layout on common desktop widths. */
+@media(max-width:1200px){
+  .theme-portal .workspace{grid-template-columns:270px minmax(0,1fr) 270px!important}
+}
+@media(max-width:1050px){
+  .theme-portal .workspace{grid-template-columns:235px minmax(0,1fr) 235px!important}
+}
+/* Local contrast fixes only: keep the existing control and viewport dimensions. */
+.theme-portal .custom-bar,
+.theme-portal .custom-bar label{
+  color:#383d3d!important;
+  background:#e4e1d8!important;
+}
+.theme-portal .custom-bar label span,
+.theme-portal .custom-bar label small,
+.theme-portal .custom-bar label em{
+  color:#383d3d!important;
+}
+.theme-portal .custom-bar input{
+  background:#101516!important;
+  color:#f3f0e8!important;
+}

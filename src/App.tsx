@@ -25,7 +25,7 @@ const MAX_CARGO_VOLUME_CBM = 120
 
 const T = {
   zh: {
-    title: '集装箱装载规划器 Beta',
+    title: '集装箱装载规划器',
     cargo: '货物列表',
     add: '添加货物',
     carton: '纸箱',
@@ -114,7 +114,7 @@ const T = {
   },
 
   en: {
-    title: 'Container Loading Planner Beta',
+    title: 'Container Loading Planner',
     cargo: 'Cargo List',
     add: 'Add Cargo',
     carton: 'Carton',
