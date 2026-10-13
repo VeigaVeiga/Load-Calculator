@@ -1221,3 +1221,132 @@ body{overflow:hidden}
 .app-footer{display:flex;justify-content:flex-end;margin-top:12px;padding:10px 0 0;border-top:1px solid #aaa59a}.app-footer button{border:0!important;background:transparent!important;box-shadow:none!important;padding:3px 0!important;color:#68736f!important;text-decoration:underline;text-underline-offset:3px;font-size:10px;cursor:pointer}.app-footer button:hover{color:#a85d2d!important}
 .ack-page{min-height:100vh;background:#d8d2c5;color:#24292a;font-family:"Segoe UI","Microsoft YaHei",Arial,sans-serif}.ack-topbar{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px max(22px,calc((100% - 1000px)/2));border-bottom:2px solid #343a39;background:#e8e2d6}.ack-brand{display:flex;align-items:center;gap:11px}.ack-mark{display:grid;place-items:center;width:38px;height:38px;background:#292f2f;color:#e9e3d6;font:700 13px Consolas,monospace;border-bottom:3px solid #c66b2d}.ack-brand b,.ack-brand small{display:block}.ack-brand b{font-size:14px}.ack-brand small{margin-top:4px;font:9px Consolas,monospace;letter-spacing:.12em;color:#7c6a58}.ack-back{white-space:nowrap}.ack-content{max-width:1000px;margin:0 auto;padding:38px 24px 24px}.ack-eyebrow,.ack-section-label{font:10px Consolas,monospace;letter-spacing:.14em;color:#a45e2e}.ack-content h1{font-size:clamp(28px,4vw,42px);line-height:1.12;letter-spacing:-.035em;margin:12px 0}.ack-lead{max-width:800px;font-size:15px;line-height:1.8;color:#565c58;margin:0 0 26px}.ack-section{padding:24px 0;border-top:1px solid #aaa59a}.ack-section h2{font-size:21px;margin:8px 0 16px}.ack-table-wrap{overflow-x:auto;border:1px solid #aaa59a;background:#eee9de;margin-top:12px}.ack-table{border-collapse:collapse;width:100%;font-size:12px;text-align:left}.ack-table th{padding:10px;background:#dcd5c8;font:10px Consolas,monospace;text-transform:uppercase;letter-spacing:.06em}.ack-table td{padding:11px;border-top:1px solid #d0cabe;vertical-align:top}.ack-table a,.ack-small a{color:#8c4b22;text-underline-offset:3px}.ack-license{display:inline-block;padding:3px 7px;border:1px solid #899489;background:#e1e8dd;color:#344c3b;font:10px Consolas,monospace}.ack-apache{background:#e8e2d2;border-color:#b6a27a;color:#70572a}.ack-small{font-size:11px;line-height:1.7;color:#666b64;margin:13px 0 0}.ack-footer{display:flex;justify-content:space-between;gap:12px;padding:14px 0 0;border-top:1px solid #aaa59a;font:9px Consolas,monospace;letter-spacing:.08em;color:#77786f}
 @media(max-width:700px){.ack-topbar{align-items:flex-start;flex-direction:column;padding:14px 18px}.ack-content{padding:28px 16px 20px}.ack-content h1{font-size:30px}.ack-table{min-width:580px}.ack-footer{flex-direction:column}.app-footer{font-size:9px}}
+
+
+/* V34 — sidebar bottom dock + random V50 / meme card */
+.theme-portal .right-panel{
+  display:flex!important;
+  flex-direction:column!important;
+  min-height:0!important;
+  overflow-y:auto!important;
+  overscroll-behavior:contain;
+}
+.theme-portal .sidebar-bottom-widgets{
+  margin-top:auto;
+  padding-top:14px;
+  flex:0 0 auto;
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+}
+.theme-portal .kfc-card{
+  padding:9px!important;
+  border:1px solid #414b45!important;
+  border-top:2px solid #c77b3d!important;
+  border-radius:4px!important;
+  background:linear-gradient(155deg,#202625 0%,#151918 100%)!important;
+  color:#e8e6de!important;
+  box-shadow:0 3px 10px rgba(0,0,0,.18)!important;
+}
+.theme-portal .kfc-meme-link{
+  display:block;
+  width:100%;
+  height:94px;
+  overflow:hidden;
+  border:1px solid #505853;
+  border-radius:3px;
+  background:#292f2d;
+}
+.theme-portal .kfc-meme-image{
+  display:block;
+  width:100%;
+  height:100%;
+  object-fit:cover;
+  object-position:center;
+  transition:transform .2s ease;
+}
+.theme-portal .kfc-meme-link:hover .kfc-meme-image{transform:scale(1.035)}
+.theme-portal .kfc-card-heading{
+  display:flex;
+  align-items:center;
+  gap:7px;
+  margin:8px 0 5px;
+  color:#e6b37d;
+  font-size:10px;
+  font-weight:800;
+  letter-spacing:.08em;
+}
+.theme-portal .kfc-live-dot{
+  width:5px;
+  height:5px;
+  flex:0 0 auto;
+  border-radius:50%;
+  background:#d58b48;
+  box-shadow:0 0 7px rgba(213,139,72,.55);
+}
+.theme-portal .kfc-copy{
+  max-height:112px;
+  overflow:auto;
+  margin:0 0 8px!important;
+  padding:0 2px 0 0;
+  color:#e5e3dc!important;
+  font-size:11px!important;
+  line-height:1.55!important;
+  white-space:pre-wrap;
+  overflow-wrap:anywhere;
+  scrollbar-width:thin;
+  scrollbar-color:#5d665f #202624;
+}
+.theme-portal .kfc-random-btn{
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  gap:8px!important;
+  width:100%!important;
+  min-height:36px!important;
+  padding:5px 12px!important;
+  border:1px solid #d49455!important;
+  border-radius:11px 999px 999px 11px!important;
+  background:linear-gradient(100deg,#a64f28 0%,#d7823e 52%,#e3a45d 100%)!important;
+  color:#fff6e8!important;
+  box-shadow:inset 0 1px 0 rgba(255,235,204,.35),0 2px 0 #713a23!important;
+  font-size:12px!important;
+  font-weight:800!important;
+  letter-spacing:.03em;
+  cursor:pointer;
+  transition:filter .15s ease,transform .15s ease;
+}
+.theme-portal .kfc-random-btn:hover:not(:disabled){filter:brightness(1.08);transform:translateY(-1px)}
+.theme-portal .kfc-random-btn:disabled{opacity:.7;cursor:wait}
+.theme-portal .kfc-drumstick{font-size:20px;line-height:1;filter:drop-shadow(0 1px 1px rgba(0,0,0,.2))}
+.theme-portal .kfc-attribution{
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  gap:7px;
+  margin-top:7px;
+  color:#747d75;
+  font-size:9px;
+}
+.theme-portal .kfc-attribution a{
+  color:#aeb7ac;
+  text-decoration:none;
+  text-underline-offset:2px;
+}
+.theme-portal .kfc-attribution a:hover{color:#e6b37d;text-decoration:underline}
+.theme-portal .app-footer{
+  margin-top:0!important;
+  padding:7px 0 0!important;
+  border-top:1px solid #343b37!important;
+}
+.theme-portal .app-footer button{
+  color:#929b92!important;
+  font-size:10px!important;
+}
+.theme-portal .app-footer button:hover{color:#e6b37d!important}
+@media(max-width:780px){
+  .theme-portal .right-panel{overflow:visible!important}
+  .theme-portal .sidebar-bottom-widgets{margin-top:14px;padding-top:10px}
+  .theme-portal .kfc-meme-link{height:140px}
+  .theme-portal .kfc-copy{max-height:180px}
+}
