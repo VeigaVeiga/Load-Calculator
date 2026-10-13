@@ -28,7 +28,7 @@ export default function OpenSourceAcknowledgements({ lang, onBack }: Props) {
         <section className="ack-section">
           <div className="ack-section-label">DATA & IMAGE SOURCES</div>
           <h2>{zh ? '数据和图片来源，感谢以下作者' : 'Data & image sources — thanks to these authors'}</h2>
-          <p className="ack-lead">{zh ? '侧边梗图来自 VME 梗图页面，页面标注作者为 zkl2333；随机文案数据来自 V50 仓库。' : 'The sidebar meme image comes from its VME joke page, which credits zkl2333. Random copy data comes from the V50 repository.'}</p>
+          <p className="ack-lead">{zh ? '侧边梗图来自 VME 梗图页面，页面标注作者为 zkl2333；随机文案数据来自 V50 仓库。' : 'The sidebar meme image comes from its VME joke page, which credits <a href="https://vme.im/authors/zkl2333" target="_blank" rel="noreferrer">zkl2333</a>. Random copy data comes from the V50 repository.'}</p>
           <ul className="ack-source-list">
             <li><a href="https://github.com/zkl2333/vme" target="_blank" rel="noreferrer">zkl2333/vme ↗</a></li>
             <li><a href="https://github.com/whitescent/KFC-Crazy-Thursday" target="_blank" rel="noreferrer">whitescent/KFC-Crazy-Thursday ↗</a></li>
