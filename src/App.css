@@ -1320,50 +1320,58 @@ body{overflow:hidden}
 }
 
 
-/* V35 — compact copy card: square image, action beside it, copy in remaining column */
+/* V36 — copy card: large readable image at top-left, action at top-right, copy below */
 .theme-portal .kfc-card{
   display:grid!important;
-  grid-template-columns:88px 62px minmax(0,1fr)!important;
-  grid-template-areas:"image action copy"!important;
-  align-items:stretch!important;
-  gap:8px!important;
+  grid-template-columns:minmax(0,1fr) 66px!important;
+  grid-template-rows:88px minmax(0,1fr)!important;
+  grid-template-areas:"image action" "copy copy"!important;
+  align-items:start!important;
+  gap:8px 10px!important;
   min-height:180px!important;
 }
 .theme-portal .kfc-meme-frame{
   grid-area:image!important;
-  width:88px!important;
+  width:100%!important;
   height:88px!important;
   min-width:0!important;
-  align-self:center!important;
+  align-self:start!important;
+  overflow:hidden!important;
   border-radius:3px!important;
+  background:#fff!important;
 }
 .theme-portal .kfc-meme-image{
+  display:block!important;
   width:100%!important;
   height:100%!important;
-  object-fit:cover!important;
+  object-fit:contain!important;
   object-position:center center!important;
   background:#fff!important;
 }
 .theme-portal .kfc-random-btn{
   grid-area:action!important;
-  width:62px!important;
+  width:66px!important;
   min-width:0!important;
   height:88px!important;
   min-height:88px!important;
-  align-self:center!important;
+  align-self:start!important;
+  display:flex!important;
   flex-direction:column!important;
+  align-items:center!important;
+  justify-content:center!important;
   gap:5px!important;
   padding:5px 3px!important;
   border-radius:8px!important;
   white-space:normal!important;
 }
-.theme-portal .kfc-drumstick{font-size:24px!important;line-height:1.1!important}
+.theme-portal .kfc-drumstick{font-size:25px!important;line-height:1.1!important}
 .theme-portal .kfc-random-label{font-size:10px!important;line-height:1.25!important;text-align:center!important;overflow-wrap:anywhere}
 .theme-portal .kfc-copy{
   grid-area:copy!important;
-  align-self:stretch!important;
+  align-self:start!important;
+  width:100%!important;
   min-width:0!important;
-  max-height:180px!important;
+  max-height:74px!important;
   margin:0!important;
   padding:0 2px 0 0!important;
   overflow:auto!important;
@@ -1373,8 +1381,13 @@ body{overflow:hidden}
   overflow-wrap:anywhere!important;
 }
 @media(max-width:780px){
-  .theme-portal .kfc-card{grid-template-columns:96px 62px minmax(0,1fr)!important;min-height:180px!important}
-  .theme-portal .kfc-meme-frame{width:96px!important;height:96px!important}
-  .theme-portal .kfc-random-btn{width:62px!important;height:96px!important;min-height:96px!important}
-  .theme-portal .kfc-copy{max-height:180px!important}
+  .theme-portal .kfc-card{
+    grid-template-columns:minmax(0,1fr) 64px!important;
+    grid-template-rows:88px minmax(0,1fr)!important;
+    min-height:180px!important;
+    gap:8px!important;
+  }
+  .theme-portal .kfc-meme-frame{height:88px!important}
+  .theme-portal .kfc-random-btn{width:64px!important;height:88px!important;min-height:88px!important}
+  .theme-portal .kfc-copy{max-height:74px!important}
 }
