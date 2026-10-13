@@ -157,6 +157,27 @@ function refineBySequenceSearch(
   return { placed: best, quality: bestQuality, iterations }
 }
 
+function nudgeTowardCenter(items: PlacedCargo[], cargo: Cargo[], container: Container, locked: PlacedCargo[]): PlacedCargo[] {
+  let result = [...items]
+  const fixed = new Set(locked.map(p => p.id))
+  const movable = [...result].filter(p => !p.locked && !fixed.has(p.id)).sort((a, b) => b.weight - a.weight).slice(0, 60)
+  for (const step of [100, 50]) {
+    for (const item of movable) {
+      const original = result.find(p => p.id === item.id)
+      if (!original) continue
+      let best = result
+      let bestScore = score(result, container)
+      for (const d of [{x:-step,y:0},{x:step,y:0},{x:0,y:-step},{x:0,y:step}]) {
+        const next = result.map(p => p.id === item.id ? {...p,x:p.x+d.x,y:p.y+d.y} : p)
+        if (validatePlan(next, container, cargo).ok && compareScores(score(next, container), bestScore) > 0) { best = next; bestScore = score(next, container) }
+      }
+      result = best
+    }
+  }
+  return validatePlan(result, container, cargo).ok ? result : items
+}
+
+
 /**
  * Automatic packing is delegated to the MIT-licensed binpack3d library
  * (a TypeScript port of py3dbp's corner-point heuristic). We run a small,
@@ -232,6 +253,7 @@ export function basePack(
       bestScore = score(best, container)
     }
   }
+  best = nudgeTowardCenter(best, cargo, container, locked)
   progress?.(98)
 
   const result = { placed: best, unplaced: completeUnplaced(cargo, best) }
