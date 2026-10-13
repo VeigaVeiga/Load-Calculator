@@ -1,5 +1,3 @@
-import React from 'react'
-
 type Props = { lang: 'zh' | 'en'; onBack: () => void }
 
 const MIT_TEXT = `MIT License
