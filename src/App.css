@@ -1248,7 +1248,7 @@ body{overflow:hidden}
   color:#e8e6de!important;
   box-shadow:0 3px 10px rgba(0,0,0,.18)!important;
 }
-.theme-portal .kfc-meme-link{
+.theme-portal .kfc-meme-frame{
   display:block;
   width:100%;
   height:94px;
@@ -1265,25 +1265,7 @@ body{overflow:hidden}
   object-position:center;
   transition:transform .2s ease;
 }
-.theme-portal .kfc-meme-link:hover .kfc-meme-image{transform:scale(1.035)}
-.theme-portal .kfc-card-heading{
-  display:flex;
-  align-items:center;
-  gap:7px;
-  margin:8px 0 5px;
-  color:#e6b37d;
-  font-size:10px;
-  font-weight:800;
-  letter-spacing:.08em;
-}
-.theme-portal .kfc-live-dot{
-  width:5px;
-  height:5px;
-  flex:0 0 auto;
-  border-radius:50%;
-  background:#d58b48;
-  box-shadow:0 0 7px rgba(213,139,72,.55);
-}
+.theme-portal .kfc-meme-frame:hover .kfc-meme-image{transform:none}
 .theme-portal .kfc-copy{
   max-height:112px;
   overflow:auto;
@@ -1319,21 +1301,6 @@ body{overflow:hidden}
 .theme-portal .kfc-random-btn:hover:not(:disabled){filter:brightness(1.08);transform:translateY(-1px)}
 .theme-portal .kfc-random-btn:disabled{opacity:.7;cursor:wait}
 .theme-portal .kfc-drumstick{font-size:20px;line-height:1;filter:drop-shadow(0 1px 1px rgba(0,0,0,.2))}
-.theme-portal .kfc-attribution{
-  display:flex;
-  justify-content:center;
-  align-items:center;
-  gap:7px;
-  margin-top:7px;
-  color:#747d75;
-  font-size:9px;
-}
-.theme-portal .kfc-attribution a{
-  color:#aeb7ac;
-  text-decoration:none;
-  text-underline-offset:2px;
-}
-.theme-portal .kfc-attribution a:hover{color:#e6b37d;text-decoration:underline}
 .theme-portal .app-footer{
   margin-top:0!important;
   padding:7px 0 0!important;
@@ -1347,6 +1314,6 @@ body{overflow:hidden}
 @media(max-width:780px){
   .theme-portal .right-panel{overflow:visible!important}
   .theme-portal .sidebar-bottom-widgets{margin-top:14px;padding-top:10px}
-  .theme-portal .kfc-meme-link{height:140px}
+  .theme-portal .kfc-meme-frame{height:140px}
   .theme-portal .kfc-copy{max-height:180px}
 }

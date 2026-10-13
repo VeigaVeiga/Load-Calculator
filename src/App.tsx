@@ -250,7 +250,7 @@ function makeCustom(
 function App() {
   const [lang, setLang] = useState<Lang>('zh')
   const [showAcknowledgements, setShowAcknowledgements] = useState(false)
-  const [kfcCopy, setKfcCopy] = useState('今天星期四，系统提示：请先完成装柜，再考虑谁请你吃炸鸡。')
+  const [kfcCopy, setKfcCopy] = useState('正在获取文案…')
   const [kfcLoading, setKfcLoading] = useState(false)
   const tr = T[lang]
 
@@ -312,20 +312,14 @@ function App() {
   const refreshKfcCopy = async () => {
     setKfcLoading(true)
     try {
+      // The V50 README documents /random as a text/plain endpoint.
       const response = await fetch('https://v50.viki.moe/random', { cache: 'no-store' })
-      if (!response.ok) throw new Error('Unable to fetch a random V50 copy')
+      if (!response.ok) throw new Error('V50 request failed')
       const copy = (await response.text()).trim()
-      if (!copy) throw new Error('Empty V50 response')
+      if (!copy) throw new Error('V50 returned an empty copy')
       setKfcCopy(copy)
     } catch {
-      const fallbackCopies = [
-        '今天星期四，系统提示：请先完成装柜，再考虑谁请你吃炸鸡。',
-        '装柜可以有方案，吃鸡只能靠缘分。今天星期四，V 我 50。',
-        '货物已经配载均衡，我的鸡腿却还没有着落。谁来优化一下？',
-        '本系统支持自动装柜，不支持自动请客。疯狂星期四，懂的都懂。',
-        '紧急通知：柜门已关闭，鸡腿尚未到货。请相关人员立即处理。',
-      ]
-      setKfcCopy(fallbackCopies[Math.floor(Math.random() * fallbackCopies.length)])
+      setKfcCopy('文案获取失败，请点击鸡腿重试。')
     } finally {
       setKfcLoading(false)
     }
@@ -1736,28 +1730,19 @@ function App() {
           )}
           <div className="sidebar-bottom-widgets">
             <section className="kfc-card" aria-label={lang === 'zh' ? '随机疯狂星期四文案' : 'Random Crazy Thursday copy'}>
-              <a className="kfc-meme-link" href="https://vme.im/jokes?tag=%E6%95%85%E4%BA%8B&type=meme" target="_blank" rel="noreferrer" aria-label={lang === 'zh' ? '在 VME50 查看更多梗图' : 'Browse memes on VME50'}>
+              <div className="kfc-meme-frame">
                 <img
                   className="kfc-meme-image"
-                  src="https://r2.vme.im/memes/1790233121764-556d81d535a4.jpg"
-                  alt={lang === 'zh' ? '疯狂星期四梗图' : 'Crazy Thursday meme'}
+                  src="/kfc-meme.jpg"
+                  alt={lang === 'zh' ? '固定梗图' : 'Meme'}
                   loading="lazy"
                 />
-              </a>
-              <div className="kfc-card-heading">
-                <span>{lang === 'zh' ? '精神状态补给站' : 'MOOD RESUPPLY'}</span>
-                <span className="kfc-live-dot" aria-hidden="true" />
               </div>
               <p className="kfc-copy" aria-live="polite">{kfcCopy}</p>
               <button className="kfc-random-btn" type="button" onClick={() => void refreshKfcCopy()} disabled={kfcLoading}>
                 <span className="kfc-drumstick" aria-hidden="true">🍗</span>
-                <span>{kfcLoading ? (lang === 'zh' ? '正在捞取文案…' : 'Fetching copy…') : (lang === 'zh' ? '再来一条' : 'Another one')}</span>
+                <span>{kfcLoading ? (lang === 'zh' ? '正在获取文案…' : 'Fetching copy…') : (lang === 'zh' ? '再来一条' : 'Another one')}</span>
               </button>
-              <div className="kfc-attribution">
-                <a href="https://github.com/vikiboss/v50" target="_blank" rel="noreferrer">V50</a>
-                <span>·</span>
-                <a href="https://vme.im/jokes?tag=%E6%95%85%E4%BA%8B&type=meme" target="_blank" rel="noreferrer">VME50</a>
-              </div>
             </section>
             <footer className="app-footer">
               <button type="button" onClick={() => setShowAcknowledgements(true)}>
