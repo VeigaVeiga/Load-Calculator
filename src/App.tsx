@@ -16,7 +16,7 @@ import type {
 import { autoPackAsync } from './packing/packer'
 import { validatePlacement } from './packing/geometry'
 import { analyzeWeight } from './analysis/weight'
-import { cbm, mm } from './utils'
+import { cbm } from './utils'
 import { createDocxWithPlanImages, extractZipEntry } from './utils/docxTemplate'
 
 type Lang = 'zh' | 'en'
@@ -1626,7 +1626,7 @@ function App() {
                   <b>{(analysis.longitudinalOffset / 1000).toFixed(2)} t</b>
                 </div>
               </div>
-              <p className="analysis-note">{lang === 'zh' ? '以上数据仅供参考，仅在参考值达到相应条件时标红，不作为铁路安全判定。前后偏重为估算值。' : 'For reference only.'}</p>
+              <p className="analysis-note">{lang === 'zh' ? '以上数据仅供参考' : 'For reference only.'}</p>
               <CenterOfGravity analysis={analysis} container={container} lang={lang}/>
             </div>
           )}
