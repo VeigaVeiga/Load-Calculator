@@ -34,7 +34,9 @@ function score(placed: PlacedCargo[], container: Container): [number, number, nu
   const cgX = placed.reduce((sum, p) => sum + (p.x + p.length / 2) * p.weight, 0) / totalWeight
   const cgY = placed.reduce((sum, p) => sum + (p.y + p.width / 2) * p.weight, 0) / totalWeight
   const balance = Math.abs(cgX - container.length / 2) + Math.abs(cgY - container.width / 2)
-  return [placed.length, volume, -balance]
+  // Keep the maximum cargo count first, then prioritize the total CG being near the
+  // geometric center, and use occupied volume as the final tie-breaker.
+  return [placed.length, -balance, volume]
 }
 
 
@@ -48,12 +50,12 @@ function compareScores(a: number[], b: number[]) {
 }
 
 function annealingQuality(items: PlacedCargo[], container: Container) {
-  const [count, volume, balance] = score(items, container)
+  const [count, negativeBalance, volume] = score(items, container)
   const containerVolume = Math.max(1, container.length * container.width * container.height)
   const normalizedVolume = volume / containerVolume
-  const normalizedBalance = Math.max(0, -balance) / Math.max(1, container.length + container.width)
-  // Unit count is a hard priority; utilisation is next; balance is a tie-breaker.
-  return count * 1_000_000_000 + normalizedVolume * 1_000_000 - normalizedBalance * 100
+  const normalizedBalance = Math.max(0, negativeBalance) / Math.max(1, container.length + container.width)
+  // Unit count is a hard priority; centering the mass is next; volume is a tie-breaker.
+  return count * 1_000_000_000 + normalizedBalance * 1_000_000 + normalizedVolume * 1_000
 }
 
 type SequenceUnit = { key: string; volume: number; footprint: number; weight: number }
