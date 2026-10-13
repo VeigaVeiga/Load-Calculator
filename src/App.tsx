@@ -1706,15 +1706,14 @@ function App() {
               </small>
             </div>
           )}
+          <footer className="app-footer">
+            <button type="button" onClick={() => setShowAcknowledgements(true)}>
+              {lang === 'zh' ? '开源致谢与许可证' : 'Open-source acknowledgements & licenses'}
+              <span aria-hidden="true"> ↗</span>
+            </button>
+          </footer>
         </aside>
       </main>
-      <footer className="app-footer">
-        <span>LOAD CALCULATOR</span>
-        <button type="button" onClick={() => setShowAcknowledgements(true)}>
-          {lang === 'zh' ? '开源致谢与许可证' : 'Open-source acknowledgements & licenses'}
-          <span aria-hidden="true"> ↗</span>
-        </button>
-      </footer>
     </div>
   )
 }
