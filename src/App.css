@@ -1087,3 +1087,131 @@ body{overflow:hidden}
   .cg-hud-values span{font-size:9px}
   .cg-hud-values b{font-size:10px}
 }
+
+
+/* V33 — sharper panel typography, compact viewport header, and cohesive status chips. */
+.theme-portal .sidebar-head,
+.theme-portal .viewer-head{
+  background:#252b2a!important;
+  color:#f2efe6!important;
+  border-bottom:1px solid #4c5550!important;
+  box-shadow:none!important;
+}
+.theme-portal .sidebar-head h2,
+.theme-portal .viewer-head h2{
+  color:#f5f1e8!important;
+  font-weight:750!important;
+  text-shadow:none!important;
+  -webkit-text-fill-color:#f5f1e8!important;
+}
+.theme-portal .sidebar-head span,
+.theme-portal .viewer-head span{
+  color:#c7cec7!important;
+  font-weight:550!important;
+  text-shadow:none!important;
+  -webkit-text-fill-color:#c7cec7!important;
+}
+/* Keep the title, hint, and both status values on one short horizontal strip. */
+.theme-portal .viewer-head{
+  min-height:32px!important;
+  height:auto!important;
+  box-sizing:border-box!important;
+  padding:3px 8px!important;
+  gap:8px!important;
+}
+.theme-portal .viewer-head>div:first-child{
+  min-width:0!important;
+  flex:1 1 auto!important;
+  display:flex!important;
+  flex-direction:row!important;
+  align-items:center!important;
+  flex-wrap:wrap!important;
+  column-gap:10px!important;
+  row-gap:1px!important;
+}
+.theme-portal .viewer-head h2{
+  flex:0 0 auto!important;
+  font-size:13px!important;
+  line-height:1.15!important;
+}
+.theme-portal .viewer-head span{
+  font-size:10px!important;
+  line-height:1.2!important;
+}
+.theme-portal .viewer-status{
+  flex:0 0 auto!important;
+  display:flex!important;
+  flex-direction:row!important;
+  align-items:center!important;
+  justify-content:flex-end!important;
+  flex-wrap:nowrap!important;
+  gap:5px!important;
+  min-width:0!important;
+}
+.theme-portal .view-badge,
+.theme-portal .payload-badge{
+  min-height:22px!important;
+  height:22px!important;
+  box-sizing:border-box!important;
+  display:flex!important;
+  flex-direction:row!important;
+  align-items:center!important;
+  justify-content:center!important;
+  gap:5px!important;
+  padding:2px 7px!important;
+  border:1px solid #59615a!important;
+  border-radius:3px!important;
+  background:#343b39!important;
+  color:#f0ede4!important;
+  box-shadow:none!important;
+  font-size:11px!important;
+  line-height:1!important;
+  font-weight:650!important;
+  white-space:nowrap!important;
+}
+.theme-portal .payload-badge span{
+  color:#c8cec6!important;
+  font-size:10px!important;
+  font-weight:550!important;
+}
+.theme-portal .payload-badge strong{
+  color:#f0c579!important;
+  font-size:11px!important;
+  font-weight:750!important;
+}
+.theme-portal .sidebar-head{
+  min-height:32px!important;
+  padding:4px 8px!important;
+  margin:-1px -1px 7px!important;
+  gap:8px!important;
+}
+.theme-portal .sidebar-head h2{font-size:13px!important;line-height:1.2!important}
+.theme-portal .sidebar-head span{font-size:10px!important;line-height:1.2!important}
+.theme-portal .sidebar-head button{
+  min-height:26px!important;
+  padding:3px 8px!important;
+  background:#3b423f!important;
+  border:1px solid #68716a!important;
+  color:#f3f0e7!important;
+  font-weight:650!important;
+}
+.theme-portal .cargo-title,
+.theme-portal .cargo-title span,
+.theme-portal .cargo-card label,
+.theme-portal .cargo-card .cargo-volume{
+  text-shadow:none!important;
+  font-weight:550!important;
+}
+.cg-hud-map .cg-hud-door{
+  stroke:#e4a754;
+  stroke-width:1.8;
+  stroke-linecap:round;
+  stroke-linejoin:round;
+  stroke-dasharray:none;
+}
+@media(max-width:760px){
+  .theme-portal .viewer-head{align-items:flex-start!important}
+  .theme-portal .viewer-head>div:first-child{flex-direction:column!important;align-items:flex-start!important;gap:2px!important}
+  .theme-portal .viewer-status{gap:3px!important}
+  .theme-portal .view-badge,.theme-portal .payload-badge{padding:2px 4px!important;font-size:10px!important}
+}
