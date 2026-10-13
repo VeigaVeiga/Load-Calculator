@@ -1759,7 +1759,7 @@ function App() {
               <div className="kfc-meme-frame">
                 <img
                   className="kfc-meme-image"
-                  src="/kfc-meme.jpg"
+                  src="https://r2.vme.im/memes/1769666983755-8bc2f86c1eed.png"
                   alt={lang === 'zh' ? '固定梗图' : 'Meme'}
                   loading="lazy"
                 />
