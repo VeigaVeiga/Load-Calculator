@@ -2,3 +2,21 @@
 html,body,#root{font-size:15px}.top-actions label{font-size:12px}.top-actions select,.custom-bar input{padding:8px 10px}.topbar h1{font-size:24px}.summary span,.summary small{font-size:10px}.summary strong{font-size:16px}.sidebar h2,.viewer h2{font-size:15px}
 .viewer-foot span:nth-child(2){display:none!important}
 .scene-toolbox{position:absolute;left:14px;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;gap:5px;padding:7px;background:rgba(248,250,249,.94);border:1px solid #b8c2be;border-radius:9px;box-shadow:0 5px 18px rgba(38,48,45,.18);backdrop-filter:blur(5px);z-index:20;min-width:94px}.scene-toolbox button{padding:7px 8px;border:1px solid #c8d0cc;border-radius:6px;background:#f7f9f8;color:#39474a;font-size:10px;text-align:left}.scene-toolbox button.active{background:#465a61;color:#fff;border-color:#465a61}.scene-toolbox button.disabled{opacity:.4}.scene-toolbox b{font-size:9px;color:#71807b;padding:3px 2px}.scene-toolbox .tool-divider{height:1px;background:#d7ddda;margin:2px 0}.scene-mode-strip{display:none!important}
+
+/* Rail loading balance thresholds and clearly distinguished CG centerlines. */
+.bias-limits{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:8px}
+.bias-limit{display:flex;flex-direction:column;gap:4px;min-width:0;padding:9px;background:#f3eee4;border:1px solid #aaa59a}
+.bias-limit span{font-size:9px;color:#747770;line-height:1.4}
+.bias-limit b{font-size:20px;line-height:1.1;color:#354145}
+.bias-limit small{font-size:9px;color:#747770}
+.bias-limit strong{font-size:10px}
+.bias-limit.is-within-limit strong{color:#28764b}
+.bias-limit.is-over-limit{background:#fff0ed;border-color:#d73b31}
+.bias-limit.is-over-limit b,.bias-limit.is-over-limit strong{color:#c52f27}
+.cg-box .cg-longitudinal{stroke:#2674c8!important;stroke-width:1.8!important;stroke-dasharray:none!important}
+.cg-box .cg-transverse{stroke:#e58a2d!important;stroke-width:1.8!important;stroke-dasharray:4 3!important}
+.cg-legend{display:flex;flex-direction:column;gap:3px;margin:5px 4px 2px;font-size:8px;color:#66716c}
+.cg-legend span{display:flex;align-items:center;gap:5px}
+.cg-legend i{display:inline-block;width:20px;height:0;border-top:2px solid}
+.cg-legend-blue{border-color:#2674c8!important}
+.cg-legend-orange{border-top:2px dashed #e58a2d!important}

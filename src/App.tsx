@@ -855,7 +855,10 @@ function App() {
   const exportPlan=async()=>{
     try{
       const response=await fetch('/装箱方案模板.docx');if(!response.ok)throw new Error('Template not found');const template=await response.arrayBuffer();const templateBytes=new Uint8Array(template);const xmlBytes=await extractZipEntry(templateBytes,'word/document.xml');const xmlText=new TextDecoder().decode(xmlBytes)
-      const parser=new DOMParser();const doc=parser.parseFromString(xmlText,'application/xml');const w='http://schemas.openxmlformats.org/wordprocessingml/2006/main';const tables=Array.from(doc.getElementsByTagNameNS(w,'tbl'));const cargoTable=tables[0],infoTable=tables[1];if(!cargoTable||!infoTable)throw new Error('Template tables not found')
+      const parser=new DOMParser();const doc=parser.parseFromString(xmlText,'application/xml');const w='http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+// Remove the obsolete Wuhan Station notice while preserving other template content.
+      for(const paragraph of Array.from(doc.getElementsByTagNameNS(w,'p'))){const text=Array.from(paragraph.getElementsByTagNameNS(w,'t')).map(node=>node.textContent||'').join('');if(text.includes('2025.2.19武汉中心站最新要求'))paragraph.parentElement?.removeChild(paragraph)}
+      const tables=Array.from(doc.getElementsByTagNameNS(w,'tbl'));const cargoTable=tables[0],infoTable=tables[1];if(!cargoTable||!infoTable)throw new Error('Template tables not found')
       const rows=Array.from(cargoTable.getElementsByTagNameNS(w,'tr'));const containerCells=Array.from(rows[0].getElementsByTagNameNS(w,'tc'));if(containerCells[1])setCellText(containerCells[1],`${container.name}（${container.length.toLocaleString()}×${container.width.toLocaleString()}×${container.height.toLocaleString()} mm）`);if(containerCells[3])setCellText(containerCells[3],lang==='zh'?'均匀、紧凑、对称布满箱底':'Uniform, compact and symmetrical loading')
       const loadedById=new Map<string,PlacedCargo[]>();for(const p of placed){const a=loadedById.get(p.cargoId)||[];a.push(p);loadedById.set(p.cargoId,a)};const loaded=cargo.filter(c=>(loadedById.get(c.id)?.length||0)>0);const totalWeight=placed.reduce((sum,p)=>sum+p.weight,0);const cargoLines=loaded.map(c=>`${c.name} × ${(loadedById.get(c.id)||[]).length}`).join('；');const dimsLines=loaded.map(c=>{const p=(loadedById.get(c.id)||[])[0];const d=p.rotation%180===0?{l:p.length,w:p.width}:{l:p.width,w:p.length};return `${d.l}×${d.w}×${p.height}`}).join('；');const typeLines=loaded.map(c=>c.type==='pallet'?tr.pallet:c.type==='woodCrate'?tr.crate:tr.carton).join('；');const first=Array.from(rows[2]?.getElementsByTagNameNS(w,'tc')||[]);for(const r0 of rows.slice(3)){for(const cell of Array.from(r0.getElementsByTagNameNS(w,'tc')))setCellText(cell,'')};if(first.length>=7){setCellText(first[1],cargoLines||'-');setCellText(first[2],String(placed.length));setCellText(first[3],loaded.map(c=>(c.weight||0).toFixed(1)).join('；')||'-');setCellText(first[4],totalWeight.toFixed(1));setCellText(first[5],dimsLines||'-');setCellText(first[6],typeLines||'-')}
       const infoRows=Array.from(infoTable.getElementsByTagNameNS(w,'tr'));if(infoRows[2]){const c=Array.from(infoRows[2].getElementsByTagNameNS(w,'tc'));if(c[1])setCellText(c[1],lang==='zh'?`根据当前3D视图内货物的实际位置、尺寸、旋转及堆叠状态生成装箱方案，共装载 ${placed.length} 件货物。`:`The loading plan is generated from the current 3D cargo arrangement; ${placed.length} units are loaded.`)}if(infoRows[3]){const c=Array.from(infoRows[3].getElementsByTagNameNS(w,'tc'));if(c[1])setCellText(c[1],lang==='zh'?`1、箱内货物紧密码靠，装载均匀、稳定、对称、配载合理。\n2、货物装箱后不影响箱门关闭。`:`1. Cargo is compact and stable.\n2. Cargo must not obstruct the doors.`)}if(infoRows[4]){const c=Array.from(infoRows[4].getElementsByTagNameNS(w,'tc'));if(c[1])setCellText(c[1],lang==='zh'?'按当前装载结果配置三角木、紧固带、气袋及其他需要的加固材料，防止运输过程中位移。':'Place securing materials at gaps and required positions to prevent movement.')}if(infoRows[5]){const c=Array.from(infoRows[5].getElementsByTagNameNS(w,'tc'));const materialText=Object.entries(materialCounts).map(([k,v])=>`${materialNames[k as SecuringMaterialType][lang]} × ${v}`).join('、')|| (lang==='zh'?'暂无加固材料':'No securing materials');if(c[1])setCellText(c[1],materialText)}
@@ -1647,11 +1650,25 @@ function App() {
             <div className="analysis">
               <h3>{tr.weight}</h3>
               <div className="bias-primary">
-                <span>{lang === 'zh' ? '当前偏载' : 'CURRENT IMBALANCE'}</span>
-                <b>{analysis.dominantOffset.toFixed(0)} kg</b>
-                <strong>{analysis.dominantDirection === 'balanced' ? (lang === 'zh' ? '基本平衡' : 'BALANCED') : analysis.dominantDirection === 'front' ? (lang === 'zh' ? '偏柜头' : 'TOWARD FRONT') : analysis.dominantDirection === 'rear' ? (lang === 'zh' ? '偏柜门' : 'TOWARD DOOR') : analysis.dominantDirection === 'left' ? (lang === 'zh' ? '偏左侧' : 'TOWARD LEFT') : (lang === 'zh' ? '偏右侧' : 'TOWARD RIGHT')}</strong>
+                <span>{lang === 'zh' ? '货物总重' : 'TOTAL CARGO WEIGHT'}</span>
+                <b>{analysis.total.toLocaleString(undefined,{maximumFractionDigits:1})} kg</b>
+                <strong>{lang === 'zh' ? '总重心投影相对车辆中心线' : 'CG projection relative to vehicle centerlines'}</strong>
               </div>
-              <p className="analysis-note">{lang === 'zh' ? '偏载 = 相对两侧的实际重量差。' : 'Imbalance is the actual weight difference between opposite sides.'}</p>
+              <div className="bias-limits">
+                <div className={`bias-limit ${analysis.transverseOffsetMm > 30 ? 'is-over-limit' : 'is-within-limit'}`}>
+                  <span>{lang === 'zh' ? '左右偏载（横向偏移）' : 'TRANSVERSE OFFSET'}</span>
+                  <b>{analysis.transverseOffsetMm.toFixed(0)} mm</b>
+                  <small>{lang === 'zh' ? '限值：30 mm' : 'Limit: 30 mm'}</small>
+                  <strong>{analysis.transverseOffsetMm > 30 ? (lang === 'zh' ? '超限，请调整' : 'LIMIT EXCEEDED') : (lang === 'zh' ? '未超限' : 'WITHIN LIMIT')}</strong>
+                </div>
+                <div className={`bias-limit ${analysis.longitudinalOffset > 3000 ? 'is-over-limit' : 'is-within-limit'}`}>
+                  <span>{lang === 'zh' ? '前后偏重（估算差值）' : 'LONGITUDINAL IMBALANCE (EST.)'}</span>
+                  <b>{(analysis.longitudinalOffset / 1000).toFixed(2)} t</b>
+                  <small>{lang === 'zh' ? '限值：3.00 t' : 'Limit: 3.00 t'}</small>
+                  <strong>{analysis.longitudinalOffset > 3000 ? (lang === 'zh' ? '超限，请调整' : 'LIMIT EXCEEDED') : (lang === 'zh' ? '未超限' : 'WITHIN LIMIT')}</strong>
+                </div>
+              </div>
+              <p className="analysis-note">{lang === 'zh' ? '左右偏载采用横向重心偏移量；前后偏重为按集装箱长度归一化的估算值。实际铁路车辆应按转向架中心距及适用站点 SOP 复核。' : 'Transverse offset is measured directly; longitudinal imbalance is normalized by container length. Verify rail-car limits using bogie spacing and the applicable station SOP.'}</p>
               <CenterOfGravity analysis={analysis} container={container} lang={lang}/>
             </div>
           )}

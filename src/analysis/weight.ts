@@ -11,6 +11,7 @@ export interface WeightAnalysis {
   corners: { fl: number; fr: number; rl: number; rr: number }
   longitudinalOffset: number
   transverseOffset: number
+  transverseOffsetMm: number
   dominantOffset: number
   dominantDirection: 'front'|'rear'|'left'|'right'|'balanced'
 }
@@ -61,6 +62,7 @@ export function analyzeWeight(items: PlacedCargo[], c: Container): WeightAnalysi
     corners,
     longitudinalOffset,
     transverseOffset,
+    transverseOffsetMm: Math.abs(cg.y - c.width / 2),
     dominantOffset,
     dominantDirection,
   }
