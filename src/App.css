@@ -1542,3 +1542,22 @@ body{overflow:hidden}
   .theme-portal .kfc-random-btn{width:40px!important;height:100%!important}
   .theme-portal .kfc-copy{min-height:150px!important;max-height:260px!important}
 }
+
+
+/* V40 — stack the refresh-button label vertically */
+.theme-portal .kfc-random-btn{
+  writing-mode:vertical-rl!important;
+  text-orientation:upright!important;
+  flex-direction:column!important;
+  justify-content:center!important;
+  align-items:center!important;
+  gap:6px!important;
+  white-space:nowrap!important;
+}
+.theme-portal .kfc-random-label{
+  writing-mode:vertical-rl!important;
+  text-orientation:upright!important;
+  letter-spacing:1px!important;
+  line-height:1.2!important;
+  overflow-wrap:normal!important;
+}
