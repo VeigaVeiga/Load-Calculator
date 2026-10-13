@@ -704,3 +704,29 @@ body{overflow:hidden}
   content:"▶ ";
   font-size:10px;
 }
+
+/* Readability pass: normalize small labels and improve contrast without changing layout. */
+.theme-portal{font-size:13px!important;line-height:1.4}
+.theme-portal button,.theme-portal input,.theme-portal select,.theme-portal textarea{font-size:12px}
+.theme-portal .topbar h1{font-size:25px!important;line-height:1.25}
+.theme-portal .eyebrow,.theme-portal .app-subtitle{font-size:12px!important;line-height:1.45}
+.theme-portal .top-actions label{font-size:12px!important}
+.theme-portal .summary span,.theme-portal .summary small{font-size:11px!important;line-height:1.4}
+.theme-portal .summary strong{font-size:17px!important;line-height:1.25}
+.theme-portal .sidebar h2,.theme-portal .viewer h2,.theme-portal .right-panel h3{font-size:16px!important;line-height:1.35}
+.theme-portal .sidebar-head span,.theme-portal .viewer-head span{font-size:11px!important}
+.theme-portal .cargo-title input,.theme-portal .cargo-card,.theme-portal .cargo-card label,.theme-portal .fields label,.theme-portal .checks label,.theme-portal .type-toggle span{font-size:12px!important;line-height:1.45}
+.theme-portal .fields input,.theme-portal .name-field input,.theme-portal .custom-bar input,.theme-portal .top-actions select{font-size:13px!important;min-height:34px}
+.theme-portal .tool-row button,.theme-portal .material-toolbar button,.theme-portal .right-panel button{font-size:12px!important;line-height:1.4}
+.theme-portal .analysis p,.theme-portal .analysis-note,.theme-portal .hint{font-size:12px!important;line-height:1.55!important;color:#46534f!important}
+.theme-portal .cg-title{font-size:12px!important}
+.theme-portal .cg-values span,.theme-portal .material-stats span{font-size:11px!important;line-height:1.45}
+.theme-portal .bias-limit span{font-size:11px!important;line-height:1.4}
+.theme-portal .bias-limit b{font-size:21px!important}
+.theme-portal .scene-label{font-size:11px!important;line-height:1.35}
+.theme-portal .cad-dimension{font-size:12px!important}
+.theme-portal .viewer-foot{font-size:11px!important}
+@media (max-width: 1200px){
+  .theme-portal .workspace{grid-template-columns:270px minmax(420px,1fr) 270px!important}
+  .theme-portal .topbar h1{font-size:22px!important}
+}
