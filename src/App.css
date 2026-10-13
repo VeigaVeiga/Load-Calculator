@@ -1444,3 +1444,47 @@ body{overflow:hidden}
   .theme-portal .kfc-random-btn{width:64px!important;height:150px!important;min-height:150px!important}
   .theme-portal .kfc-copy{min-height:120px!important;max-height:220px!important}
 }
+
+
+/* V38 — prioritize the transparent PNG subject; compact the refresh button */
+.theme-portal .kfc-card{
+  grid-template-columns:minmax(0,1fr) 44px!important;
+  grid-template-rows:160px minmax(120px,auto)!important;
+}
+.theme-portal .kfc-meme-frame{
+  height:160px!important;
+  overflow:hidden!important;
+  align-items:center!important;
+  justify-content:center!important;
+}
+.theme-portal .kfc-meme-image{
+  width:170%!important;
+  max-width:none!important;
+  height:auto!important;
+  max-height:none!important;
+  flex:0 0 auto!important;
+  object-fit:contain!important;
+  transform:scale(1.12)!important;
+  transform-origin:center center!important;
+  background:transparent!important;
+}
+.theme-portal .kfc-random-btn{
+  width:44px!important;
+  height:64px!important;
+  min-height:64px!important;
+  align-self:start!important;
+  padding:4px 2px!important;
+  gap:3px!important;
+  border-radius:7px!important;
+}
+.theme-portal .kfc-drumstick{font-size:20px!important}
+.theme-portal .kfc-random-label{font-size:9px!important;line-height:1.15!important}
+@media(max-width:780px){
+  .theme-portal .kfc-card{
+    grid-template-columns:minmax(0,1fr) 44px!important;
+    grid-template-rows:160px minmax(120px,auto)!important;
+  }
+  .theme-portal .kfc-meme-frame{height:160px!important}
+  .theme-portal .kfc-meme-image{width:170%!important}
+  .theme-portal .kfc-random-btn{width:44px!important;height:64px!important;min-height:64px!important}
+}
