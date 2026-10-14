@@ -405,7 +405,7 @@ function App() {
       return p.y < -0.5 || p.y + d.width > container.width + 0.5
     })
     const floating = placed.some((p) =>
-      p.z > 0.5 && supportMetrics(p, placed.filter((q) => q.id !== p.id)).supporters.length === 0
+      p.z > 0.5 && !supportMetrics(p, placed.filter((q) => q.id !== p.id)).stable
     )
     if (outside) warnings.push(lang === 'zh' ? '有货物未装进集装箱' : 'Some cargo is outside the container')
     if (floating) warnings.push(lang === 'zh' ? '有货物悬空' : 'Some cargo is floating')
