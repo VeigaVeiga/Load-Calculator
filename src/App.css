@@ -1604,3 +1604,21 @@ body{overflow:hidden}
   .theme-portal .planning-disclaimer{max-width:100%;text-align:left;margin-left:0}
   .theme-portal .viewer-foot{flex-wrap:wrap;align-items:center}
 }
+
+
+/* Make the acknowledgements screen independently scrollable even when the app shell locks body scrolling. */
+.ack-page{
+  height:100vh;
+  min-height:0;
+  overflow-y:auto;
+  overflow-x:hidden;
+  box-sizing:border-box;
+  overscroll-behavior:contain;
+  scrollbar-gutter:stable;
+}
+.ack-content{padding-bottom:40px}
+.ack-table-wrap{max-width:100%;overscroll-behavior-x:contain}
+@media(max-width:700px){
+  .ack-page{height:100dvh}
+  .ack-content{padding-bottom:48px}
+}
