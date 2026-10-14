@@ -188,7 +188,10 @@ function nudgeTowardCenter(items: PlacedCargo[], cargo: Cargo[], container: Cont
   const blendDy = cgDy * 0.7 + footprintDy * 0.3
   const snap = (n: number) => Math.round(n / 50) * 50
   const shifts = (target: number, cg: number, footprint: number) => [...new Set([
-    0, snap(target), snap(cg), snap(footprint),
+    // Keep exact millimetre corrections as candidates: 50 mm snap-only shifts
+    // can leave a persistent 10–25 mm transverse CG error on a single row.
+    0, target, cg, footprint, (target * 0.7 + cg * 0.2 + footprint * 0.1),
+    snap(target), snap(cg), snap(footprint),
     ...[-800, -400, -200, -100, -50, 50, 100, 200, 400, 800].map(delta => snap(target) + delta),
   ])]
   const dxs = shifts(blendDx, cgDx, footprintDx)
