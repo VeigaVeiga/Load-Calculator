@@ -356,6 +356,18 @@ function App() {
   }, [])
 
   useEffect(() => {
+    if (packingProgress === null) return
+    // The packing overlay blocks pointer input; also prevent keyboard shortcuts
+    // from editing cargo or changing selection while the worker is running.
+    const blockWorkspaceKeys = (event: KeyboardEvent) => {
+      event.preventDefault()
+      event.stopImmediatePropagation()
+    }
+    window.addEventListener('keydown', blockWorkspaceKeys, true)
+    return () => window.removeEventListener('keydown', blockWorkspaceKeys, true)
+  }, [packingProgress])
+
+  useEffect(() => {
     if (!message) return
 
     const timer = window.setTimeout(() => {
