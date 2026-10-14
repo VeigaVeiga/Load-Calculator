@@ -15,7 +15,7 @@ import type {
   SecuringMaterialType,
 } from './types'
 import { autoPackAsync } from './packing/packer'
-import { validatePlacement } from './packing/geometry'
+import { dims, supportMetrics, validatePlacement } from './packing/geometry'
 import { analyzeWeight } from './analysis/weight'
 import { cbm } from './utils'
 import { createDocxWithPlanImages, extractZipEntry } from './utils/docxTemplate'
@@ -356,6 +356,18 @@ function App() {
   }, [])
 
   useEffect(() => {
+    if (packingProgress === null) return
+    // The packing overlay blocks pointer input; also prevent keyboard shortcuts
+    // from editing cargo or changing selection while the worker is running.
+    const blockWorkspaceKeys = (event: KeyboardEvent) => {
+      event.preventDefault()
+      event.stopImmediatePropagation()
+    }
+    window.addEventListener('keydown', blockWorkspaceKeys, true)
+    return () => window.removeEventListener('keydown', blockWorkspaceKeys, true)
+  }, [packingProgress])
+
+  useEffect(() => {
     if (!message) return
 
     const timer = window.setTimeout(() => {
@@ -386,57 +398,58 @@ function App() {
     [placed, container],
   )
 
+  const placementWarnings = useMemo(() => {
+    const warnings: string[] = []
+    const outside = placed.some((p) => {
+      const d = dims(p)
+      return p.y < -0.5 || p.y + d.width > container.width + 0.5
+    })
+    const floating = placed.some((p) =>
+      p.z > 0.5 && !supportMetrics(p, placed.filter((q) => q.id !== p.id)).stable
+    )
+    if (outside) warnings.push(lang === 'zh' ? '有货物未装进集装箱' : 'Some cargo is outside the container')
+    if (floating) warnings.push(lang === 'zh' ? '有货物悬空' : 'Some cargo is floating')
+    return warnings
+  }, [placed, container.width, lang])
+
   const placedByCargo = useMemo(() => {
     const map: Record<string, number> = {}
     for (const p of placed) map[p.cargoId] = (map[p.cargoId] || 0) + 1
     return map
   }, [placed])
 
-  const overflowCount = useMemo(() =>
-    cargo.reduce((sum, c) => sum + Math.max(0, Math.floor(c.quantity) - (placedByCargo[c.id] || 0)), 0),
-    [cargo, placedByCargo],
-  )
+  // Overflow is a snapshot of the last successful auto-pack result. Editing
+  // cargo definitions must not populate the overflow stage in real time.
+  const [overflowItems, setOverflowItems] = useState<PlacedCargo[]>([])
+  const overflowCount = overflowItems.length
 
-  const overflowItems = useMemo<PlacedCargo[]>(() => {
+  const buildOverflowSnapshot = (sourceCargo: Cargo[], packedItems: PlacedCargo[]) => {
     const result: PlacedCargo[] = []
-    const gap = 180
-    const zoneXMax = Math.max(1000, container.length - 500)
-    let cursorX = 250
-    let cursorY = -3000
-    let rowDepth = 0
-    for (const c of cargo) {
-      const missing = Math.max(0, Math.floor(c.quantity) - (placedByCargo[c.id] || 0))
+    const counts: Record<string, number> = {}
+    for (const item of packedItems) counts[item.cargoId] = (counts[item.cargoId] || 0) + 1
+    for (const c of sourceCargo) {
+      const missing = Math.max(0, Math.floor(c.quantity) - (counts[c.id] || 0))
       for (let i = 0; i < missing && result.length < 48; i += 1) {
-        const rotation = c.rotatable && (result.length % 2 === 1) ? 90 : 0
-        const L = rotation % 180 === 0 ? c.length : c.width
-        const W = rotation % 180 === 0 ? c.width : c.length
-        if (cursorX + L > zoneXMax && cursorX > 250) {
-          cursorX = 250
-          cursorY -= rowDepth + gap
-          rowDepth = 0
-        }
         result.push({
           id: `overflow-${c.id}-${i + 1}`,
           cargoId: c.id,
           cargoType: c.type,
-          x: cursorX,
-          y: cursorY,
+          x: 0,
+          y: 0,
           z: 0,
           length: c.length,
           width: c.width,
           height: c.height,
-          rotation,
+          rotation: 0,
           weight: c.weight,
           color: c.color,
           placementMode: 'manual',
           locked: false,
         })
-        cursorX += L + gap
-        rowDepth = Math.max(rowDepth, W)
       }
     }
     return result
-  }, [cargo, placedByCargo, container.length])
+  }
 
   const selected = placed.find((p) => p.id === selectedId)
 
@@ -484,6 +497,7 @@ function App() {
         container,
         items,
         cargoById,
+        true,
       )
 
       if (!validation.ok) {
@@ -563,6 +577,7 @@ function App() {
           container,
           next.filter((q) => q.id !== p.id),
           cargoById,
+          true,
         )
         if (!validation.ok) {
           const translated = validation.errors.map((error) => {
@@ -760,6 +775,7 @@ function App() {
       }, { signal: controller.signal })
       if (controller.signal.aborted) return
       setPlaced(result)
+      setOverflowItems(buildOverflowSnapshot(cargo, result))
       setSelectedId(null)
       setSelectedIds([])
       setMessage(lang === 'zh' ? '自动装柜完成' : 'Auto packing complete')
@@ -1096,11 +1112,7 @@ function App() {
 
             <button
               onClick={() =>
-                setPlaced((items) =>
-                  items.filter(
-                    (p) => p.locked,
-                  ),
-                )
+                { setPlaced((items) => items.filter((p) => p.locked)); setOverflowItems([]) }
               }
             >
               {tr.clear}
@@ -1566,6 +1578,11 @@ function App() {
               onMaterialScale={scaleMaterial}
               onDeleteMaterial={deleteMaterial}
             />
+            {placementWarnings.length > 0 && (
+              <div className="placement-warning" role="alert">
+                {placementWarnings.join(' · ')}
+              </div>
+            )}
             <div className="cg-hud" aria-label={lang === 'zh' ? '装载重心摘要' : 'Loading center of gravity'}>
               <svg className="cg-hud-map" viewBox="0 0 96 58" role="img" aria-label={lang === 'zh' ? '重心相对集装箱中心的偏移' : 'Cargo center relative to container center'}>
                 <rect x="9" y="5" width="78" height="48" rx="2" />

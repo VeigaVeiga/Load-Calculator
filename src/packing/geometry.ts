@@ -46,12 +46,16 @@ export function footprintOverlap(a: PlacedCargo, b: PlacedCargo) {
   return A.x1 < B.x2 - EPS && A.x2 > B.x1 + EPS && A.y1 < B.y2 - EPS && A.y2 > B.y1 + EPS
 }
 
-export function inBounds(p: PlacedCargo, c: Container) {
+export function inBounds(p: PlacedCargo, c: Container, allowSideOverflow = false) {
   const d = dims(p)
-  return p.x >= -EPS && p.y >= -EPS && p.z >= -EPS &&
+  const lengthAndHeightInside =
+    p.x >= -EPS && p.z >= -EPS &&
     p.x + d.length <= c.length + EPS &&
-    p.y + d.width <= c.width + EPS &&
     p.z + p.height <= c.height + EPS
+  if (!lengthAndHeightInside) return false
+  // Manual placement may extend through either long side of the container.
+  // Packing calculations keep the default strict bounds.
+  return allowSideOverflow || (p.y >= -EPS && p.y + d.width <= c.width + EPS)
 }
 
 type Rect = { x1: number; x2: number; y1: number; y2: number }
@@ -293,11 +297,12 @@ export function validatePlacement(
   c: Container,
   others: PlacedCargo[],
   cargoById?: Map<string, Cargo>,
+  allowSideOverflow = false,
 ): ValidationResult {
   const errors: string[] = []
   const warnings: string[] = []
 
-  if (!inBounds(p, c)) errors.push('超出集装箱内部尺寸')
+  if (!inBounds(p, c, allowSideOverflow)) errors.push('超出集装箱内部尺寸')
   if (others.some((q) => q.id !== p.id && overlap(p, q))) errors.push('与其他货物发生碰撞')
 
   const stackingErrors = validateStacking(p, others.filter((q) => q.id !== p.id), cargoById)
