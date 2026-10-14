@@ -154,23 +154,33 @@ function SceneContent({props}:{props:Props}){
     const start=last?.position.clone()??target.clone()
     const distance=start.distanceTo(target)
     const steps=Math.max(1,Math.ceil(distance/(.02*S)))
-    let safe=start.clone()
-    let blocked=false
-    for(let step=1;step<=steps;step++){
-     const t=step/steps,probe=start.clone().lerp(target,t)
+    let safe=start.clone(),blockedAt:THREE.Vector3|null=null
+    const isBlocked=(probe:THREE.Vector3)=>{
      const x=probe.x/S-d.length/2+container.length/2
      const y=probe.y/S-d.width/2+container.width/2
      const z=probe.z/S-p.height/2
-     const outside=x<0||z<0||x+d.length>container.length||z+p.height>container.height
-     const collision=items.some(q=>{
+     if(x<0||z<0||x+d.length>container.length||z+p.height>container.height)return true
+     return items.some(q=>{
       if(q.id===id||ids.includes(q.id))return false
       const qd=dims(q)
       return x<q.x+qd.length-.1&&x+d.length>q.x+.1&&y<q.y+qd.width-.1&&y+d.width>q.y+.1&&z<q.z+q.height-.1&&z+p.height>q.z+.1
      })
-     if(outside||collision){blocked=true;break}
+    }
+    for(let step=1;step<=steps;step++){
+     const probe=start.clone().lerp(target,step/steps)
+     if(isBlocked(probe)){blockedAt=probe;break}
      safe.copy(probe)
     }
-    if(blocked){o.position.copy(safe);o.rotation.z=last?.rotation??o.rotation.z}
+    if(blockedAt){
+     let low=0,high=1
+     const span=blockedAt.clone().sub(safe)
+     for(let i=0;i<10;i++){
+      const mid=(low+high)/2,probe=safe.clone().addScaledVector(span,mid)
+      if(isBlocked(probe))high=mid;else low=mid
+     }
+     o.position.copy(safe.clone().addScaledVector(span,low))
+     o.rotation.z=last?.rotation??o.rotation.z
+    }
     lastValidTransforms.current[id]={position:o.position.clone(),rotation:o.rotation.z}
    }
   }
