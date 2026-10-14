@@ -1758,3 +1758,34 @@ body{overflow:hidden}
     font-size:9px!important;
   }
 }
+
+
+/* V44 — center the disclaimer in the footer and improve legibility. */
+.theme-portal .viewer-foot{
+  position:relative!important;
+}
+.theme-portal .viewer-foot > .planning-disclaimer{
+  position:absolute!important;
+  left:50%!important;
+  top:50%!important;
+  transform:translate(-50%,-50%)!important;
+  margin:0!important;
+  font-size:11px!important;
+  font-weight:500!important;
+  line-height:1.25!important;
+  color:#555650!important;
+  text-align:center!important;
+  white-space:nowrap!important;
+  min-width:max-content!important;
+  max-width:none!important;
+  text-shadow:none!important;
+  -webkit-font-smoothing:antialiased;
+}
+@media(max-width:780px){
+  .theme-portal .viewer-foot > .planning-disclaimer{
+    position:static!important;
+    transform:none!important;
+    margin:0 auto!important;
+    font-size:10px!important;
+  }
+}
