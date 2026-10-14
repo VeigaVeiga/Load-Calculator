@@ -15,7 +15,7 @@ import type {
   SecuringMaterialType,
 } from './types'
 import { autoPackAsync } from './packing/packer'
-import { validatePlacement } from './packing/geometry'
+import { dims, supportMetrics, validatePlacement } from './packing/geometry'
 import { analyzeWeight } from './analysis/weight'
 import { cbm } from './utils'
 import { createDocxWithPlanImages, extractZipEntry } from './utils/docxTemplate'
@@ -398,6 +398,20 @@ function App() {
     [placed, container],
   )
 
+  const placementWarnings = useMemo(() => {
+    const warnings: string[] = []
+    const outside = placed.some((p) => {
+      const d = dims(p)
+      return p.y < -0.5 || p.y + d.width > container.width + 0.5
+    })
+    const floating = placed.some((p) =>
+      p.z > 0.5 && supportMetrics(p, placed.filter((q) => q.id !== p.id)).supporters.length === 0
+    )
+    if (outside) warnings.push(lang === 'zh' ? '有货物未装进集装箱' : 'Some cargo is outside the container')
+    if (floating) warnings.push(lang === 'zh' ? '有货物悬空' : 'Some cargo is floating')
+    return warnings
+  }, [placed, container.width, lang])
+
   const placedByCargo = useMemo(() => {
     const map: Record<string, number> = {}
     for (const p of placed) map[p.cargoId] = (map[p.cargoId] || 0) + 1
@@ -483,6 +497,7 @@ function App() {
         container,
         items,
         cargoById,
+        true,
       )
 
       if (!validation.ok) {
@@ -562,6 +577,7 @@ function App() {
           container,
           next.filter((q) => q.id !== p.id),
           cargoById,
+          true,
         )
         if (!validation.ok) {
           const translated = validation.errors.map((error) => {
@@ -1562,6 +1578,11 @@ function App() {
               onMaterialScale={scaleMaterial}
               onDeleteMaterial={deleteMaterial}
             />
+            {placementWarnings.length > 0 && (
+              <div className="placement-warning" role="alert">
+                {placementWarnings.join(' · ')}
+              </div>
+            )}
             <div className="cg-hud" aria-label={lang === 'zh' ? '装载重心摘要' : 'Loading center of gravity'}>
               <svg className="cg-hud-map" viewBox="0 0 96 58" role="img" aria-label={lang === 'zh' ? '重心相对集装箱中心的偏移' : 'Cargo center relative to container center'}>
                 <rect x="9" y="5" width="78" height="48" rx="2" />
