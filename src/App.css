@@ -1622,3 +1622,87 @@ body{overflow:hidden}
   .ack-page{height:100dvh}
   .ack-content{padding-bottom:48px}
 }
+
+
+/* V42 — keep the right-panel tabs anchored and prevent analysis content from pushing them out of view. */
+.theme-portal .right-panel{
+  display:flex!important;
+  flex-direction:column!important;
+  align-items:stretch!important;
+  min-width:0!important;
+  max-width:100%!important;
+  overflow-x:hidden!important;
+  box-sizing:border-box!important;
+}
+.theme-portal .right-panel > .tabs{
+  position:relative!important;
+  display:flex!important;
+  flex:0 0 auto!important;
+  align-self:stretch!important;
+  width:100%!important;
+  min-width:0!important;
+  max-width:100%!important;
+  overflow:visible!important;
+  box-sizing:border-box!important;
+  z-index:2!important;
+}
+.theme-portal .right-panel > .tabs button{
+  display:block!important;
+  flex:1 1 0%!important;
+  width:auto!important;
+  min-width:0!important;
+  max-width:100%!important;
+  white-space:normal!important;
+  overflow-wrap:anywhere!important;
+  text-overflow:clip!important;
+  line-height:1.25!important;
+  padding:7px 2px!important;
+  font-size:clamp(9px, .72vw, 11px)!important;
+}
+.theme-portal .right-panel > .analysis,
+.theme-portal .right-panel > .status-message,
+.theme-portal .right-panel > .sidebar-bottom-widgets{
+  flex:0 1 auto!important;
+  min-width:0!important;
+  max-width:100%!important;
+  width:100%!important;
+  box-sizing:border-box!important;
+  overflow-wrap:anywhere!important;
+}
+.theme-portal .right-panel .analysis > *,
+.theme-portal .right-panel .bias-primary,
+.theme-portal .right-panel .bias-limits{
+  min-width:0!important;
+  max-width:100%!important;
+  box-sizing:border-box!important;
+}
+.theme-portal .viewer-foot{
+  display:flex!important;
+  align-items:center!important;
+  flex-wrap:nowrap!important;
+  min-width:0!important;
+  gap:8px!important;
+}
+.theme-portal .viewer-foot .planning-disclaimer{
+  flex:0 1 auto!important;
+  min-width:0!important;
+  max-width:none!important;
+  margin-left:0!important;
+  margin-right:auto!important;
+  text-align:left!important;
+  white-space:normal!important;
+  overflow-wrap:anywhere!important;
+  font-size:clamp(8px, .65vw, 10px)!important;
+}
+.theme-portal .viewer-foot > span:last-child{
+  margin-left:auto!important;
+  flex:0 0 auto!important;
+}
+@media(max-width:1050px){
+  .theme-portal .viewer-foot{gap:6px!important}
+  .theme-portal .viewer-foot .planning-disclaimer{font-size:8px!important}
+}
+@media(max-width:780px){
+  .theme-portal .viewer-foot{flex-wrap:wrap!important}
+  .theme-portal .viewer-foot .planning-disclaimer{flex:1 1 100%!important;margin-right:0!important}
+}
