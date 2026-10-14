@@ -70,7 +70,7 @@ function SecuringMaterialZone({ container }: { container: Container }) {
 function OverflowCargoZone({ container, items, cargo }: { container: Container; items: PlacedCargo[]; cargo: Cargo[] }) {
   const layout = useMemo(() => {
     const placements: Array<{ p: PlacedCargo; x: number; y: number; rotation: number }> = []
-    let x = 0, rowY = -MATERIAL_STAGE_DEPTH, rowDepth = 0
+    let x = 0, rowY = -(MATERIAL_STAGE_DEPTH + MATERIAL_STAGE_GAP), rowDepth = 0
     for (const original of items) {
       const normal = dims(original)
       let w = normal.length, d = normal.width, rotation = original.rotation
@@ -81,7 +81,7 @@ function OverflowCargoZone({ container, items, cargo }: { container: Container; 
         } else continue
       }
       if (x + w > container.length) { x = 0; rowY += rowDepth; rowDepth = 0 }
-      if (rowY + d > 0) continue
+      if (rowY + d > -MATERIAL_STAGE_GAP) continue
       placements.push({ p: original, x, y: rowY, rotation })
       x += w
       rowDepth = Math.max(rowDepth, d)
