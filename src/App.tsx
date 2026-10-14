@@ -392,51 +392,38 @@ function App() {
     return map
   }, [placed])
 
-  const overflowCount = useMemo(() =>
-    cargo.reduce((sum, c) => sum + Math.max(0, Math.floor(c.quantity) - (placedByCargo[c.id] || 0)), 0),
-    [cargo, placedByCargo],
-  )
+  // Overflow is a snapshot of the last successful auto-pack result. Editing
+  // cargo definitions must not populate the overflow stage in real time.
+  const [overflowItems, setOverflowItems] = useState<PlacedCargo[]>([])
+  const overflowCount = overflowItems.length
 
-  const overflowItems = useMemo<PlacedCargo[]>(() => {
+  const buildOverflowSnapshot = (sourceCargo: Cargo[], packedItems: PlacedCargo[]) => {
     const result: PlacedCargo[] = []
-    const gap = 180
-    const zoneXMax = Math.max(1000, container.length - 500)
-    let cursorX = 250
-    let cursorY = -3000
-    let rowDepth = 0
-    for (const c of cargo) {
-      const missing = Math.max(0, Math.floor(c.quantity) - (placedByCargo[c.id] || 0))
+    const counts: Record<string, number> = {}
+    for (const item of packedItems) counts[item.cargoId] = (counts[item.cargoId] || 0) + 1
+    for (const c of sourceCargo) {
+      const missing = Math.max(0, Math.floor(c.quantity) - (counts[c.id] || 0))
       for (let i = 0; i < missing && result.length < 48; i += 1) {
-        const rotation = c.rotatable && (result.length % 2 === 1) ? 90 : 0
-        const L = rotation % 180 === 0 ? c.length : c.width
-        const W = rotation % 180 === 0 ? c.width : c.length
-        if (cursorX + L > zoneXMax && cursorX > 250) {
-          cursorX = 250
-          cursorY -= rowDepth + gap
-          rowDepth = 0
-        }
         result.push({
           id: `overflow-${c.id}-${i + 1}`,
           cargoId: c.id,
           cargoType: c.type,
-          x: cursorX,
-          y: cursorY,
+          x: 0,
+          y: 0,
           z: 0,
           length: c.length,
           width: c.width,
           height: c.height,
-          rotation,
+          rotation: 0,
           weight: c.weight,
           color: c.color,
           placementMode: 'manual',
           locked: false,
         })
-        cursorX += L + gap
-        rowDepth = Math.max(rowDepth, W)
       }
     }
     return result
-  }, [cargo, placedByCargo, container.length])
+  }
 
   const selected = placed.find((p) => p.id === selectedId)
 
@@ -760,6 +747,7 @@ function App() {
       }, { signal: controller.signal })
       if (controller.signal.aborted) return
       setPlaced(result)
+      setOverflowItems(buildOverflowSnapshot(cargo, result))
       setSelectedId(null)
       setSelectedIds([])
       setMessage(lang === 'zh' ? '自动装柜完成' : 'Auto packing complete')
@@ -1096,11 +1084,7 @@ function App() {
 
             <button
               onClick={() =>
-                setPlaced((items) =>
-                  items.filter(
-                    (p) => p.locked,
-                  ),
-                )
+                { setPlaced((items) => items.filter((p) => p.locked)); setOverflowItems([]) }
               }
             >
               {tr.clear}
