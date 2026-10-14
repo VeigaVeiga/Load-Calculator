@@ -1588,6 +1588,9 @@ function App() {
 
           <div className="viewer-foot">
             <span>{tr.grid}</span>
+            <span className="planning-disclaimer">
+              {lang === 'zh' ? '本站装柜工具仅供学习参考，不做官方保证' : 'For educational reference only; no official guarantee.'}
+            </span>
 
             <span>
               {lang === 'zh' ? '偏载' : 'IMBALANCE'} {analysis.dominantOffset.toFixed(0)} kg
