@@ -1706,3 +1706,55 @@ body{overflow:hidden}
   .theme-portal .viewer-foot{flex-wrap:wrap!important}
   .theme-portal .viewer-foot .planning-disclaimer{flex:1 1 100%!important;margin-right:0!important}
 }
+
+
+/* V43 — keep grid hint, disclaimer and imbalance on one compact horizontal line. */
+.theme-portal .viewer-foot{
+  display:flex!important;
+  flex-direction:row!important;
+  flex-wrap:nowrap!important;
+  align-items:center!important;
+  justify-content:flex-start!important;
+  gap:10px!important;
+  width:100%!important;
+  min-width:0!important;
+  box-sizing:border-box!important;
+  overflow:visible!important;
+  white-space:nowrap!important;
+}
+.theme-portal .viewer-foot > span:first-child{
+  flex:0 0 auto!important;
+  margin:0!important;
+  white-space:nowrap!important;
+}
+.theme-portal .viewer-foot > .planning-disclaimer{
+  display:inline!important;
+  flex:0 0 auto!important;
+  width:auto!important;
+  min-width:max-content!important;
+  max-width:none!important;
+  margin:0!important;
+  padding:0!important;
+  text-align:left!important;
+  white-space:nowrap!important;
+  overflow-wrap:normal!important;
+  font-size:10px!important;
+  line-height:1.2!important;
+}
+.theme-portal .viewer-foot > span:last-child{
+  flex:0 0 auto!important;
+  margin-left:auto!important;
+  white-space:nowrap!important;
+}
+@media(max-width:780px){
+  .theme-portal .viewer-foot{
+    flex-wrap:nowrap!important;
+    overflow-x:auto!important;
+    gap:8px!important;
+  }
+  .theme-portal .viewer-foot > .planning-disclaimer{
+    flex:0 0 auto!important;
+    min-width:max-content!important;
+    font-size:9px!important;
+  }
+}
