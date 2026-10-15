@@ -125,7 +125,7 @@ export default function SecuringModel({ item, container, selected, registerRef, 
   } else {
     const beltColor = selected ? '#ffb347' : '#d5a23c'
     const darkEdge = selected ? '#fff0cf' : '#74511c'
-    const sourcePath = item.path && item.path.length >= 2 ? item.path : [
+    const sourcePath = item.path !== undefined ? item.path : [
       { x: item.x + item.length / 2, y: 38, z: Math.max(80, container.height - 28) },
       { x: item.x + item.length / 2, y: 38, z: 42 },
       { x: item.x + item.length / 2, y: container.width - 38, z: 42 },
@@ -151,7 +151,17 @@ export default function SecuringModel({ item, container, selected, registerRef, 
       straps.push(<Rope key={'edge-a'+i} a={vertices[0]} b={vertices[2]} radius={.0012} color={darkEdge} />)
       straps.push(<Rope key={'edge-b'+i} a={vertices[1]} b={vertices[3]} radius={.0012} color={darkEdge} />)
     }
-    body = <group>{straps}</group>
+    const buckle = points.length >= 2 && points[0].distanceTo(points[1]) > .25 ? (() => {
+      const direction = points[1].clone().sub(points[0]).normalize()
+      const midpoint = points[0].clone().lerp(points[1], .56)
+      const quaternion = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction)
+      return <group position={midpoint} quaternion={quaternion}>
+        <mesh position={[0, 0, .012]}><boxGeometry args={[.085, .13, .018]} /><meshStandardMaterial color={selected ? '#fff0cf' : '#8e989d'} metalness={.78} roughness={.32} /></mesh>
+        <mesh position={[0, -.035, .026]}><boxGeometry args={[.065, .055, .012]} /><meshStandardMaterial color={selected ? '#ffe0a3' : '#5e686d'} metalness={.72} roughness={.36} /></mesh>
+        <mesh position={[0, .048, .028]} rotation={[.18, 0, 0]}><boxGeometry args={[.018, .09, .012]} /><meshStandardMaterial color={selected ? '#fff0cf' : '#aab2b6'} metalness={.8} roughness={.28} /></mesh>
+      </group>
+    })() : null
+    body = <group>{straps}{buckle}</group>
   }
 
   return (
