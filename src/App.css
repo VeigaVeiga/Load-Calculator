@@ -1792,3 +1792,36 @@ body{overflow:hidden}
 
 /* Manual placement status: outside-side and unsupported cargo must remain obvious. */
 .placement-warning{position:absolute;left:12px;right:12px;top:12px;z-index:30;padding:9px 12px;background:rgba(255,245,245,.96);border:1px solid #c62828;color:#b71c1c;font-size:13px;font-weight:800;line-height:1.35;pointer-events:none;text-shadow:0 1px 0 rgba(255,255,255,.8);box-shadow:0 2px 8px rgba(0,0,0,.12)}
+
+
+/* Cargo preset library */
+.cargo-add-actions{display:flex;gap:5px;align-items:stretch}
+.cargo-add-actions button{font-size:10px!important;white-space:nowrap}
+.cargo-add-actions .more-cargo-btn{background:#d9e3df!important;border-color:#71867b!important;color:#263a31!important}
+.cargo-catalog-backdrop{position:fixed;inset:0;z-index:10000;background:rgba(19,24,25,.72);display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(4px)}
+.cargo-catalog-modal{width:min(1120px,96vw);max-height:min(88vh,920px);display:flex;flex-direction:column;background:#e9e5da;color:#24292a;border:1px solid #656b66;box-shadow:0 24px 80px #0008;border-radius:5px;overflow:hidden}
+.cargo-catalog-header{display:flex;justify-content:space-between;gap:20px;padding:20px 24px 16px;border-bottom:1px solid #aaa79d;background:linear-gradient(110deg,#f4f0e6,#dfdbcf)}
+.catalog-eyebrow{font:700 10px Consolas,monospace;letter-spacing:.12em;color:#9b5a2e}
+.cargo-catalog-header h2{margin:5px 0;font-size:23px}
+.cargo-catalog-header p{margin:0;color:#666a67;font-size:12px}
+.cargo-catalog-header .catalog-close{width:36px;height:36px;font-size:25px;flex:none}
+.cargo-catalog-grid{overflow:auto;padding:18px 22px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+.cargo-catalog-category h3{font-size:13px;margin:0 0 8px;padding-bottom:6px;border-bottom:1px solid #c2bdb1}
+.cargo-catalog-cards{display:grid;grid-template-columns:1fr;gap:7px}
+.cargo-preset-card{width:100%;display:grid;grid-template-columns:48px minmax(0,1fr) 25px;gap:10px;align-items:center;text-align:left;padding:10px!important;min-height:74px;background:#f5f2ea!important;border:1px solid #c0bcaf!important;box-shadow:none!important}
+.cargo-preset-card:hover{border-color:#c66b2d!important;background:#fffaf0!important;transform:translateY(-1px)}
+.preset-swatch{height:44px;width:44px;display:flex;align-items:center;justify-content:center;border:1px solid #9c998f;background:#d9d5ca;font-size:24px;color:#414b4a}
+.preset-drum{border-radius:50%;background:#d5e0e2;color:#526d75}
+.preset-pipe{border-radius:50%;background:#d8dcd9;color:#4d5c61}
+.preset-ibc{background:#dce4d9;color:#52695b}
+.preset-vehicle{background:#c9d8df;color:#355e73}
+.preset-pallet,.preset-woodCrate{background:#e0c5a2;color:#8d5d31}
+.preset-copy{min-width:0;display:flex;flex-direction:column;gap:3px}
+.preset-copy strong{font-size:12px}
+.preset-copy small{font-size:10px;line-height:1.4;color:#77766e}
+.preset-copy small:nth-child(2){font-family:Consolas,monospace;color:#4f5652}
+.preset-add{font-size:22px;color:#a65d2b;text-align:center}
+.cargo-catalog-foot{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:12px 22px;border-top:1px solid #aaa79d;background:#ded9cd}
+.cargo-catalog-foot span{font-size:10px;line-height:1.5;color:#666a67}
+.cargo-catalog-foot button{min-width:80px}
+@media(max-width:700px){.cargo-catalog-backdrop{padding:8px}.cargo-catalog-modal{width:100%;max-height:94vh}.cargo-catalog-grid{grid-template-columns:1fr;padding:12px;gap:14px}.cargo-catalog-header{padding:14px}.cargo-catalog-header h2{font-size:19px}.cargo-catalog-foot{align-items:flex-start;flex-direction:column}.cargo-catalog-foot button{align-self:flex-end}}
