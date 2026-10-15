@@ -1830,3 +1830,8 @@ body{overflow:hidden}
 .type-toggle .more-cargo-inline{font-size:9px!important;white-space:nowrap;padding:4px 7px!important;background:#d9e3df!important;border-color:#71867b!important;color:#263a31!important}
 .type-toggle .special-type-tag{font-size:9px;color:#9b5a2e;font-weight:700;white-space:nowrap}
 .cargo-add-actions{display:flex;gap:5px;align-items:stretch}
+
+/* Cargo preset modal: provide a stable entry point outside each cargo card. */
+.sidebar-head-actions{display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end;position:relative;z-index:2}
+.sidebar-head-actions button.open-cargo-catalog{background:#d9e3df!important;border:1px solid #71867b!important;color:#263a31!important;font-weight:700;white-space:nowrap}
+.sidebar-head-actions button{pointer-events:auto!important;position:relative;z-index:3}
