@@ -118,7 +118,9 @@ function CargoObject({ p, container, selected, onSelect, registerRef, showName }
 function materialPlacement(item: SecuringItem, container: Container) { const maxX=Math.max(0,container.length-item.length),maxY=Math.max(0,container.width+MATERIAL_STAGE_GAP+MATERIAL_STAGE_DEPTH-item.width),maxZ=Math.max(0,container.height-item.height);return{x:Math.max(0,Math.min(maxX,item.x)),y:Math.max(0,Math.min(maxY,item.y)),z:Math.max(0,Math.min(maxZ,item.z))} }
 function materialWorldPosition(item: SecuringItem, container: Container): [number,number,number] {
   if(item.type==='doorNet') return [(container.length/2)*S+.012,0,(container.doorHeight/2)*S]
-  if(item.type==='lashingBelt') return [(item.x+item.length/2-container.length/2)*S,(item.y+item.width/2-container.width/2)*S,item.z*S]
+  // A lashing belt is a transverse restraint: its 3D geometry spans the full
+  // container width, so its anchor must stay on the container's centerline.
+  if(item.type==='lashingBelt') return [(item.x+item.length/2-container.length/2)*S,0,item.z*S]
   return [(item.x+item.length/2-container.length/2)*S,(item.y+item.width/2-container.width/2)*S,(item.z+item.height/2)*S]
 }
 function MaterialObject({ item, container, selected, onSelect, registerRef, onDelete }: { item: SecuringItem; container: Container; selected: boolean; onSelect: () => void; registerRef: (id: string, o: THREE.Group | null) => void; onDelete: () => void }) {
