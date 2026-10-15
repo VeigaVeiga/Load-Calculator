@@ -93,15 +93,15 @@ function CargoModel({ p, container, selected, onPointerDown, onPointerUp, onPoin
     {pallet ? <>
       <group position={[0, 0, (-visualH / 2 + palletDeckH / 2) * S]}>
         <MemoBox size={[visualL * S, visualW * S, palletDeckH * S * .32]} color="#b57b45" roughness={.86} eventProps={eventProps} outline opacity={ghostOpacity} />
-        {[-.34, 0, .34].map((i, k) => <MemoBox key={`deck-${k}`} position={[0, i * visualW * S * .28, palletDeckH * S * .34]} size={[visualL * S, visualW * S * .16, palletDeckH * S * .22]} color="#8a5a32" roughness={.86} outline />)}
-        {[-.34, 0, .34].map((i, k) => <MemoBox key={`runner-${k}`} position={[i * visualL * S, 0, -palletDeckH * S * .20]} size={[Math.max(55, visualL * .11) * S, visualW * S * .72, palletDeckH * S * .36]} color="#76502f" roughness={.88} outline />)}
+        {[-.34, 0, .34].map((i, k) => <MemoBox key={`deck-${k}`} position={[0, i * visualW * S * .28, palletDeckH * S * .34]} size={[visualL * S, visualW * S * .16, palletDeckH * S * .22]} color="#8a5a32" roughness={.86} outline opacity={ghostOpacity} />)}
+        {[-.34, 0, .34].map((i, k) => <MemoBox key={`runner-${k}`} position={[i * visualL * S, 0, -palletDeckH * S * .20]} size={[Math.max(55, visualL * .11) * S, visualW * S * .72, palletDeckH * S * .36]} color="#76502f" roughness={.88} outline opacity={ghostOpacity} />)}
       </group>
-      <MemoBox size={[visualL * S, visualW * S, bodyH * S]} position={[0, 0, (-visualH / 2 + palletDeckH + bodyH / 2) * S]} color={mainColor} roughness={.68} eventProps={eventProps} outline />
+      <MemoBox size={[visualL * S, visualW * S, bodyH * S]} position={[0, 0, (-visualH / 2 + palletDeckH + bodyH / 2) * S]} color={mainColor} roughness={.68} eventProps={eventProps} outline opacity={ghostOpacity} />
     </> : crate ? <>
-      <MemoBox size={[visualL * S, visualW * S, visualH * S]} color="#9a6638" roughness={.82} eventProps={eventProps} outline />
-      {[-.38, -.13, .13, .38].map((t, i) => <MemoBox key={`sx${i}`} position={[0, t * visualW * S, 0]} size={[visualL * S * .96, Math.max(12, visualW * .045) * S, visualH * S * .96]} color="#c08a52" roughness={.84} outline />)}
-      {[-.40, 0, .40].map((t, i) => <MemoBox key={`sz${i}`} position={[t * visualL * S, 0, 0]} size={[Math.max(12, visualL * .045) * S, visualW * S * .96, visualH * S * .96]} color="#b97d46" roughness={.84} outline />)}
-    </> : <MemoBox size={[visualL * S, visualW * S, visualH * S]} color={mainColor} roughness={.62} eventProps={eventProps} outline />}
+      <MemoBox size={[visualL * S, visualW * S, visualH * S]} color="#9a6638" roughness={.82} eventProps={eventProps} outline opacity={ghostOpacity} />
+      {[-.38, -.13, .13, .38].map((t, i) => <MemoBox key={`sx${i}`} position={[0, t * visualW * S, 0]} size={[visualL * S * .96, Math.max(12, visualW * .045) * S, visualH * S * .96]} color="#c08a52" roughness={.84} outline opacity={ghostOpacity} />)}
+      {[-.40, 0, .40].map((t, i) => <MemoBox key={`sz${i}`} position={[t * visualL * S, 0, 0]} size={[Math.max(12, visualL * .045) * S, visualW * S * .96, visualH * S * .96]} color="#b97d46" roughness={.84} outline opacity={ghostOpacity} />)}
+    </> : <MemoBox size={[visualL * S, visualW * S, visualH * S]} color={mainColor} roughness={.62} eventProps={eventProps} outline opacity={ghostOpacity} />}
     {showName && <Html position={[0, 0, p.height * S / 2 + .02]} center><div className="cargo-name-label">{p.cargoId}</div></Html>}
   </group>
 }
