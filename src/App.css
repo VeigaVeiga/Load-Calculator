@@ -1798,7 +1798,7 @@ body{overflow:hidden}
 .cargo-add-actions{display:flex;gap:5px;align-items:stretch}
 .cargo-add-actions button{font-size:10px!important;white-space:nowrap}
 .cargo-add-actions .more-cargo-btn{background:#d9e3df!important;border-color:#71867b!important;color:#263a31!important}
-.cargo-catalog-backdrop{position:fixed;inset:0;z-index:10000;background:rgba(19,24,25,.72);display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(4px)}
+.cargo-catalog-backdrop{position:fixed!important;inset:0!important;z-index:2147483647!important;background:rgba(19,24,25,.78)!important;display:flex!important;align-items:center!important;justify-content:center!important;padding:20px;backdrop-filter:blur(4px);visibility:visible!important;opacity:1!important;pointer-events:auto!important}
 .cargo-catalog-modal{width:min(1120px,96vw);max-height:min(88vh,920px);display:flex;flex-direction:column;background:#e9e5da;color:#24292a;border:1px solid #656b66;box-shadow:0 24px 80px #0008;border-radius:5px;overflow:hidden}
 .cargo-catalog-header{display:flex;justify-content:space-between;gap:20px;padding:20px 24px 16px;border-bottom:1px solid #aaa79d;background:linear-gradient(110deg,#f4f0e6,#dfdbcf)}
 .catalog-eyebrow{font:700 10px Consolas,monospace;letter-spacing:.12em;color:#9b5a2e}
