@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom'
 import type { CargoType } from '../types'
 
 type Preset = {
@@ -42,7 +43,7 @@ export default function CargoCatalogModal({
   onSelect: (preset: Preset) => void
 }) {
   const categories = [...new Set(PRESETS.map(p => lang === 'zh' ? p.category : p.categoryEn))]
-  return <div className="cargo-catalog-backdrop" role="presentation" onMouseDown={e => { if (e.target === e.currentTarget) onClose() }}>
+  return createPortal(<div className="cargo-catalog-backdrop" role="presentation" onMouseDown={e => { if (e.target === e.currentTarget) onClose() }}>
     <section className="cargo-catalog-modal" role="dialog" aria-modal="true" aria-labelledby="cargo-catalog-title">
       <header className="cargo-catalog-header">
         <div>
@@ -75,5 +76,5 @@ export default function CargoCatalogModal({
         <button onClick={onClose}>{lang === 'zh' ? '完成' : 'Done'}</button>
       </footer>
     </section>
-  </div>
+  </div>, document.body)
 }
