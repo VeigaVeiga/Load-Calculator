@@ -1896,3 +1896,40 @@ body{overflow:hidden}
   border:1px solid #656c67!important;border-left:3px solid #e9e9e5!important;
   box-shadow:inset 0 0 0 1px rgba(233,233,229,.035)!important;
 }
+
+
+/* Fix cargo panel geometry: cards keep their natural height and the list scrolls instead of compressing them. */
+.theme-portal .sidebar{
+  display:flex!important;flex-direction:column!important;align-items:stretch!important;
+  min-width:0!important;box-sizing:border-box!important;
+}
+.theme-portal .sidebar-head,
+.theme-portal .sidebar > .tool-row{
+  flex:0 0 auto!important;width:100%!important;min-width:0!important;box-sizing:border-box!important;
+}
+.theme-portal .cargo-list{
+  display:flex!important;flex:0 1 auto!important;flex-direction:column!important;align-items:stretch!important;
+  width:100%!important;min-width:0!important;min-height:0!important;
+  max-height:calc(100vh - 250px)!important;
+  overflow-y:auto!important;overflow-x:hidden!important;
+  padding:2px 0 8px!important;gap:8px!important;box-sizing:border-box!important;
+  scrollbar-gutter:stable!important;overscroll-behavior:contain!important;
+}
+.theme-portal .cargo-list > .cargo-card{
+  display:block!important;flex:0 0 auto!important;align-self:stretch!important;
+  width:100%!important;min-width:0!important;max-width:100%!important;
+  height:auto!important;min-height:0!important;box-sizing:border-box!important;
+  margin:0!important;
+}
+@media(max-width:780px){
+  .theme-portal .sidebar{display:block!important}
+  .theme-portal .cargo-list{
+    max-height:60vh!important;overflow-y:auto!important;
+    padding:2px 0 8px!important;
+  }
+}
+
+/* Ensure the cargo list and both action rows share exactly the same inner width. */
+.theme-portal .sidebar > .tool-row,
+.theme-portal .cargo-list{margin-left:0!important;margin-right:0!important}
+.theme-portal .cargo-list > .cargo-card.active{padding-left:9px!important;padding-right:9px!important}
