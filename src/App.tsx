@@ -918,6 +918,20 @@ function App() {
     return lower.slice(0,-1).concat(upper.slice(0,-1))
   }
 
+  const lashingProjection = (points: Array<[number, number]>) => {
+    if (!points.length) return ''
+    const coords = points.map(([x,y]) => `${x.toFixed(2)},${y.toFixed(2)}`).join(' ')
+    const edge = `<polyline points="${coords}" fill="none" stroke="#713c24" stroke-width="11" stroke-linecap="butt" stroke-linejoin="miter"/>`
+    const band = `<polyline points="${coords}" fill="none" stroke="#ed762b" stroke-width="7" stroke-linecap="butt" stroke-linejoin="miter"/>`
+    const seam = `<polyline points="${coords}" fill="none" stroke="#ffc18d" stroke-width="1.2" stroke-dasharray="2 3" stroke-linecap="butt" stroke-linejoin="miter"/>`
+    const loops = points.map(([x,y]) => `<ellipse cx="${x}" cy="${y}" rx="5.5" ry="4.5" fill="#ed762b" stroke="#713c24" stroke-width="1.6"/><ellipse cx="${x}" cy="${y}" rx="2.6" ry="2.2" fill="none" stroke="#b8c0c4" stroke-width="1.4"/>`).join('')
+    const buckle = points.length > 1 ? (() => {
+      const x = (points[0][0] + points[1][0]) / 2, y = (points[0][1] + points[1][1]) / 2
+      return `<rect x="${x-5}" y="${y-7}" width="10" height="14" rx="1" fill="#8e989d" stroke="#4c5559" stroke-width="1.5"/><rect x="${x-2.5}" y="${y-4}" width="5" height="8" fill="#d5dadd" stroke="#4c5559" stroke-width=".8"/><line x1="${x-3}" y1="${y}" x2="${x+3}" y2="${y}" stroke="#4c5559" stroke-width="1.2"/>`
+    })() : ''
+    return edge + band + seam + loops + buckle
+  }
+
   const makeTopViewSvg=(W:number,H:number)=>{
     const ratio=container.length/container.width
     const boxH=Math.min(H-70,(W-80)/ratio),boxW=boxH*ratio,bx=(W-boxW)/2,by=50
@@ -927,10 +941,10 @@ function App() {
     for(const p of placed){const d=p.rotation%180===0?{l:p.length,w:p.width}:{l:p.width,w:p.length};shapes+=rect(bx+p.x/container.length*boxW,by+p.y/container.width*boxH,d.l/container.length*boxW,d.w/container.width*boxH,p.color)}
     for(const m of materials){
       const mx=bx+m.x/container.length*boxW,my=by+m.y/container.width*boxH,mw=Math.max(2,m.length/container.length*boxW),mh=Math.max(2,m.width/container.width*boxH)
-      if(m.type==='lashingBelt'&&m.path?.length){shapes+=`<polyline points="${m.path.map(p=>`${bx+p.x/container.length*boxW},${by+p.y/container.width*boxH}`).join(' ')}" fill="none" stroke="#d5a23c" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>`}
+      if(m.type==='lashingBelt'&&m.path?.length){shapes+=lashingProjection(m.path.map(p=>[bx+p.x/container.length*boxW,by+p.y/container.width*boxH] as [number,number]))}
       else if(m.type==='triangleWood'){const pts=triangleProjectionPoints(m,'top').map(([x,y])=>[bx+x/container.length*boxW,by+y/container.width*boxH] as [number,number]);shapes+=poly(pts,'#3979b8')}
       else if(m.type==='airBag')shapes+=`<rect x="${mx}" y="${my}" width="${mw}" height="${mh}" rx="3" fill="#3fa36b"/>`
-      else if(m.type==='lashingBelt'){const x=bx+(m.x+m.length/2)/container.length*boxW;shapes+=`<line x1="${x}" y1="${by}" x2="${x}" y2="${by+boxH}" stroke="#d5a23c" stroke-width="7" stroke-linecap="round"/>`}
+      else if(m.type==='lashingBelt'){const x=bx+(m.x+m.length/2)/container.length*boxW;shapes+=`<line x1="${x}" y1="${by}" x2="${x}" y2="${by+boxH}" stroke="#ed762b" stroke-width="7" stroke-linecap="butt"/>`}
       else if(m.type==='doorNet'){const x=bx+(m.x+m.length/2)/container.length*boxW;shapes+=`<line x1="${x}" y1="${by}" x2="${x}" y2="${by+boxH}" stroke="#4d5964" stroke-width="3" stroke-dasharray="5 3"/>`}
     }
     return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"><rect width="100%" height="100%" fill="#fff"/><text x="${W/2}" y="25" text-anchor="middle" font-size="17" font-weight="700" fill="#17354d">${container.name} · ${lang==='zh'?'俯视示意图':'TOP VIEW'}</text><rect x="${bx}" y="${by}" width="${boxW}" height="${boxH}" fill="#eef4f7" stroke="#17354d" stroke-width="5" stroke-linejoin="round"/>${shapes}</svg>`
@@ -945,7 +959,7 @@ function App() {
     for(const p of placed){const d=p.rotation%180===0?{l:p.length,w:p.width}:{l:p.width,w:p.length};left+=rect(side.x+p.x/container.length*side.w,side.y+(1-(p.z+p.height)/container.height)*side.h,d.l/container.length*side.w,p.height/container.height*side.h,p.color);frontShapes+=rect(front.x+p.y/container.width*front.w,front.y+(1-(p.z+p.height)/container.height)*front.h,d.w/container.width*front.w,p.height/container.height*front.h,p.color)}
     for(const m of materials){
       const sx=side.x+(m.x+m.length/2)/container.length*side.w,sy=side.y+(1-(m.z+m.height)/container.height)*side.h,sh=Math.max(2,m.height/container.height*side.h),fx=front.x+m.y/container.width*front.w,fy=front.y+(1-(m.z+m.height)/container.height)*front.h,fw=Math.max(2,m.width/container.width*front.w)
-      if(m.type==='lashingBelt'&&m.path?.length){const sidePts=m.path.map(p=>`${side.x+p.x/container.length*side.w},${side.y+(1-p.z/container.height)*side.h}`).join(' ');const frontPts=m.path.map(p=>`${front.x+p.y/container.width*front.w},${front.y+(1-p.z/container.height)*front.h}`).join(' ');left+=`<polyline points="${sidePts}" fill="none" stroke="#d5a23c" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>`;frontShapes+=`<polyline points="${frontPts}" fill="none" stroke="#d5a23c" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>`}
+      if(m.type==='lashingBelt'&&m.path?.length){const sidePts=m.path.map(p=>[side.x+p.x/container.length*side.w,side.y+(1-p.z/container.height)*side.h] as [number,number]);const frontPts=m.path.map(p=>[front.x+p.y/container.width*front.w,front.y+(1-p.z/container.height)*front.h] as [number,number]);left+=lashingProjection(sidePts);frontShapes+=lashingProjection(frontPts)}
       else if(m.type==='triangleWood'){
         const sidePts=triangleProjectionPoints(m,'side').map(([x,z])=>[side.x+x/container.length*side.w,side.y+(1-z/container.height)*side.h] as [number,number])
         const frontPts=triangleProjectionPoints(m,'front').map(([y,z])=>[front.x+y/container.width*front.w,front.y+(1-z/container.height)*front.h] as [number,number])
@@ -954,7 +968,7 @@ function App() {
       else if(m.type==='lashingBelt'){
         left+=`<line x1="${sx}" y1="${side.y+side.h}" x2="${sx}" y2="${side.y}" stroke="#d5a23c" stroke-width="7" stroke-linecap="round"/>`
         const x1=front.x, y1=front.y, x2=front.x+front.w, y2=front.y+front.h
-        frontShapes+=`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#d5a23c" stroke-width="6"/><line x1="${x1}" y1="${y2}" x2="${x2}" y2="${y1}" stroke="#d5a23c" stroke-width="6"/><line x1="${x1}" y1="${y2}" x2="${x2}" y2="${y2}" stroke="#d5a23c" stroke-width="6"/>`
+        frontShapes+=`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#ed762b" stroke-width="6" stroke-linejoin="miter"/><line x1="${x1}" y1="${y2}" x2="${x2}" y2="${y1}" stroke="#d5a23c" stroke-width="6"/><line x1="${x1}" y1="${y2}" x2="${x2}" y2="${y2}" stroke="#d5a23c" stroke-width="6"/>`
       }else if(m.type==='doorNet'){
         left+=`<line x1="${sx}" y1="${side.y}" x2="${sx}" y2="${side.y+side.h}" stroke="#4d5964" stroke-width="2.5" stroke-dasharray="5 3"/>`
         const clipId=`door-net-${String(m.id).replace(/[^a-zA-Z0-9_-]/g,'')}`;let netLines=''
