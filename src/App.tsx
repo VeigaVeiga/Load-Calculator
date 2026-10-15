@@ -853,6 +853,10 @@ function App() {
     return material.id
   }
 
+  const updateMaterialPath = (id: string, path: Array<{ x: number; y: number; z: number }>) => {
+    setMaterials((items) => items.map((m) => m.id === id ? { ...m, path: path.map((p) => ({ ...p })) } : m))
+  }
+
   const moveMaterial = (
     id: string,
     x: number,
@@ -1636,6 +1640,7 @@ function App() {
               showDimensions={showDimensions}
               airBagStretch={airBagStretch}
               onAddMaterial={addMaterial}
+              onUpdateMaterialPath={updateMaterialPath}
               onMaterialScale={scaleMaterial}
               onDeleteMaterial={deleteMaterial}
             />
