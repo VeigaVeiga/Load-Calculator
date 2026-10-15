@@ -824,7 +824,7 @@ function App() {
       z: 0,
       length:
         type === 'triangleWood'
-          ? 1000
+          ? 150
           : type === 'lashingBelt'
             ? 3000
             : type === 'doorNet'
