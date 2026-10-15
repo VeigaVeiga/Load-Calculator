@@ -27,19 +27,19 @@ type Props = {
   onMoveMany?: (u: Array<{ id: string; x: number; y: number; z: number; rotation?: number }>) => void
   onRotate: (id: string, r: number) => void; onRotateMaterial: (id: string, r: number) => void
   onMaterialMove: (id: string, x: number, y: number) => void; onMaterialScale: (id: string, f: number) => void
-  onAddMaterial: (type: SecuringMaterialType) => string; view: View; dragging: boolean; onDragState: (v: boolean) => void
+  onAddMaterial: (type: SecuringMaterialType) => string; onUpdateMaterialPath: (id: string, path: Array<{x:number;y:number;z:number}>) => void; view: View; dragging: boolean; onDragState: (v: boolean) => void
   onView?: (v: View) => void; cargo: Cargo[]; lang: 'zh' | 'en'; freePlacement?: boolean; overflowCount: number; overflowItems: PlacedCargo[]
   securingMode?: boolean; showDimensions: boolean; airBagStretch?: boolean; selectedMaterialId?: string | null
   onSelectMaterial?: (id: string | null) => void; onDeleteMaterial?: (id: string) => void; toolbarHost?: HTMLElement | null
 }
 
-function CameraRig({ view, container, dragging, transformActive, focusPoint, focusNonce }: { view: View; container: Container; dragging: boolean; transformActive: boolean; focusPoint: [number, number, number] | null; focusNonce: number }) {
+function CameraRig({ view, container, dragging, transformActive, focusPoint, focusNonce, routeMode }: { view: View; container: Container; dragging: boolean; transformActive: boolean; focusPoint: [number, number, number] | null; focusNonce: number; routeMode: boolean }) {
   const { camera, size, invalidate } = useThree(); const controls = useRef<any>(null)
   useEffect(() => {
     const L = (container.length + 6000) * S, W = container.width * S, H = container.height * S
     const targetX = view === 'iso' || view === 'top' ? 1 : 0
     const target = new THREE.Vector3(targetX, 0, H * .45)
-    const d = Math.max(L, W, H) * 1.15
+    const d = Math.max(L, W, H) * (routeMode ? .72 : 1.15)
     const pos: Record<View, [number, number, number]> = { iso: [targetX + d * .72, target.y + d * .58, target.z + d * .43], top: [targetX, 0, target.z + d * 1.55], front: [-d * 1.45, 0, target.z], left: [targetX, -d * 1.45, target.z], right: [targetX, d * 1.45, target.z] }
     camera.position.set(...pos[view]); camera.up.set(0, 0, 1); camera.lookAt(target)
     if (camera instanceof THREE.OrthographicCamera) {
@@ -50,7 +50,7 @@ function CameraRig({ view, container, dragging, transformActive, focusPoint, foc
       perspective.fov = 42; perspective.aspect = Math.max(.25, size.width / Math.max(1, size.height)); perspective.near = .01; perspective.far = 120
     }
     camera.updateProjectionMatrix(); controls.current?.target.copy(target); controls.current?.update()
-  }, [view, container.length, container.width, container.height, size.width, size.height, camera])
+  }, [view, container.length, container.width, container.height, size.width, size.height, camera, routeMode])
   useEffect(() => { const c = controls.current; if (!c || !focusPoint || focusNonce === 0) return; const nextTarget = new THREE.Vector3(...focusPoint); const offset = camera.position.clone().sub(c.target); c.target.copy(nextTarget); camera.position.copy(nextTarget).add(offset); camera.lookAt(nextTarget); c.update() }, [focusNonce, focusPoint, camera])
   useEffect(() => { const c = controls.current; if (!c) return; c.enabled = !(dragging && transformActive); if (c.enabled) c.update() }, [dragging, transformActive])
   return <OrbitControls ref={controls} makeDefault enableDamping={false} rotateSpeed={.7} panSpeed={.65} zoomSpeed={.8} minDistance={1.2} maxDistance={45} onChange={() => invalidate()} />
@@ -132,9 +132,9 @@ function stagePosition(type: SecuringMaterialType, materials: SecuringItem[], co
 
 function SceneContent({props}:{props:Props}){
  const{invalidate}=useThree()
- const{container,items,materials,selectedId,selectedIds,onSelect,onSelectMany,onMove,onMoveMany,onRotate,onRotateMaterial,onMaterialMove,onMaterialScale,onAddMaterial,view,dragging,onDragState,cargo,lang,showDimensions}=props
+ const{container,items,materials,selectedId,selectedIds,onSelect,onSelectMany,onMove,onMoveMany,onRotate,onRotateMaterial,onMaterialMove,onMaterialScale,onAddMaterial,onUpdateMaterialPath,view,dragging,onDragState,cargo,lang,showDimensions}=props
  const refs=useRef<Record<string,THREE.Group>>({}),transformControls=useRef<any>(null),snapshots=useRef<Record<string,{position:THREE.Vector3;rotation:number;scale:THREE.Vector3}>>({}),lastValidTransforms=useRef<Record<string,{position:THREE.Vector3;rotation:number}>>({})
- const[tool,setTool]=useState<SceneTool>('translate'),[sceneSelectionMode,setSceneSelectionMode]=useState<'single'|'multi'>(props.selectionMode==='box'?'multi':'single'),[freePlacementEnabled,setFreePlacementEnabled]=useState(!!props.freePlacement),[activeTransformId,setActiveTransformId]=useState<string|null>(null),[focusPoint,setFocusPoint]=useState<[number,number,number]|null>(null),[focusNonce,setFocusNonce]=useState(0)
+ const[tool,setTool]=useState<SceneTool>('translate'),[sceneSelectionMode,setSceneSelectionMode]=useState<'single'|'multi'>(props.selectionMode==='box'?'multi':'single'),[freePlacementEnabled,setFreePlacementEnabled]=useState(!!props.freePlacement),[activeTransformId,setActiveTransformId]=useState<string|null>(null),[focusPoint,setFocusPoint]=useState<[number,number,number]|null>(null),[focusNonce,setFocusNonce]=useState(0),[routeEdit,setRouteEdit]=useState<{materialId:string;nodeIds:string[]}|null>(null)
  const activeMaterial=props.selectedMaterialId?materials.find(m=>m.id===props.selectedMaterialId)??null:null,activeId=activeMaterial?.id??(freePlacementEnabled?activeTransformId:null),activeObject=activeId?refs.current[activeId]??null:null,multi=sceneSelectionMode==='multi'
  const registerRef=useCallback((id:string,o:THREE.Group|null)=>{if(o)refs.current[id]=o;else delete refs.current[id]},[])
  const selectCargo=(id:string)=>{props.onSelectMaterial?.(null);setActiveTransformId(freePlacementEnabled?id:null);if(freePlacementEnabled){const p=items.find(q=>q.id===id);if(p){const d=dims(p);setFocusPoint([(p.x+d.length/2-container.length/2)*S,(p.y+d.width/2-container.width/2)*S,(p.z+p.height/2)*S]);setFocusNonce(n=>n+1)}}if(multi){const next=selectedIds.includes(id)?selectedIds.filter(x=>x!==id):[...selectedIds,id];onSelectMany(next)}else onSelect(id)}
@@ -216,13 +216,63 @@ function SceneContent({props}:{props:Props}){
   // Fully release the active gizmo after deselection so Three.js cannot retain a stale axis.
   useEffect(()=>{if(!props.selectedId&&props.selectedIds.length===0&&!props.selectedMaterialId)setActiveTransformId(null)},[props.selectedId,props.selectedIds,props.selectedMaterialId])
  
- const addMaterial=(type:SecuringMaterialType)=>{if(type==='doorNet'){const existing=materials.find(m=>m.type==='doorNet');if(existing){selectMaterial(existing.id);return existing.id}}const id=onAddMaterial(type);if(type==='doorNet'){onMaterialMove(id,container.length-40,0);return id}const p=stagePosition(type,materials,container);onMaterialMove(id,p.x,p.y);return id}
- const toolbar=<div className="scene-toolbox" style={{pointerEvents:'auto'}}><button className={tool==='translate'?'active':''} onClick={()=>setTool('translate')}>↔ 移动</button><button className={tool==='rotate'?'active':''} onClick={()=>setTool('rotate')}>⟳ 旋转</button><button disabled={!activeMaterial} className={!activeMaterial?'disabled':tool==='scale'?'active':''} onClick={()=>setTool('scale')}>⤢ 缩放</button><button disabled={!activeMaterial} className={!activeMaterial?'disabled':'danger'} onClick={()=>{if(props.selectedMaterialId){props.onDeleteMaterial?.(props.selectedMaterialId);props.onSelectMaterial?.(null)}}}>删除选中</button><div className="tool-divider"/><b>加固材料</b><button onClick={()=>addMaterial('triangleWood')}>三角木</button><button onClick={()=>addMaterial('lashingBelt')}>紧固带</button><button onClick={()=>addMaterial('airBag')}>充气袋</button><button disabled={materials.some(m=>m.type==='doorNet')} onClick={()=>addMaterial('doorNet')}>柜门网</button></div>
+   const pointById = (id: string) => container.lashingPoints.find(p => p.id === id)
+  const routeAllowedIds = useMemo(() => {
+    if (!routeEdit) return []
+    const points = container.lashingPoints
+    const isTop = (p: typeof points[number]) => p.z > container.height / 2
+    const side = (p: typeof points[number]) => p.y <= container.width / 2 ? 'L' : 'R'
+    const slot = (p: typeof points[number]) => Number(p.id.match(/(\d+)$/)?.[1] ?? 0)
+    const chosen = routeEdit.nodeIds.map(pointById).filter(Boolean) as typeof points
+    if (chosen.length === 0) return points.filter(isTop).map(p => p.id)
+    const first = chosen[0], last = chosen[chosen.length - 1]
+    if (chosen.length === 1) return points.filter(p => !isTop(p) && side(p) === side(first) && Math.abs(slot(p)-slot(first)) <= 4).map(p => p.id)
+    if (chosen.length === 2) return points.filter(p => !isTop(p) && side(p) !== side(last) && Math.abs(slot(p)-slot(last)) <= 4).map(p => p.id)
+    if (chosen.length === 3) return points.filter(p => isTop(p) && side(p) !== side(first) && Math.abs(slot(p)-slot(last)) <= 4).map(p => p.id)
+    return []
+  }, [routeEdit, container.lashingPoints, container.height, container.width])
+  const chooseRoutePoint = (pointId: string) => {
+    if (!routeEdit || !routeAllowedIds.includes(pointId)) return
+    const nodeIds = [...routeEdit.nodeIds, pointId]
+    const path = nodeIds.map(pointById).filter(Boolean).map(p => ({ x: p!.x, y: p!.y, z: p!.z }))
+    onUpdateMaterialPath(routeEdit.materialId, path)
+    if (nodeIds.length >= 4) {
+      setRouteEdit(null)
+      props.onSelectMaterial?.(routeEdit.materialId)
+    } else setRouteEdit({ materialId: routeEdit.materialId, nodeIds })
+  }
+  const beginLashingRoute = () => {
+    const existing = props.selectedMaterialId ? materials.find(m => m.id === props.selectedMaterialId && m.type === 'lashingBelt') : undefined
+    const id = existing?.id ?? onAddMaterial('lashingBelt')
+    onUpdateMaterialPath(id, [])
+    setRouteEdit({ materialId: id, nodeIds: [] })
+    setTool('translate')
+    props.onSelectMaterial?.(id)
+    onSelect(null)
+    onSelectMany([])
+    setActiveTransformId(null)
+    props.onView?.('iso')
+    setFocusPoint([0, 0, container.height * S * .45])
+    setFocusNonce(n => n + 1)
+  }
+  const cancelLashingRoute = () => {
+    if (routeEdit) {
+      const material = materials.find(m => m.id === routeEdit.materialId)
+      if (material && !material.path?.length) {
+        props.onDeleteMaterial?.(material.id)
+        props.onSelectMaterial?.(null)
+      }
+    }
+    setRouteEdit(null)
+  }
+
+const addMaterial=(type:SecuringMaterialType)=>{if(type==='doorNet'){const existing=materials.find(m=>m.type==='doorNet');if(existing){selectMaterial(existing.id);return existing.id}}const id=onAddMaterial(type);if(type==='doorNet'){onMaterialMove(id,container.length-40,0);return id}const p=stagePosition(type,materials,container);onMaterialMove(id,p.x,p.y);return id}
+ const toolbar=<div className="scene-toolbox" style={{pointerEvents:'auto'}}><button className={tool==='translate'?'active':''} onClick={()=>setTool('translate')}>↔ 移动</button><button className={tool==='rotate'?'active':''} onClick={()=>setTool('rotate')}>⟳ 旋转</button><button disabled={!activeMaterial} className={!activeMaterial?'disabled':tool==='scale'?'active':''} onClick={()=>setTool('scale')}>⤢ 缩放</button><button disabled={!activeMaterial} className={!activeMaterial?'disabled':'danger'} onClick={()=>{if(props.selectedMaterialId){props.onDeleteMaterial?.(props.selectedMaterialId);props.onSelectMaterial?.(null)}}}>删除选中</button><div className="tool-divider"/><b>加固材料</b><button onClick={()=>addMaterial('triangleWood')}>三角木</button><button className={routeEdit?'active':''} onClick={routeEdit?cancelLashingRoute:beginLashingRoute}>{routeEdit?(lang==='zh'?'取消绑扎':'Cancel strap'):(lang==='zh'?'紧固带':'Lashing strap')}</button><button onClick={()=>addMaterial('airBag')}>充气袋</button><button disabled={materials.some(m=>m.type==='doorNet')} onClick={()=>addMaterial('doorNet')}>柜门网</button></div>
  const toolbarRoot=useRef<Root|null>(null)
  useEffect(()=>{const host=props.toolbarHost;if(!host)return;if(!toolbarRoot.current)toolbarRoot.current=createRoot(host);toolbarRoot.current.render(toolbar);return()=>{toolbarRoot.current?.unmount();toolbarRoot.current=null}},[props.toolbarHost,tool,activeMaterial?.id,props.selectedMaterialId,freePlacementEnabled,selectedId,materials.length])
  const instancedCartons=useMemo(()=>items.filter(p=>p.cargoType==='carton'&&!selectedIds.includes(p.id)&&p.id!==selectedId&&!cargo.find(c=>c.id===p.cargoId)?.showName),[items,selectedIds,selectedId,cargo]),instancedIds=useMemo(()=>new Set(instancedCartons.map(p=>p.id)),[instancedCartons]),individualItems=useMemo(()=>items.filter(p=>!instancedIds.has(p.id)),[items,instancedIds])
  const visibleMaterials=useMemo(()=>view==='iso'?materials:materials.filter(m=>m.type==='doorNet'||m.y<container.width),[view,materials,container.width])
  const orthographic=view!=='iso'
- return <>{orthographic?<OrthographicCamera makeDefault position={[0,0,10]} zoom={1}/>:<PerspectiveCamera makeDefault position={[10,8,6]} fov={42} near={.01} far={120}/>}<color attach="background" args={['#080808']}/><ambientLight intensity={1.15}/><directionalLight position={[8,10,18]} intensity={1.8}/><hemisphereLight intensity={.25} groundColor="#080808" color="#d8d8d0"/><ContainerStructure container={container} lang={lang} showDimensions={showDimensions}/><ContainerFloor container={container}/>{view==='iso'&&<><SecuringMaterialZone container={container} lang={lang}/><OverflowCargoZone container={container} items={props.overflowItems} cargo={cargo} lang={lang}/></>}<LashingPoints container={container}/><CoordinateAxes container={container}/><InstancedCartons items={instancedCartons} container={container} onSelect={selectCargo}/>{individualItems.map(p=><CargoObject key={p.id} p={p} container={container} selected={selectedIds.includes(p.id)||p.id===selectedId} onSelect={()=>selectCargo(p.id)} registerRef={registerRef} showName={!!cargo.find(c=>c.id===p.cargoId)?.showName}/>)}{visibleMaterials.map(m=><MaterialObject key={m.id} item={m} container={container} selected={m.id===props.selectedMaterialId} onSelect={()=>selectMaterial(m.id)} onDelete={()=>{props.onDeleteMaterial?.(m.id);props.onSelectMaterial?.(null);setActiveTransformId(null)}} registerRef={registerRef}/>)}{activeObject&&(activeMaterial||freePlacementEnabled)&&<TransformControls ref={transformControls} key={`${activeId}:${tool}`} object={activeObject} mode={activeMaterial&&tool==='scale'?'scale':tool} {...(tool==='rotate'?{axis:'Z'}:{})} space="local" translationSnap={null} rotationSnap={Math.PI/2} size={1.15} scaleSnap={.05} showX={true} showY={tool!=='rotate'} showZ onMouseDown={()=>{capture();onDragState(true)}} onMouseUp={()=>{commit();invalidate();requestAnimationFrame(()=>{onDragState(false);invalidate()})}} onObjectChange={handleObjectChange}/>}<CameraRig view={view} container={container} dragging={dragging} transformActive={!!activeObject&&!!(activeMaterial||freePlacementEnabled)} focusPoint={focusPoint} focusNonce={focusNonce}/></>
+ return <>{orthographic?<OrthographicCamera makeDefault position={[0,0,10]} zoom={1}/>:<PerspectiveCamera makeDefault position={[10,8,6]} fov={42} near={.01} far={120}/>}<color attach="background" args={['#080808']}/><ambientLight intensity={1.15}/><directionalLight position={[8,10,18]} intensity={1.8}/><hemisphereLight intensity={.25} groundColor="#080808" color="#d8d8d0"/><ContainerStructure container={container} lang={lang} showDimensions={showDimensions}/><ContainerFloor container={container}/>{view==='iso'&&<><SecuringMaterialZone container={container} lang={lang}/><OverflowCargoZone container={container} items={props.overflowItems} cargo={cargo} lang={lang}/></>}<LashingPoints container={container} selectable={!!routeEdit} allowedIds={routeAllowedIds} selectedIds={routeEdit?.nodeIds ?? []} onPointSelect={chooseRoutePoint}/><CoordinateAxes container={container}/><InstancedCartons items={instancedCartons} container={container} onSelect={selectCargo}/>{individualItems.map(p=><CargoObject key={p.id} p={p} container={container} selected={selectedIds.includes(p.id)||p.id===selectedId} onSelect={()=>selectCargo(p.id)} registerRef={registerRef} showName={!!cargo.find(c=>c.id===p.cargoId)?.showName}/>)}{visibleMaterials.map(m=><MaterialObject key={m.id} item={m} container={container} selected={m.id===props.selectedMaterialId} onSelect={()=>selectMaterial(m.id)} onDelete={()=>{props.onDeleteMaterial?.(m.id);props.onSelectMaterial?.(null);setActiveTransformId(null)}} registerRef={registerRef}/>)}{activeObject&&(activeMaterial||freePlacementEnabled)&&<TransformControls ref={transformControls} key={`${activeId}:${tool}`} object={activeObject} mode={activeMaterial&&tool==='scale'?'scale':tool} {...(tool==='rotate'?{axis:'Z'}:{})} space="local" translationSnap={null} rotationSnap={Math.PI/2} size={1.15} scaleSnap={.05} showX={true} showY={tool!=='rotate'} showZ onMouseDown={()=>{capture();onDragState(true)}} onMouseUp={()=>{commit();invalidate();requestAnimationFrame(()=>{onDragState(false);invalidate()})}} onObjectChange={handleObjectChange}/>}<CameraRig view={view} container={container} dragging={dragging} transformActive={!!activeObject&&!!(activeMaterial||freePlacementEnabled)} focusPoint={focusPoint} focusNonce={focusNonce} routeMode={!!routeEdit}/></>
 }
 export default function ContainerScene(props:Props){const[selectedMaterialId,setSelectedMaterialId]=useState<string|null>(null),[toolbarHost,setToolbarHost]=useState<HTMLDivElement|null>(null);return <div className="scene-shell" style={{position:'relative',width:'100%',height:'100%'}}><Canvas frameloop="demand" dpr={[1,1.25]} gl={{antialias:true,powerPreference:'high-performance'}} camera={{position:[10,8,6],fov:42,near:.01,far:120,up:[0,0,1]}} onPointerMissed={()=>{props.onSelect(null);props.onSelectMany([]);setSelectedMaterialId(null)}}><SceneContent props={{...props,selectedMaterialId,onSelectMaterial:setSelectedMaterialId,toolbarHost}}/></Canvas><div ref={setToolbarHost} className="scene-toolbar-host" style={{position:'absolute',top:12,left:12,zIndex:50,pointerEvents:'none'}}/></div>}
