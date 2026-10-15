@@ -1235,10 +1235,7 @@ function App() {
               </span>
             </div>
 
-            <div className="sidebar-head-actions">
-              <button type="button" className="open-cargo-catalog" onClick={() => setShowCargoCatalog(true)}>{lang === 'zh' ? '更多预设 +' : 'More presets +'}</button>
-              <button type="button" onClick={add}>+ {tr.add}</button>
-            </div>
+
           </div>
 
           <div className="tool-row">
@@ -1252,6 +1249,15 @@ function App() {
               }
             >
               {tr.clear}
+            </button>
+          </div>
+
+          <div className="tool-row cargo-secondary-actions">
+            <button type="button" onClick={() => setShowCargoCatalog(true)}>
+              {lang === 'zh' ? '更多预设' : 'More presets'}
+            </button>
+            <button type="button" onClick={add}>
+              + {tr.add}
             </button>
           </div>
 
@@ -1405,7 +1411,7 @@ function App() {
                       {tr.crate}
                     </label>
                     {['drum','pipe','ibc','vehicle','machinery'].includes(c.type) && <span className="special-type-tag">{({drum:'油桶',pipe:'钢管',ibc:'IBC 吨桶',vehicle:'汽车',machinery:'机械设备'} as Record<string,string>)[c.type]}</span>}
-                    <button type="button" className="more-cargo-inline" onClick={(event) => { event.preventDefault(); event.stopPropagation(); setShowCargoCatalog(true) }}>{lang === 'zh' ? '更多 +' : 'More +'}</button>
+
                   </div>
 
                   <div className="fields">
