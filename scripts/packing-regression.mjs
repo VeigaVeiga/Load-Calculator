@@ -139,7 +139,49 @@ try {
     assert.equal(result.placed.length, 2, 'payload-limit: must load exactly two 2000 kg units')
   }
 
-  console.log('Packing regression checks passed: homogeneous grid, mixed pallet/carton, payload limit.')
+  // Regression 4: the mixed IBC + industrial machinery case that previously
+  // left valid cargo unplaced despite ample floor area and payload headroom.
+  {
+    const shipment = [
+      cargo({
+        id: 'ibc',
+        name: 'IBC tank (1000 L)',
+        type: 'ibc',
+        quantity: 10,
+        length: 1200,
+        width: 1000,
+        height: 1160,
+        weight: 1100,
+        stackable: true,
+        loadBearing: true,
+        rotatable: true,
+        maxStackLayers: 0,
+        maxLoadOnTop: 0,
+      }),
+      cargo({
+        id: 'machinery',
+        name: 'Industrial machinery',
+        type: 'machinery',
+        quantity: 5,
+        length: 1800,
+        width: 1200,
+        height: 1500,
+        weight: 850,
+        stackable: false,
+        loadBearing: false,
+        rotatable: true,
+        maxStackLayers: 1,
+        maxLoadOnTop: 0,
+      }),
+    ]
+    const box = container(26000)
+    const result = basePack(shipment, box, [])
+    assertPlan(result, box, shipment, 'mixed-ibc-machinery')
+    assert.equal(result.placed.length, 15, 'mixed-ibc-machinery: expected all 10 IBC + 5 machines to fit')
+  }
+
+  console.log('Packing regression checks passed: homogeneous grid, mixed pallet/carton, payload limit, IBC + machinery.');
+
 } finally {
   await server.close()
 }
