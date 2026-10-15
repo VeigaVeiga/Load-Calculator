@@ -116,7 +116,7 @@ export default function SecuringModel({ item, container, selected, registerRef, 
       const vertices: number[] = [], indices: number[] = []
       for (let i = 0; i <= rings; i++) {
         const t = i / rings, x = (t - .5) * L
-        const end = Math.pow(Math.max(0, Math.sin(Math.PI * t)), .42)
+        const end = Math.pow(Math.max(0, Math.sin(Math.PI * t)), .24)
         const asym = 1 + .035 * Math.sin(t * Math.PI * 5)
         const ry = W * .48 * end * asym, rz = H * .46 * end * (1 + .025 * Math.cos(t * Math.PI * 4))
         for (let j = 0; j <= around; j++) {
@@ -134,8 +134,8 @@ export default function SecuringModel({ item, container, selected, registerRef, 
       return g
     })()
     body = <group>
-      <mesh geometry={geometry} castShadow receiveShadow><meshStandardMaterial color={selected ? '#f4a23b' : '#d8e0d7'} roughness={.94} metalness={0} side={THREE.DoubleSide} /></mesh>
-      <mesh position={[0, 0, H * .18]} scale={[L * .34, W * .012, H * .012]}><boxGeometry args={[1, 1, 1]} /><meshStandardMaterial color="#9eaaa0" roughness={1} /></mesh>
+      <mesh geometry={geometry} castShadow receiveShadow><meshStandardMaterial color={selected ? '#f4a23b' : '#39a85b'} roughness={.94} metalness={0} side={THREE.DoubleSide} /></mesh>
+      <mesh position={[0, 0, H * .18]} scale={[L * .34, W * .012, H * .012]}><boxGeometry args={[1, 1, 1]} /><meshStandardMaterial color="#237b42" roughness={1} /></mesh>
       <mesh position={[0, 0, -H * .18]} scale={[L * .34, W * .012, H * .012]}><boxGeometry args={[1, 1, 1]} /><meshStandardMaterial color="#9eaaa0" roughness={1} /></mesh>
       <mesh position={[L * .34, -W * .40, 0]} rotation={[0, 0, Math.PI / 2]}><cylinderGeometry args={[.018, .018, .025, 12]} /><meshStandardMaterial color="#62766b" roughness={.7} /></mesh>
     </group>
