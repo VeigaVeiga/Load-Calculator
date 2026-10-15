@@ -64,7 +64,7 @@ function CoordinateAxes({ container }: { container: Container }) {
 function SecuringMaterialZone({ container, lang }: { container: Container; lang: 'zh' | 'en' }) {
   const depth = MATERIAL_STAGE_DEPTH * S, gap = MATERIAL_STAGE_GAP * S, width = container.length * S, y = container.width * S / 2 + gap + depth / 2, z = .006
   const border = [[-width/2,y-depth/2,z],[width/2,y-depth/2,z],[width/2,y+depth/2,z],[-width/2,y+depth/2,z],[-width/2,y-depth/2,z]] as [number,number,number][]
-  return <group raycast={() => null}><mesh position={[0,y,z]}><planeGeometry args={[width,depth]}/><meshStandardMaterial color="#7f8991" transparent opacity={.13} depthWrite={false}/></mesh><Line points={border} color="#68737b" lineWidth={1.5} transparent opacity={.7}/><Line points={[[-width/2,y,z],[width/2,y,z]]} color="#8b949b" lineWidth={1} transparent opacity={.45}/><Text position={[0,y,z+.003]} fontSize={.34} letterSpacing={.025} color="#e0e5e8" anchorX="center" anchorY="middle" outlineWidth={.002} outlineColor="#343b40">{lang === 'zh' ? '加 固 材 料 区' : 'SECURING MATERIALS'}</Text></group>
+  return <group raycast={() => null}><mesh position={[0,y,z]}><planeGeometry args={[width,depth]}/><meshStandardMaterial color="#7f8991" transparent opacity={.13} depthWrite={false}/></mesh><Line points={border} color="#68737b" lineWidth={1.5} transparent opacity={.7}/><Line points={[[-width/2,y,z],[width/2,y,z]]} color="#8b949b" lineWidth={1} transparent opacity={.45}/><Text position={[0,y,z+.003]} rotation={[0,0,Math.PI]} fontSize={.34} letterSpacing={.025} color="#e0e5e8" anchorX="center" anchorY="middle" outlineWidth={.002} outlineColor="#343b40">{lang === 'zh' ? '加 固 材 料 区' : 'SECURING MATERIALS'}</Text></group>
 }
 
 function OverflowCargoZone({ container, items, cargo, lang }: { container: Container; items: PlacedCargo[]; cargo: Cargo[]; lang: 'zh' | 'en' }) {
@@ -95,7 +95,7 @@ function OverflowCargoZone({ container, items, cargo, lang }: { container: Conta
     <mesh position={[0,y,z]}><planeGeometry args={[width,depth]}/><meshStandardMaterial color="#b78b55" transparent opacity={.13} depthWrite={false}/></mesh>
     <Line points={border} color="#a77c49" lineWidth={1.5} transparent opacity={.8}/>
     <Line points={[[-width/2,y,z],[width/2,y,z]]} color="#b78b55" lineWidth={1} transparent opacity={.45}/>
-    <Text position={[0,y,z+.003]} fontSize={.36} letterSpacing={.025} color="#f6d5a4" anchorX="center" anchorY="middle" outlineWidth={.002} outlineColor="#60482d">{lang === 'zh' ? `溢 出 货 物 区 · ${items.length} 件` : `OVERFLOW CARGO · ${items.length}`}</Text>
+    <Text position={[0,y,z+.003]} rotation={[0,0,Math.PI]} fontSize={.36} letterSpacing={.025} color="#f6d5a4" anchorX="center" anchorY="middle" outlineWidth={.002} outlineColor="#60482d">{lang === 'zh' ? `溢 出 货 物 区 · ${items.length} 件` : `OVERFLOW CARGO · ${items.length}`}</Text>
     {layout.map(({p,x:px,y:py,rotation}, index) => {
       const d = dims({ ...p, rotation })
       const position: [number,number,number] = [(px+d.length/2-container.length/2)*S, (py+d.width/2-container.width/2)*S, p.height*S/2]
@@ -155,6 +155,19 @@ function SceneContent({props}:{props:Props}){
     const distance=start.distanceTo(target)
     const steps=Math.max(1,Math.ceil(distance/(.02*S)))
     let safe=start.clone(),blockedAt:THREE.Vector3|null=null
+    const startX=start.x/S-d.length/2+container.length/2
+    const startY=start.y/S-d.width/2+container.width/2
+    const startZ=start.z/S-p.height/2
+    const initialOverlaps=new Map<string,number>()
+    for(const q of items){
+     if(q.id===id||ids.includes(q.id))continue
+     const qd=dims(q)
+     const ox=Math.max(0,Math.min(startX+d.length,q.x+qd.length)-Math.max(startX,q.x))
+     const oy=Math.max(0,Math.min(startY+d.width,q.y+qd.width)-Math.max(startY,q.y))
+     const oz=Math.max(0,Math.min(startZ+p.height,q.z+q.height)-Math.max(startZ,q.z))
+     const volume=ox*oy*oz
+     if(volume>0)initialOverlaps.set(q.id,volume)
+    }
     const isBlocked=(probe:THREE.Vector3)=>{
      const x=probe.x/S-d.length/2+container.length/2
      const y=probe.y/S-d.width/2+container.width/2
@@ -163,7 +176,14 @@ function SceneContent({props}:{props:Props}){
      return items.some(q=>{
       if(q.id===id||ids.includes(q.id))return false
       const qd=dims(q)
-      return x<q.x+qd.length-.1&&x+d.length>q.x+.1&&y<q.y+qd.width-.1&&y+d.width>q.y+.1&&z<q.z+q.height-.1&&z+p.height>q.z+.1
+      const ox=Math.max(0,Math.min(x+d.length,q.x+qd.length)-Math.max(x,q.x))
+      const oy=Math.max(0,Math.min(y+d.width,q.y+qd.width)-Math.max(y,q.y))
+      const oz=Math.max(0,Math.min(z+p.height,q.z+q.height)-Math.max(z,q.z))
+      const volume=ox*oy*oz
+      // Existing tiny overlaps can occur from imported/previously packed stacks.
+      // Permit motion that does not worsen an existing overlap, so cargo can be
+      // pulled free instead of becoming locked to one direction.
+      return volume>Math.max(1,initialOverlaps.get(q.id)??0)+1
      })
     }
     for(let step=1;step<=steps;step++){
@@ -193,7 +213,7 @@ function SceneContent({props}:{props:Props}){
  useEffect(()=>{setFreePlacementEnabled(!!props.freePlacement)},[props.freePlacement])
   // Fully release the active gizmo after deselection so Three.js cannot retain a stale axis.
   useEffect(()=>{if(!props.selectedId&&props.selectedIds.length===0&&!props.selectedMaterialId)setActiveTransformId(null)},[props.selectedId,props.selectedIds,props.selectedMaterialId])
-  useEffect(()=>{const controls=transformControls.current;if(!controls)return;controls.axis=tool==='rotate'?'Z':null;invalidate()},[tool,activeId,invalidate])
+  useEffect(()=>{const controls=transformControls.current;if(!controls)return;controls.axis=tool==='rotate'?'Z':undefined;invalidate()},[tool,activeId,invalidate])
  const addMaterial=(type:SecuringMaterialType)=>{if(type==='doorNet'){const existing=materials.find(m=>m.type==='doorNet');if(existing){selectMaterial(existing.id);return existing.id}}const id=onAddMaterial(type);if(type==='doorNet'){onMaterialMove(id,container.length-40,0);return id}const p=stagePosition(type,materials,container);onMaterialMove(id,p.x,p.y);return id}
  const toolbar=<div className="scene-toolbox" style={{pointerEvents:'auto'}}><button className={tool==='translate'?'active':''} onClick={()=>setTool('translate')}>↔ 移动</button><button className={tool==='rotate'?'active':''} onClick={()=>setTool('rotate')}>⟳ 旋转</button><button disabled={!activeMaterial} className={!activeMaterial?'disabled':tool==='scale'?'active':''} onClick={()=>setTool('scale')}>⤢ 缩放</button><button disabled={!activeMaterial} className={!activeMaterial?'disabled':'danger'} onClick={()=>{if(props.selectedMaterialId){props.onDeleteMaterial?.(props.selectedMaterialId);props.onSelectMaterial?.(null)}}}>删除选中</button><div className="tool-divider"/><b>加固材料</b><button onClick={()=>addMaterial('triangleWood')}>三角木</button><button onClick={()=>addMaterial('lashingBelt')}>紧固带</button><button onClick={()=>addMaterial('airBag')}>充气袋</button><button disabled={materials.some(m=>m.type==='doorNet')} onClick={()=>addMaterial('doorNet')}>柜门网</button></div>
  const toolbarRoot=useRef<Root|null>(null)
