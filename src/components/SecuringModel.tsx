@@ -134,23 +134,56 @@ export default function SecuringModel({ item, container, selected, registerRef, 
     const points = sourcePath.map(p => new THREE.Vector3((p.x - (item.x + item.length / 2)) * S, (p.y - container.width / 2) * S, (p.z - item.z) * S))
     const strapWidth = .05
     const straps: ReactNode[] = []
-    for (let i = 0; i < points.length - 1; i++) {
-      const a = points[i], b = points[i + 1]
-      const direction = b.clone().sub(a)
-      if (direction.length() < .001) continue
-      direction.normalize()
-      let side = new THREE.Vector3().crossVectors(direction, new THREE.Vector3(0, 0, 1))
-      if (side.length() < .001) side = new THREE.Vector3().crossVectors(direction, new THREE.Vector3(0, 1, 0))
-      side.normalize().multiplyScalar(strapWidth / 2)
-      const vertices = [a.clone().add(side), a.clone().sub(side), b.clone().add(side), b.clone().sub(side)]
+    // The webbing's broad face is kept parallel to the container head/doors (X axis),
+    // rather than twisting edge-on as the diagonal changes direction.
+    const addRibbon = (key: string, vertices: THREE.Vector3[], color = beltColor) => {
       const geometry = new THREE.BufferGeometry()
       geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices.flatMap(v => [v.x, v.y, v.z]), 3))
-      geometry.setIndex([0, 1, 2, 2, 1, 3])
+      const indices: number[] = []
+      for (let j = 0; j < vertices.length - 2; j += 2) indices.push(j, j + 1, j + 2, j + 2, j + 1, j + 3)
+      geometry.setIndex(indices)
       geometry.computeVertexNormals()
-      straps.push(<mesh key={i} geometry={geometry}><meshStandardMaterial color={beltColor} roughness={.82} metalness={0} side={THREE.DoubleSide} /></mesh>)
-      straps.push(<Rope key={'edge-a'+i} a={vertices[0]} b={vertices[2]} radius={.0012} color={darkEdge} />)
-      straps.push(<Rope key={'edge-b'+i} a={vertices[1]} b={vertices[3]} radius={.0012} color={darkEdge} />)
+      straps.push(<mesh key={key} geometry={geometry}><meshStandardMaterial color={color} roughness={.82} metalness={0} side={THREE.DoubleSide} /></mesh>)
     }
+    for (let i = 0; i < points.length - 1; i++) {
+      const a = points[i], b = points[i + 1]
+      if (a.distanceTo(b) < .001) continue
+      const half = new THREE.Vector3(strapWidth / 2, 0, 0)
+      addRibbon('band-' + i, [a.clone().add(half), a.clone().sub(half), b.clone().add(half), b.clone().sub(half)])
+      straps.push(<Rope key={'edge-a'+i} a={a.clone().add(half)} b={b.clone().add(half)} radius={.0012} color={darkEdge} />)
+      straps.push(<Rope key={'edge-b'+i} a={a.clone().sub(half)} b={b.clone().sub(half)} radius={.0012} color={darkEdge} />)
+      // Reinforced folded-over webbing at each sharp change of direction.
+      if (i > 0) {
+        const corner = a.clone()
+        const patchHalf = new THREE.Vector3(strapWidth * .44, 0, 0)
+        const before = points[i - 1].clone().lerp(corner, .09)
+        const after = corner.clone().lerp(b, .09)
+        addRibbon('fold-' + i, [before.clone().add(patchHalf), before.clone().sub(patchHalf), corner.clone().add(patchHalf), corner.clone().sub(patchHalf), after.clone().add(patchHalf), after.clone().sub(patchHalf)], darkEdge)
+      }
+    }
+    // Each end is folded back through the steel lashing ring. The flattened loop
+    // is modeled as a ribbon, not a floating strap tip, and remains visible at all four nodes.
+    points.forEach((point, index) => {
+      const inward = point.y < 0 ? 1 : -1
+      const loopCenterY = point.y + inward * .012
+      const radiusY = .034
+      const radiusZ = .038
+      const vertices: THREE.Vector3[] = []
+      const samples = 16
+      for (let j = 0; j <= samples; j++) {
+        const angle = (j / samples) * Math.PI * 2
+        const center = new THREE.Vector3(point.x, loopCenterY + Math.sin(angle) * radiusY, point.z + Math.cos(angle) * radiusZ)
+        vertices.push(center.clone().add(new THREE.Vector3(strapWidth / 2, 0, 0)), center.clone().sub(new THREE.Vector3(strapWidth / 2, 0, 0)))
+      }
+      const geometry = new THREE.BufferGeometry()
+      geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices.flatMap(v => [v.x, v.y, v.z]), 3))
+      const indices: number[] = []
+      for (let j = 0; j < samples; j++) indices.push(j * 2, j * 2 + 1, j * 2 + 2, j * 2 + 2, j * 2 + 1, j * 2 + 3)
+      geometry.setIndex(indices); geometry.computeVertexNormals()
+      straps.push(<mesh key={'hook-loop-' + index} geometry={geometry}><meshStandardMaterial color={beltColor} roughness={.76} side={THREE.DoubleSide} /></mesh>)
+      // Small steel connector at the loop's throat makes the hook connection legible.
+      straps.push(<mesh key={'hook-clasp-' + index} position={[point.x, point.y, point.z]}><torusGeometry args={[.019, .004, 6, 12, Math.PI * 1.6]} /><meshStandardMaterial color="#8e989d" metalness={.82} roughness={.28} /></mesh>)
+    })
     const buckle = points.length >= 2 && points[0].distanceTo(points[1]) > .25 ? (() => {
       const direction = points[1].clone().sub(points[0]).normalize()
       const midpoint = points[0].clone().lerp(points[1], .56)
