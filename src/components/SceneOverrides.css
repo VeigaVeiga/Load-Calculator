@@ -39,3 +39,34 @@
   position:relative!important;
   z-index:4!important;
 }
+
+
+.lashing-route-hud{
+  position:absolute;
+  top:14px;
+  left:50%;
+  transform:translateX(-50%);
+  z-index:80;
+  display:flex;
+  align-items:center;
+  gap:12px;
+  max-width:calc(100vw - 360px);
+  padding:10px 14px;
+  border:1px solid rgba(67,185,255,.6);
+  border-radius:10px;
+  color:#eaf6ff;
+  background:rgba(12,24,35,.94);
+  box-shadow:0 8px 28px rgba(0,0,0,.32);
+  font-size:12px;
+  line-height:1.45;
+  pointer-events:auto;
+  white-space:nowrap;
+}
+.lashing-route-hud button{
+  border:1px solid rgba(255,255,255,.22);
+  border-radius:6px;
+  padding:5px 10px;
+  color:inherit;
+  background:rgba(255,255,255,.08);
+  cursor:pointer;
+}
