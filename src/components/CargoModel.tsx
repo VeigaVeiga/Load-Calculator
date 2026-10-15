@@ -112,7 +112,7 @@ const cargoEqual = (a: CargoModelProps, b: CargoModelProps) => {
     ap.x === bp.x && ap.y === bp.y && ap.z === bp.z && ap.length === bp.length &&
     ap.width === bp.width && ap.height === bp.height && ap.rotation === bp.rotation &&
     ap.color === bp.color && a.selected === b.selected && a.showName === b.showName &&
-    a.local === b.local && a.hovered === b.hovered && a.container.length === b.container.length &&
+    a.local === b.local && a.hovered === b.hovered && a.ghost === b.ghost && a.container.length === b.container.length &&
     a.container.width === b.container.width && a.container.height === b.container.height
 }
 
