@@ -11,11 +11,11 @@ const UNIT_EDGES = new THREE.EdgesGeometry(UNIT_BOX, 24)
 const MATERIAL_CACHE = new Map<string, THREE.MeshStandardMaterial>()
 const EDGE_MATERIAL_CACHE = new Map<string, THREE.LineBasicMaterial>()
 
-export const materialFor = (color: string, roughness: number) => {
-  const key = `${color}|${roughness}`
+export const materialFor = (color: string, roughness: number, opacity = 1) => {
+  const key = `${color}|${roughness}|${opacity}`
   let material = MATERIAL_CACHE.get(key)
   if (!material) {
-    material = new THREE.MeshStandardMaterial({ color, roughness })
+    material = new THREE.MeshStandardMaterial({ color, roughness, transparent: opacity < 1, opacity, depthWrite: opacity >= 1 })
     MATERIAL_CACHE.set(key, material)
   }
   return material
@@ -38,10 +38,11 @@ type BoxProps = {
   roughness?: number
   eventProps?: any
   outline?: boolean
+  opacity?: number
 }
 
-function Box({ size, position = [0, 0, 0], color, roughness = .7, eventProps, outline = false }: BoxProps) {
-  const material = useMemo(() => materialFor(color, roughness), [color, roughness])
+function Box({ size, position = [0, 0, 0], color, roughness = .7, eventProps, outline = false, opacity = 1 }: BoxProps) {
+  const material = useMemo(() => materialFor(color, roughness, opacity), [color, roughness, opacity])
   const edgeMaterial = useMemo(() => edgeMaterialFor(color), [color])
   return <group position={position}>
     <mesh geometry={UNIT_BOX} material={material} scale={size} {...eventProps} />
@@ -55,7 +56,7 @@ const MemoBox = memo(Box, (a, b) =>
   (a.position?.[0] ?? 0) === (b.position?.[0] ?? 0) &&
   (a.position?.[1] ?? 0) === (b.position?.[1] ?? 0) &&
   (a.position?.[2] ?? 0) === (b.position?.[2] ?? 0) &&
-  a.eventProps === b.eventProps,
+  a.eventProps === b.eventProps && (a.opacity ?? 1) === (b.opacity ?? 1),
 )
 
 type CargoModelProps = {
@@ -69,9 +70,10 @@ type CargoModelProps = {
   showName?: boolean
   local?: boolean
   hovered?: boolean
+  ghost?: boolean
 }
 
-function CargoModel({ p, container, selected, onPointerDown, onPointerUp, onPointerMove, onClick, showName = false, local = false, hovered = false }: CargoModelProps) {
+function CargoModel({ p, container, selected, onPointerDown, onPointerUp, onPointerMove, onClick, showName = false, local = false, hovered = false, ghost = false }: CargoModelProps) {
   const d = dims(p)
   const visualL = p.length
   const visualW = p.width
@@ -85,11 +87,12 @@ function CargoModel({ p, container, selected, onPointerDown, onPointerUp, onPoin
   const palletDeckH = pallet ? Math.min(120, Math.max(70, visualH * .08)) : 0
   const bodyH = pallet ? Math.max(1, visualH - palletDeckH) : visualH
   const eventProps = useMemo(() => ({ onPointerDown, onPointerMove, onPointerUp, onClick }), [onPointerDown, onPointerMove, onPointerUp, onClick])
+  const ghostOpacity = ghost ? .24 : 1
 
   return <group position={pos} rotation={[0, 0, local ? 0 : p.rotation * Math.PI / 180]}>
     {pallet ? <>
       <group position={[0, 0, (-visualH / 2 + palletDeckH / 2) * S]}>
-        <MemoBox size={[visualL * S, visualW * S, palletDeckH * S * .32]} color="#b57b45" roughness={.86} eventProps={eventProps} outline />
+        <MemoBox size={[visualL * S, visualW * S, palletDeckH * S * .32]} color="#b57b45" roughness={.86} eventProps={eventProps} outline opacity={ghostOpacity} />
         {[-.34, 0, .34].map((i, k) => <MemoBox key={`deck-${k}`} position={[0, i * visualW * S * .28, palletDeckH * S * .34]} size={[visualL * S, visualW * S * .16, palletDeckH * S * .22]} color="#8a5a32" roughness={.86} outline />)}
         {[-.34, 0, .34].map((i, k) => <MemoBox key={`runner-${k}`} position={[i * visualL * S, 0, -palletDeckH * S * .20]} size={[Math.max(55, visualL * .11) * S, visualW * S * .72, palletDeckH * S * .36]} color="#76502f" roughness={.88} outline />)}
       </group>
