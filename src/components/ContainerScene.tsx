@@ -134,16 +134,16 @@ function SceneContent({props}:{props:Props}){
  const refs=useRef<Record<string,THREE.Group>>({}),transformControls=useRef<any>(null),snapshots=useRef<Record<string,{position:THREE.Vector3;rotation:number;scale:THREE.Vector3}>>({}),lastValidTransforms=useRef<Record<string,{position:THREE.Vector3;rotation:number}>>({})
  const[tool,setTool]=useState<SceneTool>('translate'),[sceneSelectionMode,setSceneSelectionMode]=useState<'single'|'multi'>(props.selectionMode==='box'?'multi':'single'),[freePlacementEnabled,setFreePlacementEnabled]=useState(!!props.freePlacement),[activeTransformId,setActiveTransformId]=useState<string|null>(null),[focusPoint,setFocusPoint]=useState<[number,number,number]|null>(null),[focusNonce,setFocusNonce]=useState(0)
  const activeMaterial=props.selectedMaterialId?materials.find(m=>m.id===props.selectedMaterialId)??null:null,activeId=activeMaterial?.id??(freePlacementEnabled?activeTransformId:null),activeObject=activeId?refs.current[activeId]??null:null,multi=sceneSelectionMode==='multi'
- // Three.js TransformControls clears its active axis on pointerup. Explicitly refresh
- // hover after release and on every non-dragging pointer move so the next axis can
- // be picked immediately without deselecting/reselecting the cargo.
+ // TransformControls.pointerHover ignores pointer events whose button is not -1.
+ // pointerup reports button=0, so passing it through silently prevents hover refresh;
+ // clear the previous drag axis, then re-run hover with a neutral pointer state.
  useEffect(()=>{
   const controls=transformControls.current
   const element=controls?.domElement as HTMLElement|undefined
   if(!controls||!element)return
-  const pointer=(event:PointerEvent)=>{const rect=element.getBoundingClientRect();return{x:(event.clientX-rect.left)/rect.width*2-1,y:-(event.clientY-rect.top)/rect.height*2+1,button:event.button}}
+  const pointer=(event:PointerEvent)=>{const rect=element.getBoundingClientRect();return{x:(event.clientX-rect.left)/rect.width*2-1,y:-(event.clientY-rect.top)/rect.height*2+1,button:-1}}
   const hover=(event:PointerEvent)=>{if(!controls.dragging)controls.pointerHover(pointer(event))}
-  const released=(event:PointerEvent)=>{const point=pointer(event);requestAnimationFrame(()=>{if(transformControls.current===controls&&!controls.dragging){controls.pointerHover(point);invalidate()}})}
+  const released=(event:PointerEvent)=>{const point=pointer(event);requestAnimationFrame(()=>{if(transformControls.current===controls&&!controls.dragging){controls.axis=null;controls.pointerHover(point);invalidate()}})}
   element.addEventListener('pointermove',hover,true)
   element.addEventListener('pointerup',released)
   element.addEventListener('pointercancel',released)
