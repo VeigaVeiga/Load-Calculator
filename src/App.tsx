@@ -393,24 +393,39 @@ function App() {
     [cargo],
   )
 
+  const isCargoInsideContainer = useCallback((p: PlacedCargo) => {
+    const d = dims(p)
+    return p.x >= -0.5 && p.y >= -0.5 && p.z >= -0.5
+      && p.x + d.length <= container.length + 0.5
+      && p.y + d.width <= container.width + 0.5
+      && p.z + p.height <= container.height + 0.5
+  }, [container.length, container.width, container.height])
+
+  const loadedPlaced = useMemo(
+    () => placed.filter(isCargoInsideContainer),
+    [placed, isCargoInsideContainer],
+  )
+  const outsidePlacedCount = placed.length - loadedPlaced.length
+  const unloadedCount = overflowCount + outsidePlacedCount
+
   const analysis = useMemo(
-    () => analyzeWeight(placed, container),
-    [placed, container],
+    () => analyzeWeight(loadedPlaced, container),
+    [loadedPlaced, container],
   )
 
   const placementWarnings = useMemo(() => {
     const warnings: string[] = []
-    const outside = placed.some((p) => {
-      const d = dims(p)
-      return p.y < -0.5 || p.y + d.width > container.width + 0.5
-    })
-    const floating = placed.some((p) =>
-      p.z > 0.5 && !supportMetrics(p, placed.filter((q) => q.id !== p.id)).stable
+    if (outsidePlacedCount > 0) {
+      warnings.push(lang === 'zh'
+        ? `有 ${outsidePlacedCount} 件货物未装进集装箱`
+        : `${outsidePlacedCount} cargo item(s) are outside the container`)
+    }
+    const floating = loadedPlaced.some((p) =>
+      p.z > 0.5 && !supportMetrics(p, loadedPlaced.filter((q) => q.id !== p.id)).stable
     )
-    if (outside) warnings.push(lang === 'zh' ? '有货物未装进集装箱' : 'Some cargo is outside the container')
     if (floating) warnings.push(lang === 'zh' ? '有货物悬空' : 'Some cargo is floating')
     return warnings
-  }, [placed, container.width, lang])
+  }, [loadedPlaced, outsidePlacedCount, lang])
 
   const placedByCargo = useMemo(() => {
     const map: Record<string, number> = {}
@@ -1606,15 +1621,15 @@ function App() {
           <div className="viewer-foot">
             <span>{tr.grid}</span>
             <span className="planning-disclaimer">
-              {lang === 'zh' ? '本站装柜工具仅供学习参考，不做官方保证' : 'For educational reference only; no official guarantee.'}
+              {lang === 'zh' ? '本站装柜工具仅供学习参考' : 'For educational reference only.'}
             </span>
 
             <span>
               {lang === 'zh' ? '偏载' : 'IMBALANCE'} {analysis.dominantOffset.toFixed(0)} kg
             </span>
-            {overflowCount > 0 && (
+            {unloadedCount > 0 && (
               <span className="overflow-badge">
-                {lang === 'zh' ? `未装载 ${overflowCount} 件` : `${overflowCount} unplaced`}
+                {lang === 'zh' ? `未装载 ${unloadedCount} 件` : `${unloadedCount} unplaced`}
               </span>
             )}
           </div>
@@ -1706,7 +1721,8 @@ function App() {
               <div className="bias-primary">
                 <span>{lang === 'zh' ? '货物总重' : 'TOTAL CARGO WEIGHT'}</span>
                 <b>{analysis.total.toLocaleString(undefined,{maximumFractionDigits:1})} kg</b>
-                <strong>{lang === 'zh' ? '总重心投影相对车辆中心线' : 'CG projection relative to vehicle centerlines'}</strong>
+                <strong>{lang === 'zh' ? '集装箱内全部已装货物的整体重心' : 'Overall CG of all cargo inside the container'}</strong>
+                <span className="cg-height-value">{lang === 'zh' ? '重心高度' : 'CG HEIGHT'} <b>{analysis.cg.z.toLocaleString(undefined,{maximumFractionDigits:0})} mm</b></span>
               </div>
               <div className="bias-limits">
                 <div className={`bias-limit ${analysis.transverseOffsetMm > 30 ? 'is-over-limit' : ''}`}>
