@@ -1865,3 +1865,14 @@ body{overflow:hidden}
 .theme-portal .tool-row.cargo-secondary-actions button:first-child:hover{
   color:#050505!important;background:#f4f4f0!important;border-color:#f4f4f0!important;
 }
+
+
+/* Match each secondary action's width to the corresponding button directly above: presets ↔ auto-pack, add cargo ↔ clear-unlocked. */
+.tool-row.cargo-secondary-actions button:first-child,
+.tool-row.cargo-secondary-actions button:first-child:hover,
+.theme-portal .tool-row.cargo-secondary-actions button:first-child,
+.theme-portal .tool-row.cargo-secondary-actions button:first-child:hover{flex:1.5 1 0!important}
+.tool-row.cargo-secondary-actions button:nth-child(2),
+.tool-row.cargo-secondary-actions button:nth-child(2):hover,
+.theme-portal .tool-row.cargo-secondary-actions button:nth-child(2),
+.theme-portal .tool-row.cargo-secondary-actions button:nth-child(2):hover{flex:1 1 0!important}
