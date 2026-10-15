@@ -123,29 +123,35 @@ export default function SecuringModel({ item, container, selected, registerRef, 
       </group>
     )
   } else {
-    const leftY = 38
-    const rightY = container.width - 38
-    const spanY = Math.max(0, rightY - leftY) * S
-    const bottomZ = 42 * S
-    const topZ = Math.max(80, container.height - 28) * S
-    const spanZ = Math.max(0, topZ - bottomZ)
-    const yL = -spanY / 2
-    const yR = spanY / 2
-    const zB = 0
-    const zT = spanZ
-    const beltColor = selected ? '#f4a23b' : '#c08a2e'
-    const radius = .018
-    body = (
-      <group>
-        <Rope a={new THREE.Vector3(0, yL, zT)} b={new THREE.Vector3(0, yR, zB)} radius={radius} color={beltColor} />
-        <Rope a={new THREE.Vector3(0, yR, zT)} b={new THREE.Vector3(0, yL, zB)} radius={radius} color={beltColor} />
-        <Rope a={new THREE.Vector3(0, yL, zB)} b={new THREE.Vector3(0, yR, zB)} radius={radius * 1.12} color={beltColor} />
-        <mesh position={[0, yL, zT]} raycast={() => null}><sphereGeometry args={[.045, 10, 6]} />{material('#72777b')}</mesh>
-        <mesh position={[0, yR, zT]} raycast={() => null}><sphereGeometry args={[.045, 10, 6]} />{material('#72777b')}</mesh>
-        <mesh position={[0, yL, zB]} raycast={() => null}><sphereGeometry args={[.045, 10, 6]} />{material('#72777b')}</mesh>
-        <mesh position={[0, yR, zB]} raycast={() => null}><sphereGeometry args={[.045, 10, 6]} />{material('#72777b')}</mesh>
-      </group>
-    )
+    const beltColor = selected ? '#ffb347' : '#d5a23c'
+    const darkEdge = selected ? '#fff0cf' : '#74511c'
+    const sourcePath = item.path && item.path.length >= 2 ? item.path : [
+      { x: item.x + item.length / 2, y: 38, z: Math.max(80, container.height - 28) },
+      { x: item.x + item.length / 2, y: 38, z: 42 },
+      { x: item.x + item.length / 2, y: container.width - 38, z: 42 },
+      { x: item.x + item.length / 2, y: container.width - 38, z: Math.max(80, container.height - 28) },
+    ]
+    const points = sourcePath.map(p => new THREE.Vector3((p.x - (item.x + item.length / 2)) * S, (p.y - container.width / 2) * S, (p.z - item.z) * S))
+    const strapWidth = .05
+    const straps: ReactNode[] = []
+    for (let i = 0; i < points.length - 1; i++) {
+      const a = points[i], b = points[i + 1]
+      const direction = b.clone().sub(a)
+      if (direction.length() < .001) continue
+      direction.normalize()
+      let side = new THREE.Vector3().crossVectors(direction, new THREE.Vector3(0, 0, 1))
+      if (side.length() < .001) side = new THREE.Vector3().crossVectors(direction, new THREE.Vector3(0, 1, 0))
+      side.normalize().multiplyScalar(strapWidth / 2)
+      const vertices = [a.clone().add(side), a.clone().sub(side), b.clone().add(side), b.clone().sub(side)]
+      const geometry = new THREE.BufferGeometry()
+      geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices.flatMap(v => [v.x, v.y, v.z]), 3))
+      geometry.setIndex([0, 1, 2, 2, 1, 3])
+      geometry.computeVertexNormals()
+      straps.push(<mesh key={i} geometry={geometry}><meshStandardMaterial color={beltColor} roughness={.82} metalness={0} side={THREE.DoubleSide} /></mesh>)
+      straps.push(<Rope key={'edge-a'+i} a={vertices[0]} b={vertices[2]} radius={.0012} color={darkEdge} />)
+      straps.push(<Rope key={'edge-b'+i} a={vertices[1]} b={vertices[3]} radius={.0012} color={darkEdge} />)
+    }
+    body = <group>{straps}</group>
   }
 
   return (
