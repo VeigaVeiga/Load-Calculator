@@ -110,7 +110,7 @@ function CargoModel({ p, container, selected, onPointerDown, onPointerUp, onPoin
       <mesh position={[0, 0, 0]} rotation={[Math.PI / 2, 0, 0]} scale={[visualW * S * .48, visualH * S * .48, visualW * S * .48]} material={materialFor(selected ? '#f2c94c' : '#6f8992', .48, ghostOpacity)} {...eventProps}>
         <cylinderGeometry args={[1, 1, 1, 24, 1, false]} />
       </mesh>
-      {[-.38, .38].map((z, i) => <mesh key={i} position={[0, 0, z * visualH * S]} rotation={[Math.PI / 2, 0, 0]} raycast={() => null}>
+      {[-.38, .38].map((z, i) => <mesh key={i} position={[0, 0, z * visualH * S]} raycast={() => null}>
         <torusGeometry args={[Math.min(visualW, visualL) * S * .47, Math.max(3, Math.min(visualW, visualL) * S * .018), 5, 24]} />
         <meshStandardMaterial color="#b9c4c7" metalness={.72} roughness={.35} transparent opacity={ghostOpacity} />
       </mesh>)}
@@ -134,7 +134,7 @@ function CargoModel({ p, container, selected, onPointerDown, onPointerUp, onPoin
     </> : vehicle ? <>
       <MemoBox size={[visualL * S * .98, visualW * S * .82, visualH * S * .43]} position={[0, 0, -visualH * S * .16]} color={selected ? '#f2c94c' : '#477b9a'} roughness={.38} eventProps={eventProps} outline opacity={ghostOpacity} />
       <MemoBox size={[visualL * S * .48, visualW * S * .68, visualH * S * .34]} position={[-visualL * S * .04, 0, visualH * S * .22]} color={selected ? '#f2c94c' : '#83a6b8'} roughness={.28} outline opacity={ghostOpacity} />
-      {[-.32, .32].flatMap((x, i) => [-.48, .48].map((y, j) => <mesh key={i * 2 + j} position={[x * visualL * S, y * visualW * S, -visualH * S * .31]} rotation={[Math.PI / 2, 0, 0]} raycast={() => null}>
+      {[-.32, .32].flatMap((x, i) => [-.48, .48].map((y, j) => <mesh key={i * 2 + j} position={[x * visualL * S, y * visualW * S, -visualH * S * .31]} raycast={() => null}>
         <cylinderGeometry args={[visualH * S * .12, visualH * S * .12, Math.max(6, visualW * S * .12), 16]} />
         <meshStandardMaterial color="#202629" roughness={.9} />
       </mesh>))}
