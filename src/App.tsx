@@ -927,10 +927,10 @@ function App() {
     for(const p of placed){const d=p.rotation%180===0?{l:p.length,w:p.width}:{l:p.width,w:p.length};shapes+=rect(bx+p.x/container.length*boxW,by+p.y/container.width*boxH,d.l/container.length*boxW,d.w/container.width*boxH,p.color)}
     for(const m of materials){
       const mx=bx+m.x/container.length*boxW,my=by+m.y/container.width*boxH,mw=Math.max(2,m.length/container.length*boxW),mh=Math.max(2,m.width/container.width*boxH)
-      if(m.type==='lashingBelt'&&m.path?.length){shapes+=`<polyline points="${m.path.map(p=>`${bx+p.x/container.length*boxW},${by+p.y/container.width*boxH}`).join(' ')}" fill="none" stroke="#e86d43" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>`}
+      if(m.type==='lashingBelt'&&m.path?.length){shapes+=`<polyline points="${m.path.map(p=>`${bx+p.x/container.length*boxW},${by+p.y/container.width*boxH}`).join(' ')}" fill="none" stroke="#d5a23c" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>`}
       else if(m.type==='triangleWood'){const pts=triangleProjectionPoints(m,'top').map(([x,y])=>[bx+x/container.length*boxW,by+y/container.width*boxH] as [number,number]);shapes+=poly(pts,'#3979b8')}
       else if(m.type==='airBag')shapes+=`<rect x="${mx}" y="${my}" width="${mw}" height="${mh}" rx="3" fill="#3fa36b"/>`
-      else if(m.type==='lashingBelt'){const x=bx+(m.x+m.length/2)/container.length*boxW;shapes+=`<line x1="${x}" y1="${by}" x2="${x}" y2="${by+boxH}" stroke="#e86d43" stroke-width="4" stroke-linecap="round"/>`}
+      else if(m.type==='lashingBelt'){const x=bx+(m.x+m.length/2)/container.length*boxW;shapes+=`<line x1="${x}" y1="${by}" x2="${x}" y2="${by+boxH}" stroke="#d5a23c" stroke-width="7" stroke-linecap="round"/>`}
       else if(m.type==='doorNet'){const x=bx+(m.x+m.length/2)/container.length*boxW;shapes+=`<line x1="${x}" y1="${by}" x2="${x}" y2="${by+boxH}" stroke="#4d5964" stroke-width="3" stroke-dasharray="5 3"/>`}
     }
     return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"><rect width="100%" height="100%" fill="#fff"/><text x="${W/2}" y="25" text-anchor="middle" font-size="17" font-weight="700" fill="#17354d">${container.name} · ${lang==='zh'?'俯视示意图':'TOP VIEW'}</text><rect x="${bx}" y="${by}" width="${boxW}" height="${boxH}" fill="#eef4f7" stroke="#17354d" stroke-width="5" stroke-linejoin="round"/>${shapes}</svg>`
@@ -945,16 +945,16 @@ function App() {
     for(const p of placed){const d=p.rotation%180===0?{l:p.length,w:p.width}:{l:p.width,w:p.length};left+=rect(side.x+p.x/container.length*side.w,side.y+(1-(p.z+p.height)/container.height)*side.h,d.l/container.length*side.w,p.height/container.height*side.h,p.color);frontShapes+=rect(front.x+p.y/container.width*front.w,front.y+(1-(p.z+p.height)/container.height)*front.h,d.w/container.width*front.w,p.height/container.height*front.h,p.color)}
     for(const m of materials){
       const sx=side.x+(m.x+m.length/2)/container.length*side.w,sy=side.y+(1-(m.z+m.height)/container.height)*side.h,sh=Math.max(2,m.height/container.height*side.h),fx=front.x+m.y/container.width*front.w,fy=front.y+(1-(m.z+m.height)/container.height)*front.h,fw=Math.max(2,m.width/container.width*front.w)
-      if(m.type==='lashingBelt'&&m.path?.length){const sidePts=m.path.map(p=>`${side.x+p.x/container.length*side.w},${side.y+(1-p.z/container.height)*side.h}`).join(' ');const frontPts=m.path.map(p=>`${front.x+p.y/container.width*front.w},${front.y+(1-p.z/container.height)*front.h}`).join(' ');left+=`<polyline points="${sidePts}" fill="none" stroke="#e86d43" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>`;frontShapes+=`<polyline points="${frontPts}" fill="none" stroke="#e86d43" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>`}
+      if(m.type==='lashingBelt'&&m.path?.length){const sidePts=m.path.map(p=>`${side.x+p.x/container.length*side.w},${side.y+(1-p.z/container.height)*side.h}`).join(' ');const frontPts=m.path.map(p=>`${front.x+p.y/container.width*front.w},${front.y+(1-p.z/container.height)*front.h}`).join(' ');left+=`<polyline points="${sidePts}" fill="none" stroke="#d5a23c" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>`;frontShapes+=`<polyline points="${frontPts}" fill="none" stroke="#d5a23c" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>`}
       else if(m.type==='triangleWood'){
         const sidePts=triangleProjectionPoints(m,'side').map(([x,z])=>[side.x+x/container.length*side.w,side.y+(1-z/container.height)*side.h] as [number,number])
         const frontPts=triangleProjectionPoints(m,'front').map(([y,z])=>[front.x+y/container.width*front.w,front.y+(1-z/container.height)*front.h] as [number,number])
         left+=poly(sidePts,'#3979b8');frontShapes+=poly(frontPts,'#3979b8')
       }else if(m.type==='airBag'){left+=`<rect x="${side.x+(m.x+m.length/2)/container.length*side.w-m.length/container.length*side.w/2}" y="${sy}" width="${Math.max(2,m.length/container.length*side.w)}" height="${sh}" fill="#3fa36b"/>`;frontShapes+=`<rect x="${fx}" y="${fy}" width="${fw}" height="${sh}" fill="#3fa36b"/>`}
       else if(m.type==='lashingBelt'){
-        left+=`<line x1="${sx}" y1="${side.y+side.h}" x2="${sx}" y2="${side.y}" stroke="#e86d43" stroke-width="4" stroke-linecap="round"/>`
+        left+=`<line x1="${sx}" y1="${side.y+side.h}" x2="${sx}" y2="${side.y}" stroke="#d5a23c" stroke-width="7" stroke-linecap="round"/>`
         const x1=front.x, y1=front.y, x2=front.x+front.w, y2=front.y+front.h
-        frontShapes+=`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#e86d43" stroke-width="3"/><line x1="${x1}" y1="${y2}" x2="${x2}" y2="${y1}" stroke="#e86d43" stroke-width="3"/><line x1="${x1}" y1="${y2}" x2="${x2}" y2="${y2}" stroke="#e86d43" stroke-width="3"/>`
+        frontShapes+=`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#d5a23c" stroke-width="6"/><line x1="${x1}" y1="${y2}" x2="${x2}" y2="${y1}" stroke="#d5a23c" stroke-width="6"/><line x1="${x1}" y1="${y2}" x2="${x2}" y2="${y2}" stroke="#d5a23c" stroke-width="6"/>`
       }else if(m.type==='doorNet'){
         left+=`<line x1="${sx}" y1="${side.y}" x2="${sx}" y2="${side.y+side.h}" stroke="#4d5964" stroke-width="2.5" stroke-dasharray="5 3"/>`
         const clipId=`door-net-${String(m.id).replace(/[^a-zA-Z0-9_-]/g,'')}`;let netLines=''
