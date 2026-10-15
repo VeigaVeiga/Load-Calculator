@@ -1226,10 +1226,7 @@ function App() {
               </span>
             </div>
 
-            <div className="cargo-add-actions">
-              <button onClick={add}>+ {tr.add}</button>
-              <button className="more-cargo-btn" onClick={() => setShowCargoCatalog(true)}>{lang === 'zh' ? '更多类型' : 'More types'} ▦</button>
-            </div>
+            <button onClick={add}>+ {tr.add}</button>
           </div>
 
           <div className="tool-row">
@@ -1395,6 +1392,8 @@ function App() {
 
                       {tr.crate}
                     </label>
+                    {['drum','pipe','ibc','vehicle','machinery'].includes(c.type) && <span className="special-type-tag">{({drum:'油桶',pipe:'钢管',ibc:'IBC 吨桶',vehicle:'汽车',machinery:'机械设备'} as Record<string,string>)[c.type]}</span>}
+                    <button type="button" className="more-cargo-inline" onClick={() => setShowCargoCatalog(true)}>{lang === 'zh' ? '更多 +' : 'More +'}</button>
                   </div>
 
                   <div className="fields">
