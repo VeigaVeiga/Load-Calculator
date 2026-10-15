@@ -129,11 +129,26 @@ function stageFootprint(type: SecuringMaterialType, container: Container): [numb
 function stagePosition(type: SecuringMaterialType, materials: SecuringItem[], container: Container){const stageMinY=container.width+MATERIAL_STAGE_GAP,stageMaxY=stageMinY+MATERIAL_STAGE_DEPTH,centerX=container.length/2,centerY=stageMinY+MATERIAL_STAGE_DEPTH/2,[fw,fd]=stageFootprint(type,container),candidates:Array<[number,number]>=[[0,0],[-1,0],[1,0],[0,-1],[0,1],[-1,-1],[1,-1],[-1,1],[1,1],[-2,0],[2,0],[0,-2],[0,2],[-2,-1],[2,-1],[-2,1],[2,1]],stepX=Math.max(700,fw+180),stepY=Math.max(650,Math.min(1200,fd+180));const intersects=(cx:number,cy:number)=>materials.some(m=>{const[mw,md]=stageFootprint(m.type,container),mcx=m.x+m.length/2,mcy=m.type==='lashingBelt'?m.y+2:m.y+m.width/2;return Math.abs(cx-mcx)<(fw+mw)/2&&Math.abs(cy-mcy)<(fd+md)/2});for(const[gx,gy]of candidates){const cx=centerX+gx*stepX,cy=centerY+gy*stepY;if(cx-fw/2<0||cx+fw/2>container.length||cy-fd/2<stageMinY||cy+fd/2>stageMaxY)continue;if(!intersects(cx,cy))return{x:Math.max(0,cx-fw/2),y:Math.max(0,cy-(type==='lashingBelt'?2:fw/2)),z:0}}return{x:Math.max(0,centerX-fw/2),y:stageMinY+100,z:0}}
 
 function SceneContent({props}:{props:Props}){
- const{invalidate}=useThree()
+ const{invalidate,gl}=useThree()
  const{container,items,materials,selectedId,selectedIds,onSelect,onSelectMany,onMove,onMoveMany,onRotate,onRotateMaterial,onMaterialMove,onMaterialScale,onAddMaterial,view,dragging,onDragState,cargo,lang,showDimensions}=props
  const refs=useRef<Record<string,THREE.Group>>({}),transformControls=useRef<any>(null),snapshots=useRef<Record<string,{position:THREE.Vector3;rotation:number;scale:THREE.Vector3}>>({}),lastValidTransforms=useRef<Record<string,{position:THREE.Vector3;rotation:number}>>({})
  const[tool,setTool]=useState<SceneTool>('translate'),[sceneSelectionMode,setSceneSelectionMode]=useState<'single'|'multi'>(props.selectionMode==='box'?'multi':'single'),[freePlacementEnabled,setFreePlacementEnabled]=useState(!!props.freePlacement),[activeTransformId,setActiveTransformId]=useState<string|null>(null),[focusPoint,setFocusPoint]=useState<[number,number,number]|null>(null),[focusNonce,setFocusNonce]=useState(0)
  const activeMaterial=props.selectedMaterialId?materials.find(m=>m.id===props.selectedMaterialId)??null:null,activeId=activeMaterial?.id??(freePlacementEnabled?activeTransformId:null),activeObject=activeId?refs.current[activeId]??null:null,multi=sceneSelectionMode==='multi'
+ // Three.js TransformControls clears its active axis on pointerup. Explicitly refresh
+ // hover after release and on every non-dragging pointer move so the next axis can
+ // be picked immediately without deselecting/reselecting the cargo.
+ useEffect(()=>{
+  const controls=transformControls.current
+  const element=controls?.domElement as HTMLElement|undefined
+  if(!controls||!element)return
+  const pointer=(event:PointerEvent)=>{const rect=element.getBoundingClientRect();return{x:(event.clientX-rect.left)/rect.width*2-1,y:-(event.clientY-rect.top)/rect.height*2+1,button:event.button}}
+  const hover=(event:PointerEvent)=>{if(!controls.dragging)controls.pointerHover(pointer(event))}
+  const released=(event:PointerEvent)=>{const point=pointer(event);requestAnimationFrame(()=>{if(transformControls.current===controls&&!controls.dragging){controls.pointerHover(point);invalidate()}})}
+  element.addEventListener('pointermove',hover,true)
+  element.addEventListener('pointerup',released)
+  element.addEventListener('pointercancel',released)
+  return()=>{element.removeEventListener('pointermove',hover,true);element.removeEventListener('pointerup',released);element.removeEventListener('pointercancel',released)}
+ },[activeId,activeObject,tool,gl,invalidate])
  const registerRef=useCallback((id:string,o:THREE.Group|null)=>{if(o)refs.current[id]=o;else delete refs.current[id]},[])
  const selectCargo=(id:string)=>{props.onSelectMaterial?.(null);setActiveTransformId(freePlacementEnabled?id:null);if(freePlacementEnabled){const p=items.find(q=>q.id===id);if(p){const d=dims(p);setFocusPoint([(p.x+d.length/2-container.length/2)*S,(p.y+d.width/2-container.width/2)*S,(p.z+p.height/2)*S]);setFocusNonce(n=>n+1)}}if(multi){const next=selectedIds.includes(id)?selectedIds.filter(x=>x!==id):[...selectedIds,id];onSelectMany(next)}else onSelect(id)}
  const selectMaterial=(id:string)=>{const m=materials.find(q=>q.id===id);props.onSelectMaterial?.(id);onSelect(null);onSelectMany([]);setActiveTransformId(null);if(m){setFocusPoint(materialWorldPosition(m,container));setFocusNonce(n=>n+1)}}
