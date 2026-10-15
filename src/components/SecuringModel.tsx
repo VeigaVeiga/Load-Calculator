@@ -86,9 +86,9 @@ export default function SecuringModel({ item, container, selected, registerRef, 
   let body: ReactNode
 
   if (item.type === 'triangleWood') {
-    const L = 150 * S
-    const W = 150 * S
-    const H = 150 * S
+    const L = Math.max(1, item.length) * S
+    const W = Math.max(1, item.width) * S
+    const H = Math.max(1, item.height) * S
     const shape = new THREE.Shape()
     // Cross-section in X/Z after rotating the extruded shape: the vertical
     // right-angle face is at -X, while the sloped face falls toward +X.
@@ -98,7 +98,7 @@ export default function SecuringModel({ item, container, selected, registerRef, 
     shape.closePath()
     body = (
       <group rotation={[Math.PI / 2, 0, 0]}>
-        <mesh>
+        <mesh position={[0, 0, -W / 2]}>
           <extrudeGeometry args={[shape, { depth: W, bevelEnabled: true, bevelThickness: .0015, bevelSize: .0015, bevelSegments: 1 }]} />
           {material('#3979b8')}
         </mesh>
