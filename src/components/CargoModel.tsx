@@ -128,16 +128,21 @@ function CargoModel({ p, container, selected, onPointerDown, onPointerUp, onPoin
       </mesh>
     </> : ibc ? <>
       <MemoBox size={[visualL * S, visualW * S, visualH * S]} color={selected ? '#f2c94c' : '#d9e1d8'} roughness={.34} eventProps={eventProps} outline opacity={ghostOpacity} />
-      {[-.44, -.15, .15, .44].map((t, i) => <MemoBox key={i} position={[t * visualL * S, 0, 0]} size={[Math.max(5, visualL * .025) * S, visualW * S * 1.025, visualH * S * 1.02]} color="#a8b2b4" roughness={.4} outline opacity={ghostOpacity} />)}
-      {[-.44, .44].map((t, i) => <MemoBox key={i} position={[0, t * visualW * S, 0]} size={[visualL * S * 1.025, Math.max(5, visualW * .025) * S, visualH * S * 1.02]} color="#a8b2b4" roughness={.4} outline opacity={ghostOpacity} />)}
-      <MemoBox size={[visualL * S * .22, visualW * S * .22, Math.max(12, visualH * .035) * S]} position={[0, 0, visualH * S * .49]} color="#3b4548" roughness={.5} outline opacity={ghostOpacity} />
+      {[-.44, -.15, .15, .44].map((t, i) => <MemoBox key={i} position={[t * visualL * S, 0, 0]} size={[Math.max(5, visualL * .022) * S, visualW * S * .98, visualH * S * .98]} color="#a8b2b4" roughness={.4} outline opacity={ghostOpacity} />)}
+      {[-.44, .44].map((t, i) => <MemoBox key={i} position={[0, t * visualW * S, 0]} size={[visualL * S * .98, Math.max(5, visualW * .022) * S, visualH * S * .98]} color="#a8b2b4" roughness={.4} outline opacity={ghostOpacity} />)}
+      <MemoBox size={[visualL * S * .22, visualW * S * .22, Math.max(12, visualH * .035) * S]} position={[0, 0, visualH * S * .45]} color="#3b4548" roughness={.5} outline opacity={ghostOpacity} />
     </> : vehicle ? <>
       <MemoBox size={[visualL * S * .98, visualW * S * .82, visualH * S * .43]} position={[0, 0, -visualH * S * .16]} color={selected ? '#f2c94c' : '#477b9a'} roughness={.38} eventProps={eventProps} outline opacity={ghostOpacity} />
       <MemoBox size={[visualL * S * .48, visualW * S * .68, visualH * S * .34]} position={[-visualL * S * .04, 0, visualH * S * .22]} color={selected ? '#f2c94c' : '#83a6b8'} roughness={.28} outline opacity={ghostOpacity} />
-      {[-.32, .32].flatMap((x, i) => [-.48, .48].map((y, j) => <mesh key={i * 2 + j} position={[x * visualL * S, y * visualW * S, -visualH * S * .31]} raycast={() => null}>
-        <cylinderGeometry args={[visualH * S * .12, visualH * S * .12, Math.max(6, visualW * S * .12), 16]} />
+      {[-.32, .32].flatMap((x, i) => [-1, 1].map((side, j) => {
+        const tireRadius = Math.min(visualH * .12, visualW * .105) * S
+        const tireWidth = Math.min(visualW * .10, visualH * .09) * S
+        return <mesh key={i * 2 + j} position={[x * visualL * S, side * (visualW * S / 2 - tireWidth / 2), -visualH * S * .27]} raycast={() => null}>
+        <cylinderGeometry args={[tireRadius, tireRadius, tireWidth, 16]} />
         <meshStandardMaterial color="#202629" roughness={.9} />
-      </mesh>))}
+      </mesh>
+      }))}
+      <MemoBox size={[visualL * S * .12, visualW * S * .62, visualH * S * .07]} position={[visualL * S * .10, 0, visualH * S * .13]} color="#293b46" roughness={.35} opacity={ghostOpacity} />
     </> : machinery ? <>
       <MemoBox size={[visualL * S, visualW * S, visualH * S]} color={selected ? '#f2c94c' : '#8b9690'} roughness={.62} eventProps={eventProps} outline opacity={ghostOpacity} />
       <MemoBox size={[visualL * S * .72, visualW * S * .72, visualH * S * .12]} position={[0, 0, visualH * S * .56]} color="#515d59" roughness={.55} outline opacity={ghostOpacity} />
@@ -145,9 +150,9 @@ function CargoModel({ p, container, selected, onPointerDown, onPointerUp, onPoin
     </> : <>
       <MemoBox size={[visualL * S, visualW * S, visualH * S]} color={mainColor} roughness={.62} eventProps={eventProps} outline opacity={ghostOpacity} />
       {p.cargoType === 'carton' && <>
-        <MemoBox position={[0, 0, visualH * S * .495]} size={[visualL * S * .12, visualW * S * .94, Math.max(2, visualH * .012) * S]} color={selected ? '#b89036' : '#d6b57b'} roughness={.88} opacity={ghostOpacity} />
-        <MemoBox position={[0, 0, visualH * S * .495]} size={[visualL * S * .94, visualW * S * .045, Math.max(2, visualH * .012) * S]} color={selected ? '#b89036' : '#d6b57b'} roughness={.88} opacity={ghostOpacity} />
-        <MemoBox position={[0, visualW * S * .495, 0]} size={[visualL * S * .025, Math.max(2, visualW * .012) * S, visualH * S * .96]} color="#8e704c" roughness={.9} opacity={ghostOpacity} />
+        <MemoBox position={[0, 0, visualH * S * .48]} size={[visualL * S * .12, visualW * S * .94, Math.max(2, visualH * .01) * S]} color={selected ? '#b89036' : '#d6b57b'} roughness={.88} opacity={ghostOpacity} />
+        <MemoBox position={[0, 0, visualH * S * .48]} size={[visualL * S * .94, visualW * S * .045, Math.max(2, visualH * .01) * S]} color={selected ? '#b89036' : '#d6b57b'} roughness={.88} opacity={ghostOpacity} />
+        <MemoBox position={[0, visualW * S * .48, 0]} size={[visualL * S * .02, Math.max(2, visualW * .01) * S, visualH * S * .94]} color="#8e704c" roughness={.9} opacity={ghostOpacity} />
       </>}
     </>}
     {showName && <Html position={[0, 0, p.height * S / 2 + .02]} center><div className="cargo-name-label">{p.cargoId}</div></Html>}
