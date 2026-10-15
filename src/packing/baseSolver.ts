@@ -1,10 +1,112 @@
 import type { Cargo, Container, PlacedCargo } from '../types'
-import { dims, validatePlan } from './geometry'
+import { dims, validatePlacement, validatePlan } from './geometry'
 import { binpackingJsCandidate, openSourcePackCandidate } from './openSourceSolver'
 
 export type SolverResult = {
   placed: PlacedCargo[]
   unplaced: Cargo[]
+}
+
+/**
+ * Small-shipment floor-layout fallback.
+ *
+ * The general 3D solvers can leave avoidable gaps when a shipment mixes a few
+ * large machines with regular IBC footprints. For modest shipments, try a
+ * deterministic 2D edge-anchor layout on the container floor. This does not
+ * relax any constraints: every candidate is still checked by validatePlacement.
+ */
+function floorSpaceCandidate(
+  cargo: Cargo[],
+  container: Container,
+  locked: PlacedCargo[],
+): PlacedCargo[] | null {
+  const requested = cargo.reduce((sum, item) => sum + Math.max(0, Math.floor(item.quantity)), 0)
+  if (requested > 50) return null
+
+  const lockedIds = new Set(locked.map(item => item.id))
+  const cargoById = new Map(cargo.map(item => [item.id, item]))
+  const units = cargo.flatMap(item =>
+    Array.from({ length: Math.max(0, Math.floor(item.quantity)) }, (_, index) => {
+      const id = item.id + '#' + (index + 1)
+      return lockedIds.has(id) ? [] : [{ item, id, index }]
+    }).flat(),
+  ).sort((a, b) =>
+    b.item.length * b.item.width * b.item.height - a.item.length * a.item.width * a.item.height ||
+    b.item.length * b.item.width - a.item.length * a.item.width ||
+    b.item.weight - a.item.weight ||
+    a.id.localeCompare(b.id),
+  )
+
+  let placed = [...locked]
+  for (const unit of units) {
+    const item = unit.item
+    const rotations: Array<0 | 90> = item.rotatable === false || item.length === item.width ? [0] : [0, 90]
+    let best: PlacedCargo | null = null
+    let bestContact = -Infinity
+
+    for (const rotation of rotations) {
+      const d = dims({ length: item.length, width: item.width, rotation })
+      if (d.length > container.length || d.width > container.width || item.height > container.height) continue
+      const xs = new Set<number>([0, container.length - d.length])
+      const ys = new Set<number>([0, container.width - d.width])
+      for (const q of placed) {
+        const qd = dims(q)
+        xs.add(q.x)
+        xs.add(q.x + qd.length)
+        xs.add(q.x - d.length)
+        ys.add(q.y)
+        ys.add(q.y + qd.width)
+        ys.add(q.y - d.width)
+      }
+
+      const candidates = [...xs].flatMap(x => [...ys].map(y => [x, y] as const))
+        .filter(([x, y]) => x >= 0 && y >= 0 && x + d.length <= container.length && y + d.width <= container.width)
+        .sort((a, b) => a[1] - b[1] || a[0] - b[0])
+
+      for (const [x, y] of candidates) {
+        const candidate: PlacedCargo = {
+          id: unit.id,
+          cargoId: item.id,
+          cargoType: item.type,
+          x, y, z: 0,
+          length: item.length,
+          width: item.width,
+          height: item.height,
+          rotation,
+          weight: item.weight,
+          color: item.color,
+          placementMode: 'automatic',
+          locked: false,
+          stackable: item.stackable,
+          loadBearing: item.loadBearing,
+          maxStackLayers: item.maxStackLayers,
+          maxLoadOnTop: item.maxLoadOnTop,
+          rotatable: item.rotatable,
+        }
+        if (!validatePlacement(candidate, container, placed, cargoById).ok) continue
+
+        // Prefer touching neighbours (compact layout), then a low, left anchor.
+        let contact = 0
+        for (const q of placed) {
+          const qd = dims(q)
+          const xTouch = Math.abs(x + d.length - q.x) < 0.5 || Math.abs(q.x + qd.length - x) < 0.5
+          const yTouch = Math.abs(y + d.width - q.y) < 0.5 || Math.abs(q.y + qd.width - y) < 0.5
+          const xOverlap = Math.max(0, Math.min(x + d.length, q.x + qd.length) - Math.max(x, q.x))
+          const yOverlap = Math.max(0, Math.min(y + d.width, q.y + qd.width) - Math.max(y, q.y))
+          if (xTouch) contact += yOverlap
+          if (yTouch) contact += xOverlap
+        }
+        const adjusted = contact - y * 0.001 - x * 0.0001
+        if (adjusted > bestContact) {
+          bestContact = adjusted
+          best = candidate
+        }
+      }
+    }
+    if (best) placed.push(best)
+  }
+
+  return placed.length > locked.length ? placed : null
 }
 
 function completeUnplaced(cargo: Cargo[], placed: PlacedCargo[]): Cargo[] {
@@ -282,6 +384,18 @@ export function basePack(
       }
     }
   }
+  // For small mixed shipments, a floor-only edge-anchor pass can recover
+  // valid layouts missed by the 3D heuristics. Compare by item count first;
+  // never prefer it merely because it is a different arrangement.
+  const floorCandidate = floorSpaceCandidate(cargo, container, locked)
+  if (floorCandidate && validatePlan(floorCandidate, container, cargo).ok) {
+    const candidateScore = score(floorCandidate, container)
+    if (compareScores(candidateScore, bestScore) > 0) {
+      best = floorCandidate
+      bestScore = candidateScore
+    }
+  }
+
   // Search cargo ordering with a bounded simulated-annealing pass inspired by
   // LoadZa's F5 improvement stage. Keep the best valid plan, never a worse one.
   if (requested > locked.length && cargo.length > 1) {
