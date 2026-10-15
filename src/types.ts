@@ -1,4 +1,4 @@
-export type CargoType = 'carton' | 'pallet' | 'woodCrate'
+export type CargoType = 'carton' | 'pallet' | 'woodCrate' | 'drum' | 'pipe' | 'ibc' | 'vehicle' | 'machinery'
 
 export interface Cargo {
   id: string
