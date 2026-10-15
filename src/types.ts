@@ -10,6 +10,8 @@ export interface Cargo {
   height: number
   weight: number
   color: string
+  /** True when created from the extended cargo preset catalog. */
+  isCatalogPreset?: boolean
 
   // V14
   showName: boolean
