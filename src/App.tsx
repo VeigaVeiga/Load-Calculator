@@ -1235,7 +1235,10 @@ function App() {
               </span>
             </div>
 
-            <button onClick={add}>+ {tr.add}</button>
+            <div className="sidebar-head-actions">
+              <button type="button" className="open-cargo-catalog" onClick={() => setShowCargoCatalog(true)}>{lang === 'zh' ? '更多预设 +' : 'More presets +'}</button>
+              <button type="button" onClick={add}>+ {tr.add}</button>
+            </div>
           </div>
 
           <div className="tool-row">
