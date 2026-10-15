@@ -17,8 +17,8 @@ export default function CargoProperties({
   if (!placed || !cargo) return <div className="empty-props">{lang === 'zh' ? '选择货物或加固材料查看数据' : 'Select cargo or securing material'}</div>
   const d = dims(placed)
   const typeName = lang === 'zh'
-    ? (cargo.type === 'woodCrate' ? '木箱' : cargo.type === 'pallet' ? '托盘' : '纸箱')
-    : (cargo.type === 'woodCrate' ? 'WOOD CRATE' : cargo.type === 'pallet' ? 'PALLET' : 'CARTON')
+    ? (cargo.type === 'woodCrate' ? '木箱' : cargo.type === 'pallet' ? '托盘' : cargo.type === 'drum' ? '油桶' : cargo.type === 'pipe' ? '钢管' : cargo.type === 'ibc' ? 'IBC 吨桶' : cargo.type === 'vehicle' ? '汽车' : cargo.type === 'machinery' ? '机械设备' : '纸箱')
+    : (cargo.type === 'woodCrate' ? 'WOOD CRATE' : cargo.type === 'pallet' ? 'PALLET' : cargo.type === 'drum' ? 'DRUM' : cargo.type === 'pipe' ? 'PIPE' : cargo.type === 'ibc' ? 'IBC' : cargo.type === 'vehicle' ? 'VEHICLE' : cargo.type === 'machinery' ? 'MACHINERY' : 'CARTON')
   return <div className="properties">
     <div className="prop-title">
       <div><b>{cargo.name}</b><small>{typeName}</small></div>
