@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
 import OpenSourceAcknowledgements from './OpenSourceAcknowledgements'
 import ContainerScene, { type View } from './components/ContainerScene'
