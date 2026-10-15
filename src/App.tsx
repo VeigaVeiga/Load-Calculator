@@ -3,6 +3,7 @@ import './App.css'
 import OpenSourceAcknowledgements from './OpenSourceAcknowledgements'
 import ContainerScene, { type View } from './components/ContainerScene'
 import CargoProperties from './components/CargoProperties'
+import CargoCatalogModal from './components/CargoCatalogModal'
 import CenterOfGravity from './components/CenterOfGravity'
 import { containerTemplates } from './data/containerTemplates'
 import { cargoTemplates } from './data/cargoTemplates'
@@ -250,6 +251,7 @@ function makeCustom(
 function App() {
   const [lang, setLang] = useState<Lang>('zh')
   const [showAcknowledgements, setShowAcknowledgements] = useState(false)
+  const [showCargoCatalog, setShowCargoCatalog] = useState(false)
   const [kfcCopy, setKfcCopy] = useState('正在获取文案…')
   const [kfcCopies, setKfcCopies] = useState<string[]>([])
   const [kfcLoading, setKfcLoading] = useState(false)
@@ -765,7 +767,45 @@ function App() {
     id: string,
     type: CargoType,
   ) => {
+    const current = cargo.find((item) => item.id === id)
+    if (!current) return
+    if (type === 'pallet') {
+      setCargo(items => items.map(item => item.id === id ? {
+        ...item, type, length: 1200, width: 1100, height: 1000,
+        color: '#b88b5a',
+      } : item))
+      setPlaced(items => items.map(item => item.cargoId === id ? {
+        ...item, cargoType: type, length: 1200, width: 1100, height: 1000, color: '#b88b5a',
+      } : item))
+      return
+    }
     update(id, 'type', type)
+  }
+
+  const addPresetCargo = (preset: { id: string; name: string; type: CargoType; length: number; width: number; height: number; weight: number; color: string; stackable?: boolean; loadBearing?: boolean; rotatable?: boolean }) => {
+    const n = cargo.length + 1
+    const newCargo: Cargo = {
+      id: `PRESET-${preset.id}-${n}`,
+      name: preset.name,
+      type: preset.type,
+      quantity: 1,
+      length: preset.length,
+      width: preset.width,
+      height: preset.height,
+      weight: preset.weight,
+      color: preset.color,
+      showName: false,
+      locked: false,
+      stackable: preset.stackable ?? ['carton', 'woodCrate', 'pallet', 'ibc'].includes(preset.type),
+      loadBearing: preset.loadBearing ?? ['pallet', 'woodCrate', 'ibc'].includes(preset.type),
+      rotatable: preset.rotatable ?? !['vehicle', 'pipe'].includes(preset.type),
+      maxStackLayers: 0,
+      maxLoadOnTop: 0,
+      breakablePallet: false,
+    }
+    setCargo(items => [...items, newCargo])
+    setShowCargoCatalog(false)
+    setMessage(lang === 'zh' ? `已添加货物预设：${preset.name}。尺寸和重量可在列表中修改。` : `Added preset: ${preset.name}. You can edit its dimensions and weight.`)
   }
 
   const runPacking = async (nextContainer = container) => {
@@ -1173,6 +1213,8 @@ function App() {
         </div>
       )}
 
+      {showCargoCatalog && <CargoCatalogModal lang={lang} onClose={() => setShowCargoCatalog(false)} onSelect={addPresetCargo} />}
+
       <main className="workspace">
         <aside className="sidebar">
           <div className="sidebar-head">
@@ -1184,9 +1226,10 @@ function App() {
               </span>
             </div>
 
-            <button onClick={add}>
-              + {tr.add}
-            </button>
+            <div className="cargo-add-actions">
+              <button onClick={add}>+ {tr.add}</button>
+              <button className="more-cargo-btn" onClick={() => setShowCargoCatalog(true)}>{lang === 'zh' ? '更多类型' : 'More types'} ▦</button>
+            </div>
           </div>
 
           <div className="tool-row">
