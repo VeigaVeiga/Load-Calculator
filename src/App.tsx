@@ -837,7 +837,9 @@ function App() {
             ? 4
             : type === 'doorNet'
               ? container.width
-              : 1000,
+              : type === 'airBag'
+                ? 400
+                : 1000,
       height:
         type === 'triangleWood'
           ? 150
