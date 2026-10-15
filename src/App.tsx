@@ -779,6 +779,15 @@ function App() {
       } : item))
       return
     }
+    if (current.type === 'pallet' && current.length === 1200 && current.width === 1100 && current.height === 1000) {
+      setCargo(items => items.map(item => item.id === id ? {
+        ...item, type, length: 600, width: 400, height: 400,
+      } : item))
+      setPlaced(items => items.map(item => item.cargoId === id ? {
+        ...item, cargoType: type, length: 600, width: 400, height: 400,
+      } : item))
+      return
+    }
     update(id, 'type', type)
   }
 
