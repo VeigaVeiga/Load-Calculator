@@ -406,7 +406,6 @@ function App() {
     [placed, isCargoInsideContainer],
   )
   const outsidePlacedCount = placed.length - loadedPlaced.length
-  const unloadedCount = overflowCount + outsidePlacedCount
 
   const analysis = useMemo(
     () => analyzeWeight(loadedPlaced, container),
@@ -437,6 +436,7 @@ function App() {
   // cargo definitions must not populate the overflow stage in real time.
   const [overflowItems, setOverflowItems] = useState<PlacedCargo[]>([])
   const overflowCount = overflowItems.length
+  const unloadedCount = overflowCount + outsidePlacedCount
 
   const buildOverflowSnapshot = (sourceCargo: Cargo[], packedItems: PlacedCargo[]) => {
     const result: PlacedCargo[] = []
