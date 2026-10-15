@@ -1827,11 +1827,12 @@ body{overflow:hidden}
 @media(max-width:700px){.cargo-catalog-backdrop{padding:8px}.cargo-catalog-modal{width:100%;max-height:94vh}.cargo-catalog-grid{grid-template-columns:1fr;padding:12px;gap:14px}.cargo-catalog-header{padding:14px}.cargo-catalog-header h2{font-size:19px}.cargo-catalog-foot{align-items:flex-start;flex-direction:column}.cargo-catalog-foot button{align-self:flex-end}}
 
 
-.type-toggle .more-cargo-inline{font-size:9px!important;white-space:nowrap;padding:4px 7px!important;background:#d9e3df!important;border-color:#71867b!important;color:#263a31!important}
 .type-toggle .special-type-tag{font-size:9px;color:#9b5a2e;font-weight:700;white-space:nowrap}
 .cargo-add-actions{display:flex;gap:5px;align-items:stretch}
 
-/* Cargo preset modal: provide a stable entry point outside each cargo card. */
-.sidebar-head-actions{display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end;position:relative;z-index:2}
-.sidebar-head-actions button.open-cargo-catalog{background:#d9e3df!important;border:1px solid #71867b!important;color:#263a31!important;font-weight:700;white-space:nowrap}
-.sidebar-head-actions button{pointer-events:auto!important;position:relative;z-index:3}
+
+/* Secondary cargo actions sit below auto-pack / clear-unlocked, matching their button style. */
+.cargo-secondary-actions{margin: -3px 0 8px!important;gap:5px!important}
+.cargo-secondary-actions button{flex:1;min-height:25px!important;height:25px!important;padding:0 8px!important;font-size:10px!important;line-height:1!important}
+.theme-portal .cargo-secondary-actions button{min-height:24px!important;height:24px!important;padding:0 8px!important;color:#ddd!important;background:#0a0a0a!important;border:1px solid var(--miao-line)!important;border-radius:0!important;box-shadow:none!important;font-size:8px!important}
+.theme-portal .cargo-secondary-actions button:hover{color:#050505!important;background:#f4f4f0!important;border-color:#f4f4f0!important}
