@@ -182,7 +182,7 @@ export default function SecuringModel({ item, container, selected, registerRef, 
       geometry.setIndex(indices); geometry.computeVertexNormals()
       straps.push(<mesh key={'hook-loop-' + index} geometry={geometry}><meshStandardMaterial color={beltColor} roughness={.76} side={THREE.DoubleSide} /></mesh>)
       // Small steel connector at the loop's throat makes the hook connection legible.
-      straps.push(<mesh key={'hook-clasp-' + index} position={[point.x, point.y, point.z]}><torusGeometry args={[.019, .004, 6, 12, Math.PI * 1.6]} /><meshStandardMaterial color="#8e989d" metalness={.82} roughness={.28} /></mesh>)
+      straps.push(<mesh key={'hook-clasp-' + index} position={[point.x, point.y, point.z]} rotation={[Math.PI / 2, 0, 0]}><torusGeometry args={[.019, .004, 6, 12, Math.PI * 1.6]} /><meshStandardMaterial color="#8e989d" metalness={.82} roughness={.28} /></mesh>)
     })
     const buckle = points.length >= 2 && points[0].distanceTo(points[1]) > .25 ? (() => {
       const direction = points[1].clone().sub(points[0]).normalize()
