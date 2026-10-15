@@ -1836,3 +1836,32 @@ body{overflow:hidden}
 .cargo-secondary-actions button{flex:1;min-height:25px!important;height:25px!important;padding:0 8px!important;font-size:10px!important;line-height:1!important}
 .theme-portal .cargo-secondary-actions button{min-height:24px!important;height:24px!important;padding:0 8px!important;color:#ddd!important;background:#0a0a0a!important;border:1px solid var(--miao-line)!important;border-radius:0!important;box-shadow:none!important;font-size:8px!important}
 .theme-portal .cargo-secondary-actions button:hover{color:#050505!important;background:#f4f4f0!important;border-color:#f4f4f0!important}
+
+
+/* Keep both secondary cargo actions visually identical to Clear Unlocked, with equal sizing and no decorative icon. */
+.tool-row.cargo-secondary-actions{display:flex!important;align-items:stretch!important;gap:6px!important}
+.tool-row.cargo-secondary-actions button,
+.tool-row.cargo-secondary-actions button:first-child{
+  flex:1 1 0!important;min-width:0!important;width:0!important;
+  height:38px!important;min-height:38px!important;max-height:38px!important;
+  margin:0!important;padding:6px 8px!important;
+  color:#ddd!important;background:#0a0a0a!important;
+  border:1px solid var(--miao-line)!important;border-radius:0!important;
+  box-shadow:none!important;font-size:11px!important;font-weight:400!important;
+  line-height:1.25!important;letter-spacing:normal!important;white-space:normal!important;
+}
+.tool-row.cargo-secondary-actions button:first-child:before{content:none!important;display:none!important}
+.tool-row.cargo-secondary-actions button:hover,
+.tool-row.cargo-secondary-actions button:first-child:hover{
+  color:#050505!important;background:#f4f4f0!important;border-color:#f4f4f0!important;
+}
+.theme-portal .tool-row.cargo-secondary-actions button,
+.theme-portal .tool-row.cargo-secondary-actions button:first-child{
+  height:38px!important;min-height:38px!important;max-height:38px!important;
+  color:#ddd!important;background:#0a0a0a!important;border:1px solid var(--miao-line)!important;
+  box-shadow:none!important;font-size:11px!important;font-weight:400!important;
+}
+.theme-portal .tool-row.cargo-secondary-actions button:hover,
+.theme-portal .tool-row.cargo-secondary-actions button:first-child:hover{
+  color:#050505!important;background:#f4f4f0!important;border-color:#f4f4f0!important;
+}
