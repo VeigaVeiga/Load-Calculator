@@ -803,6 +803,7 @@ function App() {
       height: preset.height,
       weight: preset.weight,
       color: preset.color,
+      isCatalogPreset: true,
       showName: false,
       locked: false,
       stackable: preset.stackable ?? ['carton', 'woodCrate', 'pallet', 'ibc'].includes(preset.type),
@@ -1254,7 +1255,7 @@ function App() {
 
           <div className="tool-row cargo-secondary-actions">
             <button type="button" onClick={() => setShowCargoCatalog(true)}>
-              {lang === 'zh' ? '更多预设' : 'More presets'}
+              {lang === 'zh' ? '更多预设货物' : 'More preset cargo'}
             </button>
             <button type="button" onClick={add}>
               + {tr.add}
@@ -1330,7 +1331,7 @@ function App() {
                     </button>
                   </div>
 
-                  <div className="type-toggle">
+                  {!c.isCatalogPreset && <div className="type-toggle">
                     <span>{tr.type}</span>
 
                     <label
@@ -1412,7 +1413,7 @@ function App() {
                     </label>
                     {['drum','pipe','ibc','vehicle','machinery'].includes(c.type) && <span className="special-type-tag">{({drum:'油桶',pipe:'钢管',ibc:'IBC 吨桶',vehicle:'汽车',machinery:'机械设备'} as Record<string,string>)[c.type]}</span>}
 
-                  </div>
+                  </div>}
 
                   <div className="fields">
                     <label>
