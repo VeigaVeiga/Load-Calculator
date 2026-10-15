@@ -152,7 +152,7 @@ function CargoModel({ p, container, selected, onPointerDown, onPointerUp, onPoin
       }))}
       <MemoBox size={[visualL * S * .025, visualW * S * .52, visualH * S * .13]} position={[visualL * S * .17, 0, visualH * S * .23]} color="#293b46" roughness={.35} opacity={ghostOpacity} />
       <MemoBox size={[visualL * S * .025, visualW * S * .52, visualH * S * .11]} position={[-visualL * S * .22, 0, visualH * S * .22]} color="#293b46" roughness={.35} opacity={ghostOpacity} />
-      {[-1, 1].map(side => <MemoBox key={side} size={[visualL * S * .30, visualW * S * .018, visualH * S * .12]} position={[-visualL * S * .04, side * visualW * S * .32, visualH * S * .23]} color="#293b46" roughness={.35} opacity={ghostOpacity} />)
+      {[-1, 1].map(side => <MemoBox key={side} size={[visualL * S * .30, visualW * S * .018, visualH * S * .12]} position={[-visualL * S * .04, side * visualW * S * .32, visualH * S * .23]} color="#293b46" roughness={.35} opacity={ghostOpacity} />)}
       <MemoBox size={[visualL * S * .035, visualW * S * .30, visualH * S * .075]} position={[visualL * S * .475, 0, -visualH * S * .19]} color="#26343a" roughness={.45} opacity={ghostOpacity} />
     </> : machinery ? <>
       <MemoBox size={[visualL * S, visualW * S, visualH * S]} color={selected ? '#f2c94c' : '#8b9690'} roughness={.62} eventProps={eventProps} outline opacity={ghostOpacity} />
