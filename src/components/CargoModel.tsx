@@ -137,7 +137,7 @@ function CargoModel({ p, container, selected, onPointerDown, onPointerUp, onPoin
       {[-.32, .32].flatMap((x, i) => [-.48, .48].map((y, j) => <mesh key={i * 2 + j} position={[x * visualL * S, y * visualW * S, -visualH * S * .31]} rotation={[Math.PI / 2, 0, 0]} raycast={() => null}>
         <cylinderGeometry args={[visualH * S * .12, visualH * S * .12, Math.max(6, visualW * S * .12), 16]} />
         <meshStandardMaterial color="#202629" roughness={.9} />
-      </mesh>)}
+      </mesh>))}
     </> : machinery ? <>
       <MemoBox size={[visualL * S, visualW * S, visualH * S]} color={selected ? '#f2c94c' : '#8b9690'} roughness={.62} eventProps={eventProps} outline opacity={ghostOpacity} />
       <MemoBox size={[visualL * S * .72, visualW * S * .72, visualH * S * .12]} position={[0, 0, visualH * S * .56]} color="#515d59" roughness={.55} outline opacity={ghostOpacity} />
