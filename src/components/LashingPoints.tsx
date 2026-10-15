@@ -24,7 +24,7 @@ export default function LashingPoints({ container, selectable = false, allowedId
       const isTop = p.z > container.height / 2
       const allowed = selectable && allowedIds.includes(p.id)
       const selected = selectedIds.includes(p.id)
-      const color = selected ? '#42e6a4' : allowed && hoveredId === p.id ? '#ffe16a' : allowed ? '#43b9ff' : '#5d6665'
+      const color = selected ? '#8dffb0' : allowed && hoveredId === p.id ? '#c5ff62' : allowed ? '#36e879' : '#5d6665'
       return <group key={p.id} position={[x, y, z]}>
         <Ring top={isTop} color={color} />
         {selectable && <mesh
@@ -32,8 +32,8 @@ export default function LashingPoints({ container, selectable = false, allowedId
           onPointerOut={e => { e.stopPropagation(); setHoveredId(current => current === p.id ? null : current) }}
           onPointerDown={e => { e.stopPropagation(); if (allowed) onPointSelect?.(p.id) }}
         >
-          <sphereGeometry args={[.105, 12, 8]} />
-          <meshBasicMaterial color={color} transparent opacity={allowed ? (hoveredId === p.id ? .28 : .12) : .015} depthWrite={false} />
+          <sphereGeometry args={[.125, 14, 10]} />
+          <meshBasicMaterial color={color} transparent opacity={allowed ? (hoveredId === p.id ? .48 : .25) : .008} depthWrite={false} />
         </mesh>}
         {!isTop && <mesh position={[0, 0, -.014]} raycast={() => null}><boxGeometry args={[.055, .012, .025]} /><meshStandardMaterial color="#4f5858" metalness={.5} roughness={.45} /></mesh>}
       </group>
