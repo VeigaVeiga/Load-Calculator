@@ -824,7 +824,7 @@ function App() {
       z: 0,
       length:
         type === 'triangleWood'
-          ? 200
+          ? 1000
           : type === 'lashingBelt'
             ? 3000
             : type === 'doorNet'
@@ -925,9 +925,12 @@ function App() {
     const band = `<polyline points="${coords}" fill="none" stroke="#ed762b" stroke-width="7" stroke-linecap="butt" stroke-linejoin="miter"/>`
     const seam = `<polyline points="${coords}" fill="none" stroke="#ffc18d" stroke-width="1.2" stroke-dasharray="2 3" stroke-linecap="butt" stroke-linejoin="miter"/>`
     const loops = points.map(([x,y]) => `<ellipse cx="${x}" cy="${y}" rx="5.5" ry="4.5" fill="#ed762b" stroke="#713c24" stroke-width="1.6"/><ellipse cx="${x}" cy="${y}" rx="2.6" ry="2.2" fill="none" stroke="#b8c0c4" stroke-width="1.4"/>`).join('')
-    const buckle = points.length > 1 ? (() => {
-      const x = (points[0][0] + points[1][0]) / 2, y = (points[0][1] + points[1][1]) / 2
-      return `<rect x="${x-5}" y="${y-7}" width="10" height="14" rx="1" fill="#8e989d" stroke="#4c5559" stroke-width="1.5"/><rect x="${x-2.5}" y="${y-4}" width="5" height="8" fill="#d5dadd" stroke="#4c5559" stroke-width=".8"/><line x1="${x-3}" y1="${y}" x2="${x+3}" y2="${y}" stroke="#4c5559" stroke-width="1.2"/>`
+    // Put the ratchet on the lower cross-piece (segment 2), not at the X intersection.
+    const buckle = points.length >= 3 ? (() => {
+      const a = points[1], b = points[2], t = .62
+      const x = a[0] + (b[0] - a[0]) * t, y = a[1] + (b[1] - a[1]) * t
+      const angle = Math.atan2(b[1] - a[1], b[0] - a[0]) * 180 / Math.PI
+      return `<g transform="translate(${x} ${y}) rotate(${angle})"><rect x="-7" y="-4.5" width="14" height="9" rx="1.2" fill="#8e989d" stroke="#4c5559" stroke-width="1.5"/><rect x="-4.5" y="-2.4" width="9" height="4.8" fill="#d5dadd" stroke="#4c5559" stroke-width=".8"/><line x1="-4" y1="0" x2="4" y2="0" stroke="#4c5559" stroke-width="1.2"/><path d="M-5 -4 L-2 -7 L5 -7 L7 -4" fill="none" stroke="#4c5559" stroke-width="1.4"/></g>`
     })() : ''
     return edge + band + seam + loops + buckle
   }
@@ -941,7 +944,7 @@ function App() {
     for(const p of placed){const d=p.rotation%180===0?{l:p.length,w:p.width}:{l:p.width,w:p.length};shapes+=rect(bx+p.x/container.length*boxW,by+p.y/container.width*boxH,d.l/container.length*boxW,d.w/container.width*boxH,p.color)}
     for(const m of materials){
       const mx=bx+m.x/container.length*boxW,my=by+m.y/container.width*boxH,mw=Math.max(2,m.length/container.length*boxW),mh=Math.max(2,m.width/container.width*boxH)
-      if(m.type==='lashingBelt'&&m.path?.length){shapes+=lashingProjection(m.path.map(p=>[bx+p.x/container.length*boxW,by+p.y/container.width*boxH] as [number,number]))}
+      if(m.type==='lashingBelt'&&m.path?.length){const clipId=`lash-top-${String(m.id).replace(/[^a-zA-Z0-9_-]/g,'')}`;shapes+=`<defs><clipPath id="${clipId}"><rect x="${bx+2}" y="${by+2}" width="${boxW-4}" height="${boxH-4}"/></clipPath></defs><g clip-path="url(#${clipId})">${lashingProjection(m.path.map(p=>[bx+p.x/container.length*boxW,by+p.y/container.width*boxH] as [number,number]))}</g>`}
       else if(m.type==='triangleWood'){const pts=triangleProjectionPoints(m,'top').map(([x,y])=>[bx+x/container.length*boxW,by+y/container.width*boxH] as [number,number]);shapes+=poly(pts,'#3979b8')}
       else if(m.type==='airBag')shapes+=`<rect x="${mx}" y="${my}" width="${mw}" height="${mh}" rx="3" fill="#3fa36b"/>`
       else if(m.type==='lashingBelt'){const x=bx+(m.x+m.length/2)/container.length*boxW;shapes+=`<line x1="${x}" y1="${by}" x2="${x}" y2="${by+boxH}" stroke="#ed762b" stroke-width="7" stroke-linecap="butt"/>`}
@@ -959,7 +962,7 @@ function App() {
     for(const p of placed){const d=p.rotation%180===0?{l:p.length,w:p.width}:{l:p.width,w:p.length};left+=rect(side.x+p.x/container.length*side.w,side.y+(1-(p.z+p.height)/container.height)*side.h,d.l/container.length*side.w,p.height/container.height*side.h,p.color);frontShapes+=rect(front.x+p.y/container.width*front.w,front.y+(1-(p.z+p.height)/container.height)*front.h,d.w/container.width*front.w,p.height/container.height*front.h,p.color)}
     for(const m of materials){
       const sx=side.x+(m.x+m.length/2)/container.length*side.w,sy=side.y+(1-(m.z+m.height)/container.height)*side.h,sh=Math.max(2,m.height/container.height*side.h),fx=front.x+m.y/container.width*front.w,fy=front.y+(1-(m.z+m.height)/container.height)*front.h,fw=Math.max(2,m.width/container.width*front.w)
-      if(m.type==='lashingBelt'&&m.path?.length){const sidePts=m.path.map(p=>[side.x+p.x/container.length*side.w,side.y+(1-p.z/container.height)*side.h] as [number,number]);const frontPts=m.path.map(p=>[front.x+p.y/container.width*front.w,front.y+(1-p.z/container.height)*front.h] as [number,number]);left+=lashingProjection(sidePts);frontShapes+=lashingProjection(frontPts)}
+      if(m.type==='lashingBelt'&&m.path?.length){const sidePts=m.path.map(p=>[side.x+p.x/container.length*side.w,side.y+(1-p.z/container.height)*side.h] as [number,number]);const frontPts=m.path.map(p=>[front.x+p.y/container.width*front.w,front.y+(1-p.z/container.height)*front.h] as [number,number]);const sid=`lash-side-${String(m.id).replace(/[^a-zA-Z0-9_-]/g,'')}`,fid=`lash-front-${String(m.id).replace(/[^a-zA-Z0-9_-]/g,'')}`;left+=`<defs><clipPath id="${sid}"><rect x="${side.x+2}" y="${side.y+2}" width="${side.w-4}" height="${side.h-4}"/></clipPath></defs><g clip-path="url(#${sid})">${lashingProjection(sidePts)}</g>`;frontShapes+=`<defs><clipPath id="${fid}"><rect x="${front.x+2}" y="${front.y+2}" width="${front.w-4}" height="${front.h-4}"/></clipPath></defs><g clip-path="url(#${fid})">${lashingProjection(frontPts)}</g>`}
       else if(m.type==='triangleWood'){
         const sidePts=triangleProjectionPoints(m,'side').map(([x,z])=>[side.x+x/container.length*side.w,side.y+(1-z/container.height)*side.h] as [number,number])
         const frontPts=triangleProjectionPoints(m,'front').map(([y,z])=>[front.x+y/container.width*front.w,front.y+(1-z/container.height)*front.h] as [number,number])
