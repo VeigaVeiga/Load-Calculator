@@ -123,8 +123,8 @@ export default function SecuringModel({ item, container, selected, registerRef, 
       </group>
     )
   } else {
-    const beltColor = selected ? '#ffb347' : '#d5a23c'
-    const darkEdge = selected ? '#fff0cf' : '#74511c'
+    const beltColor = selected ? '#ffad63' : '#ed762b'
+    const darkEdge = selected ? '#fff0cf' : '#7c3d20'
     const sourcePath = item.path !== undefined ? item.path : [
       { x: item.x + item.length / 2, y: 38, z: Math.max(80, container.height - 28) },
       { x: item.x + item.length / 2, y: 38, z: 42 },
@@ -152,6 +152,14 @@ export default function SecuringModel({ item, container, selected, registerRef, 
       addRibbon('band-' + i, [a.clone().add(half), a.clone().sub(half), b.clone().add(half), b.clone().sub(half)])
       straps.push(<Rope key={'edge-a'+i} a={a.clone().add(half)} b={b.clone().add(half)} radius={.0012} color={darkEdge} />)
       straps.push(<Rope key={'edge-b'+i} a={a.clone().sub(half)} b={b.clone().sub(half)} radius={.0012} color={darkEdge} />)
+      // A restrained row of pale bar-tacks makes the webbing read as sewn textile,
+      // without turning the scene into hundreds of expensive individual details.
+      const stitchCount = Math.min(24, Math.max(4, Math.floor(a.distanceTo(b) / .075)))
+      for (let stitch = 1; stitch < stitchCount; stitch++) {
+        const t = stitch / stitchCount
+        const center = a.clone().lerp(b, t)
+        straps.push(<Rope key={'stitch-'+i+'-'+stitch} a={center.clone().add(half.clone().multiplyScalar(.78))} b={center.clone().sub(half.clone().multiplyScalar(.78))} radius={.00075} color={selected ? '#fff1d8' : '#ffc18d'} />)
+      }
       // Reinforced folded-over webbing at each sharp change of direction.
       if (i > 0) {
         const corner = a.clone()
