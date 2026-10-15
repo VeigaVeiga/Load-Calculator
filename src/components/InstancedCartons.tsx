@@ -10,7 +10,7 @@ baseColors.fill(1)
 CARTON_GEOMETRY.setAttribute('color', new THREE.Float32BufferAttribute(baseColors, 3))
 const OUTLINE_SOURCE = new THREE.EdgesGeometry(new THREE.BoxGeometry(1, 1, 1))
 
-type Props = { items: PlacedCargo[]; container: Container; onSelect: (id: string) => void }
+type Props = { items: PlacedCargo[]; container: Container; onSelect: (id: string) => void; ghost?: boolean }
 
 function safeCartonColor(value?: string) {
   if (!value) return '#c7c7c7'
@@ -19,11 +19,11 @@ function safeCartonColor(value?: string) {
   return value
 }
 
-export default function InstancedCartons({ items, container, onSelect }: Props) {
+export default function InstancedCartons({ items, container, onSelect, ghost = false }: Props) {
   const meshRef = useRef<THREE.InstancedMesh>(null)
   const lineRef = useRef<THREE.LineSegments>(null)
-  const material = useMemo(() => new THREE.MeshBasicMaterial({ color: 0xffffff, vertexColors: true, toneMapped: false }), [])
-  const lineMaterial = useMemo(() => new THREE.LineBasicMaterial({ color: 0x59636b, transparent: true, opacity: .92, depthTest: true }), [])
+  const material = useMemo(() => new THREE.MeshBasicMaterial({ color: 0xffffff, vertexColors: true, toneMapped: false, transparent: ghost, opacity: ghost ? .24 : 1, depthWrite: !ghost }), [ghost])
+  const lineMaterial = useMemo(() => new THREE.LineBasicMaterial({ color: 0x59636b, transparent: true, opacity: ghost ? .35 : .92, depthTest: true }), [ghost])
   const lineGeometry = useMemo(() => new THREE.BufferGeometry(), [])
   const matrix = useMemo(() => new THREE.Matrix4(), [])
   const quaternion = useMemo(() => new THREE.Quaternion(), [])
