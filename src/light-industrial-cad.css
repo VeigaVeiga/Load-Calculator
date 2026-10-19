@@ -252,3 +252,264 @@ html:has(.app.theme-light), body:has(.app.theme-light), body:has(.app.theme-ligh
   .theme-portal.theme-light .top-actions select,
   .theme-portal.theme-light .top-actions button { font-size: 10px !important; padding: 6px 7px !important; }
 }
+
+
+/* Comprehensive Light Industrial CAD overrides for panels, forms, overlays and scene chrome. */
+.theme-portal.theme-light,
+.theme-portal.theme-light * {
+  scrollbar-color: #b7c4d0 #edf1f5;
+}
+.theme-portal.theme-light .app-subtitle,
+.theme-portal.theme-light .eyebrow,
+.theme-portal.theme-light .summary label,
+.theme-portal.theme-light .summary .label,
+.theme-portal.theme-light .section-kicker,
+.theme-portal.theme-light .panel-kicker,
+.theme-portal.theme-light .muted,
+.theme-portal.theme-light .hint,
+.theme-portal.theme-light .hint-text {
+  color: #687586 !important;
+}
+.theme-portal.theme-light .summary > div,
+.theme-portal.theme-light .sidebar,
+.theme-portal.theme-light .viewer,
+.theme-portal.theme-light .right-panel,
+.theme-portal.theme-light .custom-bar,
+.theme-portal.theme-light .securing-palette,
+.theme-portal.theme-light .bias-card,
+.theme-portal.theme-light .bias-limit,
+.theme-portal.theme-light .material-card,
+.theme-portal.theme-light .material-item,
+.theme-portal.theme-light .property-section,
+.theme-portal.theme-light .cargo-data div,
+.theme-portal.theme-light .balance-grid span,
+.theme-portal.theme-light .cg-values span,
+.theme-portal.theme-light .material-stats span,
+.theme-portal.theme-light .bias-secondary,
+.theme-portal.theme-light .cargo-card,
+.theme-portal.theme-light .cargo-list,
+.theme-portal.theme-light .analysis,
+.theme-portal.theme-light .properties,
+.theme-portal.theme-light .props-content {
+  color: #26313d !important;
+}
+.theme-portal.theme-light .cargo-list,
+.theme-portal.theme-light .analysis,
+.theme-portal.theme-light .properties,
+.theme-portal.theme-light .props-content,
+.theme-portal.theme-light .right-panel .tab-content {
+  background: transparent !important;
+}
+.theme-portal.theme-light .securing-palette {
+  background: #f1f4f7 !important;
+  border-color: #d4dce4 !important;
+  box-shadow: none !important;
+}
+.theme-portal.theme-light .palette-title,
+.theme-portal.theme-light .palette-title small,
+.theme-portal.theme-light .securing-palette label,
+.theme-portal.theme-light .securing-palette span {
+  color: #586779 !important;
+}
+.theme-portal.theme-light .material-toolbar button,
+.theme-portal.theme-light .property-actions button,
+.theme-portal.theme-light .sidebar-head button,
+.theme-portal.theme-light .tool-row button,
+.theme-portal.theme-light .scene-toolbox button,
+.theme-portal.theme-light .view-toolbar button,
+.theme-portal.theme-light .tabs button,
+.theme-portal.theme-light .top-actions button,
+.theme-portal.theme-light .top-actions select {
+  text-shadow: none !important;
+}
+.theme-portal.theme-light .placement-toggle,
+.theme-portal.theme-light .placement-toggle.active,
+.theme-portal.theme-light .tool-row button.active,
+.theme-portal.theme-light .tabs button.active,
+.theme-portal.theme-light .view-toolbar button.active {
+  background: #2563a6 !important;
+  color: #fff !important;
+  border-color: #2563a6 !important;
+}
+.theme-portal.theme-light .placement-toggle:not(.active),
+.theme-portal.theme-light .tool-row button:not(.active),
+.theme-portal.theme-light .tabs button:not(.active) {
+  color: #425064 !important;
+}
+.theme-portal.theme-light .bias-card {
+  background: #f7f9fb !important;
+  border: 1px solid #d9dee5 !important;
+  box-shadow: none !important;
+}
+.theme-portal.theme-light .bias-card.warning {
+  background: #fff7e8 !important;
+  border-color: #e8c77b !important;
+}
+.theme-portal.theme-light .bias-card span,
+.theme-portal.theme-light .bias-card small,
+.theme-portal.theme-light .balance-meter-head,
+.theme-portal.theme-light .cg-title,
+.theme-portal.theme-light .cg-orientation,
+.theme-portal.theme-light .cg-legend {
+  color: #687586 !important;
+}
+.theme-portal.theme-light .bias-card b,
+.theme-portal.theme-light .bias-card strong {
+  color: #26313d !important;
+}
+.theme-portal.theme-light .balance-meter-track {
+  background: #e4eaf0 !important;
+  border-color: #c8d2dd !important;
+}
+.theme-portal.theme-light .balance-meter-track i { background: #3d8a68 !important; }
+.theme-portal.theme-light .bias-limit.is-within-limit { background: #edf8f1 !important; border-color: #a8d4b7 !important; }
+.theme-portal.theme-light .bias-limit.is-over-limit { background: #fff0ee !important; border-color: #e5aaa4 !important; }
+.theme-portal.theme-light .volume-error,
+.theme-portal.theme-light .status-message {
+  color: #8d3434 !important;
+  background: #fff2f0 !important;
+  border-color: #efc7c2 !important;
+}
+.theme-portal.theme-light .scene-label {
+  color: #26313d !important;
+  background: rgba(255,255,255,.96) !important;
+  border: 1px solid #c7d1dc !important;
+  box-shadow: 0 2px 6px rgba(28,43,58,.1) !important;
+}
+.theme-portal.theme-light .lashing-label {
+  color: #78541b !important;
+  background: rgba(255,248,220,.98) !important;
+  border-color: #d9bb65 !important;
+}
+.theme-portal.theme-light .cad-dimension,
+.theme-portal.theme-light .cad-tick-label,
+.theme-portal.theme-light .door-label,
+.theme-portal.theme-light .front-label,
+.theme-portal.theme-light .cargo-name-label,
+.theme-portal.theme-light .axis-label {
+  box-shadow: 0 1px 4px rgba(35,49,63,.08) !important;
+}
+.theme-portal.theme-light .scene-shell {
+  background: #e8edf2 !important;
+  border-color: #cbd5df !important;
+}
+.theme-portal.theme-light .scene-shell canvas {
+  background: #e8edf2 !important;
+}
+.theme-portal.theme-light .scene-toolbox {
+  color: #26313d !important;
+  background: rgba(255,255,255,.98) !important;
+  border-color: #c4ced8 !important;
+  box-shadow: 0 3px 10px rgba(31,49,68,.12) !important;
+}
+.theme-portal.theme-light .scene-toolbox b {
+  color: #506174 !important;
+  background: #edf2f7 !important;
+}
+.theme-portal.theme-light .scene-toolbox .tool-divider { background: #d9e1e9 !important; }
+.theme-portal.theme-light .scene-toolbox button.active {
+  color: #fff !important;
+  background: #2563a6 !important;
+  border-color: #2563a6 !important;
+}
+.theme-portal.theme-light .scene-toolbox button.danger {
+  color: #983d36 !important;
+  background: #fff2f0 !important;
+  border-color: #e3b9b4 !important;
+}
+.theme-portal.theme-light .lashing-route-hud {
+  color: #26313d !important;
+  background: rgba(255,255,255,.98) !important;
+  border: 1px solid #c4ced8 !important;
+  box-shadow: 0 3px 12px rgba(31,49,68,.14) !important;
+}
+.theme-portal.theme-light .lashing-route-hud button {
+  color: #26313d !important;
+  background: #f4f7fa !important;
+  border-color: #c4ced8 !important;
+}
+.theme-portal.theme-light .custom-bar {
+  background: #fff !important;
+  border-color: #d9dee5 !important;
+}
+.theme-portal.theme-light .custom-bar label,
+.theme-portal.theme-light .custom-bar span,
+.theme-portal.theme-light .custom-bar small {
+  color: #687586 !important;
+}
+.theme-portal.theme-light input,
+.theme-portal.theme-light select,
+.theme-portal.theme-light textarea {
+  color: #26313d !important;
+  caret-color: #2563a6 !important;
+  background-color: #fff !important;
+  border-color: #b8c2ce !important;
+}
+.theme-portal.theme-light input::placeholder,
+.theme-portal.theme-light textarea::placeholder {
+  color: #8995a3 !important;
+}
+.theme-portal.theme-light input[type="checkbox"],
+.theme-portal.theme-light input[type="radio"] {
+  accent-color: #2563a6;
+}
+.theme-portal.theme-light input[type="color"] {
+  padding: 2px !important;
+  background: #fff !important;
+}
+.theme-portal.theme-light .cargo-title .name-field input,
+.theme-portal.theme-light .name-field input {
+  background: transparent !important;
+}
+.theme-portal.theme-light .cargo-title .delete,
+.theme-portal.theme-light .danger-btn {
+  color: #983d36 !important;
+  background: #fff2f0 !important;
+  border-color: #e3b9b4 !important;
+}
+.theme-portal.theme-light .scene-25d .stage-25d-background {
+  background: #e8edf2 !important;
+}
+.theme-portal.theme-light .scene-25d .stage-25d-vignette {
+  background: radial-gradient(ellipse at center, transparent 52%, rgba(60,75,90,.08) 100%) !important;
+}
+.theme-portal.theme-light .webgl-fallback {
+  color: #26313d !important;
+  background: #f8fafc !important;
+  border-color: #cbd5df !important;
+}
+.theme-portal.theme-light .webgl-fallback button {
+  color: #fff !important;
+  background: #2563a6 !important;
+  border-color: #2563a6 !important;
+}
+.theme-portal.theme-light .overflow-badge { color: #b83f35 !important; }
+.theme-portal.theme-light .scene-zone-label {
+  color: #26313d !important;
+  background: rgba(255,255,255,.96) !important;
+}
+.theme-portal.theme-light .scene-zone-label span { color: #687586 !important; }
+.theme-portal.theme-light .view-badge { color: #2563a6 !important; }
+.theme-portal.theme-light .viewer-foot { color: #687586 !important; }
+.theme-portal.theme-light .viewer-head,
+.theme-portal.theme-light .sidebar-head {
+  background: #f8fafc !important;
+  border-bottom-color: #d9dee5 !important;
+}
+.theme-portal.theme-light .viewer-head:after,
+.theme-portal.theme-light .sidebar-head:after { background: #2563a6 !important; opacity: .55 !important; }
+.theme-portal.theme-light .summary > div:after { border-color: #7b8b9b !important; }
+.theme-portal.theme-light .sidebar:before,
+.theme-portal.theme-light .right-panel:before { background: #2563a6 !important; opacity: .45 !important; }
+.theme-portal.theme-light .cargo-card:before { border-color: #9eacb9 !important; }
+.theme-portal.theme-light .cargo-card.active {
+  background: #edf5fd !important;
+  border-color: #7eacd8 !important;
+  box-shadow: inset 3px 0 #2563a6 !important;
+}
+.theme-portal.theme-light .tabs { background: #f8fafc !important; }
+.theme-portal.theme-light .property-section { border-top-color: #e1e7ed !important; }
+.theme-portal.theme-light .cg-box line { stroke: #a8b4c0 !important; }
+.theme-portal.theme-light .cg-box text { fill: #596a7b !important; }
+.theme-portal.theme-light .cg-box .cg-longitudinal { stroke: #2674c8 !important; }
+.theme-portal.theme-light .cg-box .cg-transverse { stroke: #e58a2d !important; }
