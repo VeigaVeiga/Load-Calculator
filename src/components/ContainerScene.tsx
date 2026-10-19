@@ -171,7 +171,6 @@ function ProceduralSky() {
     }
     const tex = new THREE.CanvasTexture(canvas)
     tex.colorSpace = THREE.SRGBColorSpace
-    tex.mapping = THREE.EquirectangularReflectionMapping
     tex.needsUpdate = true
     return tex
   }, [])
