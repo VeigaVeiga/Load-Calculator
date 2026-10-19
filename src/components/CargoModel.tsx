@@ -101,15 +101,15 @@ function CargoModel({ p, container, selected, onPointerDown, onPointerUp, onPoin
       {/* Lightweight legacy pallet model: one load block and a simple deck/runner structure. */}
       <group position={[0, 0, (-rawH / 2 + Math.min(120, Math.max(70, rawH * .08) ) / 2) * S]}>
         <MemoBox size={[L, W, Math.min(120, Math.max(70, rawH * .08)) * S * .32]} color="#b57b45" roughness={.86} eventProps={eventProps} outline opacity={ghostOpacity} />
-        {[-.34, 0, .34].map((t, i) => <MemoBox key={`deck-${i}`} position={[0, t * W * .28, Math.min(120, Math.max(70, rawH * .08)) * S * .34]} size={[L, W * .16, Math.min(120, Math.max(70, rawH * .08)) * S * .22]} color="#8a5a32" roughness={.86} outline opacity={ghostOpacity} />)}
-        {[-.34, 0, .34].map((t, i) => <MemoBox key={`runner-${i}`} position={[t * L, 0, -Math.min(120, Math.max(70, rawH * .08)) * S * .20]} size={[Math.max(55, rawL * .11) * S, W * .72, Math.min(120, Math.max(70, rawH * .08)) * S * .36]} color="#76502f" roughness={.88} outline opacity={ghostOpacity} />)}
+        {[-.34, 0, .34].map((t, i) => <MemoBox key={`deck-${i}`} position={[0, t * W * .28, Math.min(120, Math.max(70, rawH * .08)) * S * .34]} size={[L, W * .16, Math.min(120, Math.max(70, rawH * .08)) * S * .22]} color="#8a5a32" roughness={.86} opacity={ghostOpacity} />)}
+        {[-.34, 0, .34].map((t, i) => <MemoBox key={`runner-${i}`} position={[t * L, 0, -Math.min(120, Math.max(70, rawH * .08)) * S * .20]} size={[Math.max(55, rawL * .11) * S, W * .72, Math.min(120, Math.max(70, rawH * .08)) * S * .36]} color="#76502f" roughness={.88} opacity={ghostOpacity} />)}
       </group>
       <MemoBox size={[L, W, Math.max(1, rawH - Math.min(120, Math.max(70, rawH * .08))) * S]} position={[0, 0, (-rawH / 2 + Math.min(120, Math.max(70, rawH * .08)) + Math.max(1, rawH - Math.min(120, Math.max(70, rawH * .08))) / 2) * S]} color={mainColor} roughness={.68} eventProps={eventProps} outline opacity={ghostOpacity} />
     </> : crate ? <>
       {/* Lightweight legacy crate model; avoid dozens of overlapping detail meshes. */}
       <MemoBox size={[L, W, H]} color="#9a6638" roughness={.82} eventProps={eventProps} outline opacity={ghostOpacity} />
-      {[-.38, -.13, .13, .38].map((t, i) => <MemoBox key={`sx${i}`} position={[0, t * W, 0]} size={[L * .96, Math.max(12, rawW * .045) * S, H * .96]} color="#c08a52" roughness={.84} outline opacity={ghostOpacity} />)}
-      {[-.40, 0, .40].map((t, i) => <MemoBox key={`sz${i}`} position={[t * L, 0, 0]} size={[Math.max(12, rawL * .045) * S, W * .96, H * .96]} color="#b97d46" roughness={.84} outline opacity={ghostOpacity} />)}
+      {[-.38, -.13, .13, .38].map((t, i) => <MemoBox key={`sx${i}`} position={[0, t * W, 0]} size={[L * .96, Math.max(12, rawW * .045) * S, H * .96]} color="#c08a52" roughness={.84} opacity={ghostOpacity} />)}
+      {[-.40, 0, .40].map((t, i) => <MemoBox key={`sz${i}`} position={[t * L, 0, 0]} size={[Math.max(12, rawL * .045) * S, W * .96, H * .96]} color="#b97d46" roughness={.84} opacity={ghostOpacity} />)}
     </>: drum ? (() => {
       const diameter = Math.min(rawL, rawW) * .91 * S
       const radius = diameter / 2
