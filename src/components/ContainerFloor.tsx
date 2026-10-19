@@ -2,7 +2,7 @@ import { Line } from '@react-three/drei'
 import type { ReactElement } from 'react'
 import type { Container } from '../types'
 const S=.001
-const isLightIndustrialTheme = () => typeof document !== 'undefined' && document.querySelector('.app.theme-light') !== null
+import { isLightIndustrialTheme } from '../theme'
 export default function ContainerFloor({container}:{container:Container}){
  const L=container.length*S,W=container.width*S
  const lines:ReactElement[]=[]
