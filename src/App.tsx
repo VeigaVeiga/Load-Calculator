@@ -252,21 +252,8 @@ function makeCustom(
 
 function App() {
   const [lang, setLang] = useState<Lang>('zh')
-  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
-    try {
-      return window.localStorage.getItem('load-calculator-theme') === 'light' ? 'light' : 'dark'
-    } catch {
-      return 'dark'
-    }
-  })
-
-  useEffect(() => {
-    try {
-      window.localStorage.setItem('load-calculator-theme', theme)
-    } catch {
-      // Theme selection still works for this session when storage is unavailable.
-    }
-  }, [theme])
+  // Light mode is temporarily disabled until its visual issues are resolved.
+  const [theme] = useState<'dark' | 'light'>('dark')
   const [showAcknowledgements, setShowAcknowledgements] = useState(false)
   const [showCargoCatalog, setShowCargoCatalog] = useState(false)
   const [kfcCopy, setKfcCopy] = useState('正在获取文案…')
@@ -1051,33 +1038,20 @@ function App() {
 
   const makeTopViewSvg=(W:number,H:number)=>{
     const ratio=container.length/container.width
-    const boxH=Math.min(H-112,(W-150)/ratio),boxW=boxH*ratio,bx=(W-boxW)/2,by=68
-    const rect=(x:number,y:number,w:number,h:number,c:string)=>`<rect x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${w.toFixed(2)}" height="${h.toFixed(2)}" fill="${c}" fill-opacity=".86" stroke="#243b4b" stroke-width="1.15"/>`
+    const boxH=Math.min(H-70,(W-80)/ratio),boxW=boxH*ratio,bx=(W-boxW)/2,by=50
+    const rect=(x:number,y:number,w:number,h:number,c:string)=>`<rect x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${w.toFixed(2)}" height="${h.toFixed(2)}" fill="${c}" fill-opacity=".82" stroke="#243b4b" stroke-width="1.2"/>`
     const poly=(pts:Array<[number,number]>,fill:string)=>`<polygon points="${pts.map(([x,y])=>`${x.toFixed(2)},${y.toFixed(2)}`).join(' ')}" fill="${fill}" stroke="#243b4b" stroke-width="1.2"/>`
     let shapes=''
-    // Container engineering details: corner castings, top side rails, floor seams and wall ribs.
-    for(let i=1;i<34;i++){const x=bx+boxW*i/34;shapes+=`<line x1="${x}" y1="${by+2}" x2="${x}" y2="${by+boxH-2}" stroke="#9bb0bf" stroke-width=".65" opacity=".42"/>`}
-    for(const edgeY of [by+3,by+boxH-3]){shapes+=`<line x1="${bx+4}" y1="${edgeY}" x2="${bx+boxW-4}" y2="${edgeY}" stroke="#355a75" stroke-width="2.3"/>`}
-    for(const [cx,cy] of [[bx+5,by+5],[bx+boxW-5,by+5],[bx+5,by+boxH-5],[bx+boxW-5,by+boxH-5]]){shapes+=`<rect x="${cx-3.5}" y="${cy-3.5}" width="7" height="7" rx=".7" fill="#dce7ee" stroke="#244b68" stroke-width="1.2"/><circle cx="${cx}" cy="${cy}" r="1.4" fill="#244b68"/>`}
-    for(let i=0;i<Math.min(18,Math.max(8,Math.floor(boxW/25)));i++){const x=bx+boxW*(i+.5)/Math.min(18,Math.max(8,Math.floor(boxW/25)));shapes+=`<line x1="${x}" y1="${by+boxH*.08}" x2="${x}" y2="${by+boxH*.92}" stroke="#8ca1b0" stroke-width=".55" opacity=".35"/>`}
-    for(let i=0;i<placed.length;i++){
-      const p=placed[i],d=p.rotation%180===0?{l:p.length,w:p.width}:{l:p.width,w:p.length}
-      const x=bx+p.x/container.length*boxW,y=by+p.y/container.width*boxH,w=d.l/container.length*boxW,h=d.w/container.width*boxH
-      shapes+=rect(x,y,w,h,p.color)
-      if(w>38&&h>19)shapes+=`<text x="${x+w/2}" y="${y+h/2-2}" text-anchor="middle" font-size="8" font-weight="700" fill="#20384b" stroke="#ffffff" stroke-width=".7" paint-order="stroke">${i+1}</text><text x="${x+w/2}" y="${y+h/2+7}" text-anchor="middle" font-size="5.5" fill="#20384b" stroke="#ffffff" stroke-width=".6" paint-order="stroke">${Math.round(d.l)}×${Math.round(d.w)}</text>`
-    }
+    for(const p of placed){const d=p.rotation%180===0?{l:p.length,w:p.width}:{l:p.width,w:p.length};shapes+=rect(bx+p.x/container.length*boxW,by+p.y/container.width*boxH,d.l/container.length*boxW,d.w/container.width*boxH,p.color)}
     for(const m of materials){
       const mx=bx+m.x/container.length*boxW,my=by+m.y/container.width*boxH,mw=Math.max(2,m.length/container.length*boxW),mh=Math.max(2,m.width/container.width*boxH)
       if(m.type==='lashingBelt'&&m.path?.length){const clipId=`lash-top-${String(m.id).replace(/[^a-zA-Z0-9_-]/g,'')}`;shapes+=`<defs><clipPath id="${clipId}"><rect x="${bx+2}" y="${by+2}" width="${boxW-4}" height="${boxH-4}"/></clipPath></defs><g clip-path="url(#${clipId})">${lashingProjection(m.path.map(p=>[bx+p.x/container.length*boxW,by+p.y/container.width*boxH] as [number,number]))}</g>`}
       else if(m.type==='triangleWood'){const pts=triangleProjectionPoints(m,'top').map(([x,y])=>[bx+x/container.length*boxW,by+y/container.width*boxH] as [number,number]);shapes+=poly(pts,'#3979b8')}
-      else if(m.type==='airBag')shapes+=`<rect x="${mx}" y="${my}" width="${mw}" height="${mh}" rx="3" fill="#3fa36b" stroke="#267448" stroke-width="1.2"/><path d="M${mx+mw*.15} ${my+mh*.5} Q${mx+mw*.5} ${my+mh*.2} ${mx+mw*.85} ${my+mh*.5}" fill="none" stroke="#b8f0cd" stroke-width="1.2"/>`
-      else if(m.type==='lashingBelt'){const x=bx+(m.x+m.length/2)/container.length*boxW;shapes+=`<line x1="${x}" y1="${by}" x2="${x}" y2="${by+boxH}" stroke="#9c431d" stroke-width="9" opacity=".9"/><line x1="${x}" y1="${by}" x2="${x}" y2="${by+boxH}" stroke="#f07a35" stroke-width="5"/><line x1="${x}" y1="${by}" x2="${x}" y2="${by+boxH}" stroke="#ffd3a4" stroke-width="1" stroke-dasharray="2 3"/>`}
+      else if(m.type==='airBag')shapes+=`<rect x="${mx}" y="${my}" width="${mw}" height="${mh}" rx="3" fill="#3fa36b"/>`
+      else if(m.type==='lashingBelt'){const x=bx+(m.x+m.length/2)/container.length*boxW;shapes+=`<line x1="${x}" y1="${by}" x2="${x}" y2="${by+boxH}" stroke="#ed762b" stroke-width="7" stroke-linecap="butt"/>`}
       else if(m.type==='doorNet'){const x=bx+(m.x+m.length/2)/container.length*boxW;shapes+=`<line x1="${x}" y1="${by}" x2="${x}" y2="${by+boxH}" stroke="#4d5964" stroke-width="3" stroke-dasharray="5 3"/>`}
     }
-    const dimY=by-13,dimX=bx-14
-    const dimMarkup=`<defs><marker id="dimArrowTop" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto-start-reverse"><path d="M0 0 L6 3 L0 6 Z" fill="#536d80"/></marker></defs><g fill="none" stroke="#536d80" stroke-width=".85"><line x1="${bx}" y1="${dimY}" x2="${bx+boxW}" y2="${dimY}" marker-start="url(#dimArrowTop)" marker-end="url(#dimArrowTop)"/><line x1="${bx}" y1="${dimY-4}" x2="${bx}" y2="${by-2}"/><line x1="${bx+boxW}" y1="${dimY-4}" x2="${bx+boxW}" y2="${by-2}"/><line x1="${dimX}" y1="${by}" x2="${dimX}" y2="${by+boxH}" marker-start="url(#dimArrowTop)" marker-end="url(#dimArrowTop)"/><line x1="${dimX-4}" y1="${by}" x2="${bx-2}" y2="${by}"/><line x1="${dimX-4}" y1="${by+boxH}" x2="${bx-2}" y2="${by+boxH}"/></g><g fill="#405b70" font-family="Arial,sans-serif" font-size="10"><text x="${bx+boxW/2}" y="${dimY-4}" text-anchor="middle">${container.length.toLocaleString()} mm</text><text x="${dimX-5}" y="${by+boxH/2}" text-anchor="middle" transform="rotate(-90 ${dimX-5} ${by+boxH/2})">${container.width.toLocaleString()} mm</text></g>`
-    const titleBlock=`<text x="16" y="${H-17}" font-family="Arial,sans-serif" font-size="9" fill="#637b8d">${lang==='zh'?'俯视工程投影 · 尺寸单位 mm':'TOP ORTHOGRAPHIC · DIMENSIONS IN mm'}</text><text x="${W-16}" y="${H-17}" text-anchor="end" font-family="Arial,sans-serif" font-size="9" fill="#637b8d">${placed.length} ${lang==='zh'?'件货物':'ITEMS'} / ${materials.length} ${lang==='zh'?'件加固件':'RESTRAINTS'}</text>`
-    return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"><rect width="100%" height="100%" fill="#f8fbfd"/><text x="${W/2}" y="22" text-anchor="middle" font-size="16" font-weight="700" letter-spacing=".6" fill="#17354d">${container.name} · ${lang==='zh'?'俯视图 / TOP VIEW':'TOP VIEW'}</text><text x="16" y="22" font-size="8" fill="#6a8397">PLAN / 01</text><rect x="${bx}" y="${by}" width="${boxW}" height="${boxH}" fill="#e7f0f6" stroke="#17354d" stroke-width="3.2" stroke-linejoin="round"/>${shapes}${dimMarkup}${titleBlock}<path d="M${W-44} 42 l0 -10 l-4 6 m4 -6 l4 6" fill="none" stroke="#3c5e77" stroke-width="1.2"/><text x="${W-44}" y="51" text-anchor="middle" font-size="8" fill="#3c5e77">N</text></svg>`
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"><rect width="100%" height="100%" fill="#fff"/><text x="${W/2}" y="25" text-anchor="middle" font-size="17" font-weight="700" fill="#17354d">${container.name} · ${lang==='zh'?'俯视示意图':'TOP VIEW'}</text><rect x="${bx}" y="${by}" width="${boxW}" height="${boxH}" fill="#eef4f7" stroke="#17354d" stroke-width="5" stroke-linejoin="round"/>${shapes}</svg>`
   }
 
   const makeSideFrontSvg=(W:number,H:number)=>{
@@ -1086,12 +1060,7 @@ function App() {
     const rect=(x:number,y:number,w:number,h:number,c:string)=>`<rect x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${w.toFixed(2)}" height="${h.toFixed(2)}" fill="${c}" fill-opacity=".82" stroke="#243b4b" stroke-width="1.1"/>`
     const poly=(pts:Array<[number,number]>,fill:string)=>`<polygon points="${pts.map(([x,y])=>`${x.toFixed(2)},${y.toFixed(2)}`).join(' ')}" fill="${fill}" stroke="#243b4b" stroke-width="1.2"/>`
     let left='',frontShapes=''
-    // Longitudinal wall ribs, corner posts, top/bottom rails and door lock bars.
-    for(let i=1;i<42;i++){const x=side.x+side.w*i/42;left+=`<line x1="${x}" y1="${side.y+2}" x2="${x}" y2="${side.y+side.h-2}" stroke="#91a7b7" stroke-width=".65" opacity=".55"/>`}
-    left+=`<line x1="${side.x}" y1="${side.y+3}" x2="${side.x+side.w}" y2="${side.y+3}" stroke="#294e69" stroke-width="3"/><line x1="${side.x}" y1="${side.y+side.h-3}" x2="${side.x+side.w}" y2="${side.y+side.h-3}" stroke="#294e69" stroke-width="3"/><rect x="${side.x}" y="${side.y}" width="${side.w}" height="${side.h}" fill="none" stroke="#17354d" stroke-width="3"/>`
-    for(let i=1;i<10;i++){const x=front.x+front.w*i/10;frontShapes+=`<line x1="${x}" y1="${front.y+2}" x2="${x}" y2="${front.y+front.h-2}" stroke="#8099aa" stroke-width=".9" opacity=".7"/>`}
-    frontShapes+=`<line x1="${front.x+front.w*.08}" y1="${front.y+front.h*.33}" x2="${front.x+front.w*.92}" y2="${front.y+front.h*.33}" stroke="#526d81" stroke-width="2"/><line x1="${front.x+front.w*.08}" y1="${front.y+front.h*.67}" x2="${front.x+front.w*.92}" y2="${front.y+front.h*.67}" stroke="#526d81" stroke-width="2"/><rect x="${front.x}" y="${front.y}" width="${front.w}" height="${front.h}" fill="none" stroke="#17354d" stroke-width="3"/>`
-    for(let i=0;i<placed.length;i++){const p=placed[i],d=p.rotation%180===0?{l:p.length,w:p.width}:{l:p.width,w:p.length};const x=side.x+p.x/container.length*side.w,y=side.y+(1-(p.z+p.height)/container.height)*side.h,w=d.l/container.length*side.w,h=p.height/container.height*side.h;left+=rect(x,y,w,h,p.color);if(w>38&&h>18)left+=`<text x="${x+w/2}" y="${y+h/2+3}" text-anchor="middle" font-size="8" font-weight="700" fill="#20384b" stroke="#fff" stroke-width=".7" paint-order="stroke">${i+1}</text>`;const fx=front.x+p.y/container.width*front.w,fy=front.y+(1-(p.z+p.height)/container.height)*front.h,fw=d.w/container.width*front.w,fh=p.height/container.height*front.h;frontShapes+=rect(fx,fy,fw,fh,p.color);if(fw>28&&fh>18)frontShapes+=`<text x="${fx+fw/2}" y="${fy+fh/2+3}" text-anchor="middle" font-size="8" font-weight="700" fill="#20384b" stroke="#fff" stroke-width=".7" paint-order="stroke">${i+1}</text>`}
+    for(const p of placed){const d=p.rotation%180===0?{l:p.length,w:p.width}:{l:p.width,w:p.length};left+=rect(side.x+p.x/container.length*side.w,side.y+(1-(p.z+p.height)/container.height)*side.h,d.l/container.length*side.w,p.height/container.height*side.h,p.color);frontShapes+=rect(front.x+p.y/container.width*front.w,front.y+(1-(p.z+p.height)/container.height)*front.h,d.w/container.width*front.w,p.height/container.height*front.h,p.color)}
     for(const m of materials){
       const sx=side.x+(m.x+m.length/2)/container.length*side.w,sy=side.y+(1-(m.z+m.height)/container.height)*side.h,sh=Math.max(2,m.height/container.height*side.h),fx=front.x+m.y/container.width*front.w,fy=front.y+(1-(m.z+m.height)/container.height)*front.h,fw=Math.max(2,m.width/container.width*front.w)
       if(m.type==='lashingBelt'&&m.path?.length){const sidePts=m.path.map(p=>[side.x+p.x/container.length*side.w,side.y+(1-p.z/container.height)*side.h] as [number,number]);const frontPts=m.path.map(p=>[front.x+p.y/container.width*front.w,front.y+(1-p.z/container.height)*front.h] as [number,number]);const sid=`lash-side-${String(m.id).replace(/[^a-zA-Z0-9_-]/g,'')}`,fid=`lash-front-${String(m.id).replace(/[^a-zA-Z0-9_-]/g,'')}`;left+=`<defs><clipPath id="${sid}"><rect x="${side.x+2}" y="${side.y+2}" width="${side.w-4}" height="${side.h-4}"/></clipPath></defs><g clip-path="url(#${sid})">${lashingProjection(sidePts)}</g>`;frontShapes+=`<defs><clipPath id="${fid}"><rect x="${front.x+2}" y="${front.y+2}" width="${front.w-4}" height="${front.h-4}"/></clipPath></defs><g clip-path="url(#${fid})">${lashingProjection(frontPts)}</g>`}
@@ -1111,8 +1080,7 @@ function App() {
         frontShapes+=`<defs><clipPath id="${clipId}"><rect x="${front.x}" y="${front.y}" width="${front.w}" height="${front.h}"/></clipPath></defs><g clip-path="url(#${clipId})">${netLines}</g><rect x="${front.x}" y="${front.y}" width="${front.w}" height="${front.h}" fill="none" stroke="#4d5964" stroke-width="2.5"/>`
       }else{left+=`<rect x="${sx}" y="${sy}" width="2" height="${sh}" fill="none" stroke="#737b82" stroke-width="2" stroke-dasharray="6 5"/>`;frontShapes+=`<rect x="${fx}" y="${fy}" width="${fw}" height="${sh}" fill="none" stroke="#737b82" stroke-width="2" stroke-dasharray="6 5"/>`}
     }
-    const dim=`<defs><marker id="dimArrowSF" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto-start-reverse"><path d="M0 0 L6 3 L0 6 Z" fill="#536d80"/></marker></defs><g stroke="#536d80" stroke-width=".8" fill="none"><line x1="${side.x}" y1="${side.y+side.h+12}" x2="${side.x+side.w}" y2="${side.y+side.h+12}" marker-start="url(#dimArrowSF)" marker-end="url(#dimArrowSF)"/><line x1="${side.x}" y1="${side.y+side.h+5}" x2="${side.x}" y2="${side.y+side.h+17}"/><line x1="${side.x+side.w}" y1="${side.y+side.h+5}" x2="${side.x+side.w}" y2="${side.y+side.h+17}"/><line x1="${front.x+front.w+10}" y1="${front.y}" x2="${front.x+front.w+10}" y2="${front.y+front.h}" marker-start="url(#dimArrowSF)" marker-end="url(#dimArrowSF)"/></g><g font-family="Arial,sans-serif" font-size="9" fill="#405b70"><text x="${side.x+side.w/2}" y="${side.y+side.h+26}" text-anchor="middle">${container.length.toLocaleString()} mm</text><text x="${front.x+front.w+19}" y="${front.y+front.h/2}" text-anchor="middle" transform="rotate(-90 ${front.x+front.w+19} ${front.y+front.h/2})">${container.height.toLocaleString()} mm</text><text x="${front.x+front.w/2}" y="${front.y+front.h+25}" text-anchor="middle">${container.width.toLocaleString()} mm</text></g><text x="16" y="${H-10}" font-size="9" fill="#637b8d">${lang==='zh'?'侧视与门端正视 · 尺寸单位 mm':'SIDE ELEVATION + DOOR-END ELEVATION · mm'}</text><text x="${W-16}" y="${H-10}" text-anchor="end" font-size="9" fill="#637b8d">${placed.length} ITEMS / ${materials.length} RESTRAINTS</text>`
-    return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"><rect width="100%" height="100%" fill="#f8fbfd"/><text x="${side.x+side.w/2}" y="23" text-anchor="middle" font-size="14" font-weight="700" letter-spacing=".5" fill="#17354d">${lang==='zh'?'侧视图 / SIDE ELEVATION':'SIDE ELEVATION'}</text><text x="${front.x+front.w/2}" y="23" text-anchor="middle" font-size="14" font-weight="700" letter-spacing=".5" fill="#17354d">${lang==='zh'?'门端正视图 / FRONT ELEVATION':'FRONT ELEVATION'}</text><text x="16" y="23" font-size="8" fill="#6a8397">ELEVATION / 02–03</text><rect x="${side.x}" y="${side.y}" width="${side.w}" height="${side.h}" fill="#e7f0f6" stroke="#17354d" stroke-width="3" stroke-linejoin="round"/>${left}<rect x="${front.x}" y="${front.y}" width="${front.w}" height="${front.h}" fill="#e7f0f6" stroke="#17354d" stroke-width="3" stroke-linejoin="round"/>${frontShapes}${dim}<path d="M${side.x+side.w-12} ${side.y+side.h+2} l12 0" stroke="#17354d" stroke-width="2"/><path d="M${front.x+front.w*.18} ${front.y+front.h-5} l0 -16 m${front.w*.64} 0 l0 16" stroke="#526d81" stroke-width="2" fill="none"/></svg>`
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"><rect width="100%" height="100%" fill="#fff"/><text x="${side.x+side.w/2}" y="30" text-anchor="middle" font-size="15" font-weight="700" fill="#17354d">${lang==='zh'?'侧视示意图':'SIDE VIEW'}</text><text x="${front.x+front.w/2}" y="30" text-anchor="middle" font-size="15" font-weight="700" fill="#17354d">${lang==='zh'?'正视示意图':'FRONT VIEW'}</text><rect x="${side.x}" y="${side.y}" width="${side.w}" height="${side.h}" fill="#eef4f7" stroke="#17354d" stroke-width="5" stroke-linejoin="round"/>${left}<rect x="${front.x}" y="${front.y}" width="${front.w}" height="${front.h}" fill="#eef4f7" stroke="#17354d" stroke-width="5" stroke-linejoin="round"/>${frontShapes}</svg>`
   }
 
   const svgToPng=async(svg:string,W:number,H:number)=>{
@@ -1231,15 +1199,6 @@ function App() {
 
           <button onClick={exportPlan}>{tr.exportPlan}</button>
           <button onClick={exportThree}>{tr.export}</button>
-          <button
-            className="theme-switch"
-            type="button"
-            aria-pressed={theme === 'light'}
-            onClick={() => setTheme(current => current === 'dark' ? 'light' : 'dark')}
-          >
-            <span aria-hidden="true">{theme === 'dark' ? '☼' : '◐'}</span>
-            {theme === 'dark' ? (lang === 'zh' ? '浅色模式' : 'Light mode') : (lang === 'zh' ? '深色模式' : 'Dark mode')}
-          </button>
         </div>
       </header>
 
