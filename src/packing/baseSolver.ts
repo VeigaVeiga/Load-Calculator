@@ -161,13 +161,29 @@ function annealingQuality(items: PlacedCargo[], container: Container, cargo: Car
   return count * 1_000_000_000 + normalizedMassBalance * 1_000_000 + normalizedVolume * 1_000
 }
 
-type SequenceUnit = { key: string; volume: number; footprint: number; weight: number }
+type SequenceUnit = { key: string; group: string; volume: number; footprint: number; weight: number }
 
 function mutateOrder(items: SequenceUnit[], random: () => number): SequenceUnit[] {
   const next = [...items]
   if (next.length < 2) return next
-  const a = Math.floor(random() * next.length)
-  const b = Math.floor(random() * next.length)
+
+  // Mixed loads often contain hundreds of identical cartons. Randomly swapping
+  // two of those is a no-op for packing quality, so bias mutations toward
+  // different cargo groups while preserving a deterministic fallback for a
+  // homogeneous shipment.
+  const groups = new Set(next.map(item => item.group))
+  let a = Math.floor(random() * next.length)
+  let b = Math.floor(random() * next.length)
+  if (groups.size > 1) {
+    for (let attempt = 0; attempt < 12 && next[a].group === next[b].group; attempt += 1) {
+      a = Math.floor(random() * next.length)
+      b = Math.floor(random() * next.length)
+    }
+    if (next[a].group === next[b].group) {
+      const other = next.findIndex((item, index) => index !== a && item.group !== next[a].group)
+      if (other >= 0) b = other
+    }
+  }
   const move = Math.floor(random() * 10)
 
   if (move < 4) {
@@ -212,6 +228,7 @@ function refineBySequenceSearch(
   let order: SequenceUnit[] = cargo.flatMap(item =>
     Array.from({ length: Math.max(0, Math.floor(item.quantity)) }, (_, index) => ({
       key: item.id + '#' + (index + 1),
+      group: item.id,
       volume: item.length * item.width * item.height,
       footprint: item.length * item.width,
       weight: Math.max(0, item.weight),
