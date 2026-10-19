@@ -25,9 +25,11 @@ export function analyzeWeight(
   // A malformed/legacy placement must not poison the entire sum with NaN,
   // which previously made the CG fall back to the container centre and show 0 offset.
   const weightOf = (p: PlacedCargo) => {
-    if (Number.isFinite(p.weight) && p.weight >= 0) return p.weight
-    const fallback = weightByCargoId.get(p.cargoId)
-    return Number.isFinite(fallback) && (fallback ?? -1) >= 0 ? fallback as number : 0
+    // Current cargo definitions are authoritative. Older placed snapshots can
+    // contain stale zero weights even when the cargo list has a real weight.
+    const currentWeight = weightByCargoId.get(p.cargoId)
+    if (currentWeight !== undefined && Number.isFinite(currentWeight) && currentWeight >= 0) return currentWeight
+    return Number.isFinite(p.weight) && p.weight >= 0 ? p.weight : 0
   }
   const total = items.reduce((sum, p) => sum + weightOf(p), 0)
   const moment = { x: 0, y: 0, z: 0 }
