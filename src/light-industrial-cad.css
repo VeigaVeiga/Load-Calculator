@@ -735,3 +735,165 @@ html:has(.app.theme-light), body:has(.app.theme-light), body:has(.app.theme-ligh
 
 .theme-portal.theme-light .scene-toolbox button.active,
 .theme-portal.theme-light .scene-toolbox button.active * { color: #fff !important; background-color: #2563a6 !important; border-color: #2563a6 !important; }
+
+
+/* Final light-theme simplification: remove legacy dark-theme ornamentation and accidental boxed text. */
+.theme-portal.theme-light .topbar,
+.theme-portal.theme-light .sidebar,
+.theme-portal.theme-light .viewer,
+.theme-portal.theme-light .right-panel,
+.theme-portal.theme-light .summary > div,
+.theme-portal.theme-light .custom-bar,
+.theme-portal.theme-light .cargo-card,
+.theme-portal.theme-light .bias-card,
+.theme-portal.theme-light .securing-palette,
+.theme-portal.theme-light .property-section,
+.theme-portal.theme-light .analysis,
+.theme-portal.theme-light .kfc-card,
+.theme-portal.theme-light .viewer-head,
+.theme-portal.theme-light .sidebar-head,
+.theme-portal.theme-light .view-toolbar,
+.theme-portal.theme-light .viewer-foot {
+  box-shadow: none !important;
+  text-shadow: none !important;
+}
+.theme-portal.theme-light .topbar::before,
+.theme-portal.theme-light .topbar::after,
+.theme-portal.theme-light .sidebar::before,
+.theme-portal.theme-light .sidebar::after,
+.theme-portal.theme-light .viewer::before,
+.theme-portal.theme-light .viewer::after,
+.theme-portal.theme-light .right-panel::before,
+.theme-portal.theme-light .right-panel::after,
+.theme-portal.theme-light .sidebar-head::before,
+.theme-portal.theme-light .sidebar-head::after,
+.theme-portal.theme-light .viewer-head::before,
+.theme-portal.theme-light .viewer-head::after,
+.theme-portal.theme-light .tabs::before,
+.theme-portal.theme-light .tabs::after,
+.theme-portal.theme-light .viewer-foot::before,
+.theme-portal.theme-light .cargo-card::before,
+.theme-portal.theme-light .cargo-card::after,
+.theme-portal.theme-light .summary > div::before,
+.theme-portal.theme-light .summary > div::after,
+.theme-portal.theme-light .bias-card::before,
+.theme-portal.theme-light .bias-card::after {
+  display: none !important;
+  content: none !important;
+  background: none !important;
+  border: 0 !important;
+}
+.theme-portal.theme-light .topbar {
+  background: #f8fafc !important;
+  border: 0 !important;
+  border-bottom: 1px solid #d5dde6 !important;
+}
+.theme-portal.theme-light .topbar h1,
+.theme-portal.theme-light .topbar .hero-title h1 { color: #243b53 !important; -webkit-text-fill-color: #243b53 !important; }
+.theme-portal.theme-light .hero-title { height: auto !important; min-height: 42px !important; overflow: visible !important; }
+.theme-portal.theme-light .theme-switch { position: relative !important; }
+.theme-portal.theme-light .theme-switch:hover::after,
+.theme-portal.theme-light .theme-switch:hover::before { display: none !important; content: none !important; }
+.theme-portal.theme-light .theme-switch[title] { cursor: pointer; }
+.theme-portal.theme-light .sidebar-head,
+.theme-portal.theme-light .viewer-head,
+.theme-portal.theme-light .view-toolbar,
+.theme-portal.theme-light .viewer-foot {
+  border-radius: 0 !important;
+  border-bottom: 1px solid #d5dde6 !important;
+  border-top: 0 !important;
+}
+.theme-portal.theme-light .sidebar,
+.theme-portal.theme-light .viewer,
+.theme-portal.theme-light .right-panel,
+.theme-portal.theme-light .summary > div {
+  border: 1px solid #d5dde6 !important;
+  border-radius: 3px !important;
+}
+.theme-portal.theme-light .summary > div + div { border-left: 0 !important; }
+.theme-portal.theme-light .bias-secondary,
+.theme-portal.theme-light .balance-grid span,
+.theme-portal.theme-light .cargo-data div,
+.theme-portal.theme-light .material-stats span,
+.theme-portal.theme-light .cg-values span,
+.theme-portal.theme-light .bias-limit {
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+.theme-portal.theme-light .bias-secondary,
+.theme-portal.theme-light .balance-grid,
+.theme-portal.theme-light .cargo-data,
+.theme-portal.theme-light .material-stats,
+.theme-portal.theme-light .cg-values {
+  border-bottom: 1px solid #e0e6ec !important;
+}
+.theme-portal.theme-light .bias-secondary > *,
+.theme-portal.theme-light .balance-grid > *,
+.theme-portal.theme-light .cargo-data > *,
+.theme-portal.theme-light .material-stats > *,
+.theme-portal.theme-light .cg-values > * {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+.theme-portal.theme-light .tool-row:not(.cargo-secondary-actions) button:first-child,
+.theme-portal.theme-light .tool-row:not(.cargo-secondary-actions) button:first-child:hover,
+.theme-portal.theme-light .tool-row:not(.cargo-secondary-actions) button:first-child:focus-visible {
+  color: #fff !important;
+  background: #2563a6 !important;
+  border: 1px solid #2563a6 !important;
+}
+.theme-portal.theme-light .tool-row:not(.cargo-secondary-actions) button:not(:first-child),
+.theme-portal.theme-light .cargo-secondary-actions button,
+.theme-portal.theme-light .cargo-secondary-actions button:first-child,
+.theme-portal.theme-light .cargo-secondary-actions button:nth-child(2),
+.theme-portal.theme-light .tool-row:not(.cargo-secondary-actions) button:not(:first-child):hover,
+.theme-portal.theme-light .cargo-secondary-actions button:hover,
+.theme-portal.theme-light .cargo-secondary-actions button:first-child:hover,
+.theme-portal.theme-light .cargo-secondary-actions button:nth-child(2):hover {
+  color: #3d5064 !important;
+  background: #fff !important;
+  border: 1px solid #cbd5df !important;
+  box-shadow: none !important;
+}
+.theme-portal.theme-light .tool-row:not(.cargo-secondary-actions) button:not(:first-child):hover,
+.theme-portal.theme-light .cargo-secondary-actions button:hover {
+  color: #3d5064 !important;
+  background: #f7f9fb !important;
+  border-color: #cbd5df !important;
+}
+.theme-portal.theme-light .canvas-wrap {
+  background: linear-gradient(180deg, #a9d4f4 0%, #d5ebfb 100%) !important;
+  border: 1px solid #9bbbd6 !important;
+}
+.theme-portal.theme-light .scene-shell { background: #83c1ee !important; }
+.theme-portal.theme-light .scene-shell canvas { background: transparent !important; }
+.theme-portal.theme-light .view-badge,
+.theme-portal.theme-light .payload-badge {
+  border-radius: 2px !important;
+  box-shadow: none !important;
+}
+.theme-portal.theme-light .scene-toolbox,
+.theme-portal.theme-light .scene-toolbox button,
+.theme-portal.theme-light .scene-toolbox b,
+.theme-portal.theme-light .lashing-route-hud,
+.theme-portal.theme-light .bias-readout,
+.theme-portal.theme-light .bias-primary,
+.theme-portal.theme-light .bias-secondary {
+  box-shadow: none !important;
+}
+.theme-portal.theme-light .scene-toolbox b { background: transparent !important; border: 0 !important; }
+.theme-portal.theme-light .scene-toolbox button { background: #fff !important; color: #40556a !important; }
+.theme-portal.theme-light .scene-toolbox button.active { background: #2563a6 !important; color: #fff !important; }
+.theme-portal.theme-light .scene-toolbox button.active * { color: #fff !important; }
+.theme-portal.theme-light .scene-toolbox button:hover:not(.active) { background: #f7f9fb !important; color: #40556a !important; }
+.theme-portal.theme-light .viewer-head *,
+.theme-portal.theme-light .sidebar-head *,
+.theme-portal.theme-light .view-toolbar *,
+.theme-portal.theme-light .analysis *,
+.theme-portal.theme-light .right-panel *,
+.theme-portal.theme-light .kfc-card * {
+  text-shadow: none !important;
+}
