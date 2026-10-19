@@ -136,8 +136,8 @@ function stagePosition(type: SecuringMaterialType, materials: SecuringItem[], co
 function ProceduralSky() {
   const texture = useMemo(() => {
     const canvas = document.createElement('canvas')
-    canvas.width = 2048
-    canvas.height = 1024
+    canvas.width = 3072
+    canvas.height = 1536
     const ctx = canvas.getContext('2d')
     if (!ctx) return null
     const sky = ctx.createLinearGradient(0, 0, 0, canvas.height)
@@ -150,22 +150,23 @@ function ProceduralSky() {
     // Soft, painterly cloud clusters; deterministic placement avoids rerender flicker.
     let seed = 20261019
     const rand = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296 }
-    for (let cluster = 0; cluster < 76; cluster++) {
+    for (let cluster = 0; cluster < 42; cluster++) {
       const cx = rand() * canvas.width
-      const cy = canvas.height * (.34 + rand() * .43)
-      const scale = 18 + rand() * 52
-      const puffs = 5 + Math.floor(rand() * 10)
+      const cy = canvas.height * (.32 + rand() * .46)
+      const scale = 34 + rand() * 86
+      const puffs = 10 + Math.floor(rand() * 13)
       for (let puff = 0; puff < puffs; puff++) {
-        const x = cx + (rand() - .5) * scale * 3.4
-        const y = cy + (rand() - .5) * scale * .95
-        const radius = scale * (.32 + rand() * .68)
+        const x = cx + (rand() - .5) * scale * 3.1
+        const y = cy + (rand() - .5) * scale * .8
+        const radius = scale * (.42 + rand() * .78)
         const g = ctx.createRadialGradient(x, y, radius * .08, x, y, radius)
-        g.addColorStop(0, 'rgba(255,255,255,.86)')
-        g.addColorStop(.48, 'rgba(255,255,255,.56)')
+        g.addColorStop(0, 'rgba(255,255,255,.62)')
+        g.addColorStop(.38, 'rgba(255,255,255,.42)')
+        g.addColorStop(.76, 'rgba(255,255,255,.14)')
         g.addColorStop(1, 'rgba(255,255,255,0)')
         ctx.fillStyle = g
         ctx.beginPath()
-        ctx.ellipse(x, y, radius * 1.55, radius * .72, 0, 0, Math.PI * 2)
+        ctx.ellipse(x, y, radius * 1.7, radius * .68, (rand() - .5) * .18, 0, Math.PI * 2)
         ctx.fill()
       }
     }
