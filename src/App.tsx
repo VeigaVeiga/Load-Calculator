@@ -1837,8 +1837,12 @@ function App() {
               {lang === 'zh' ? '本站装柜工具仅供学习参考' : 'For educational reference only.'}
             </span>
 
-            <span>
-              {lang === 'zh' ? '偏载' : 'IMBALANCE'} {analysis.dominantOffset.toFixed(0)} kg
+            <span title={lang === 'zh'
+              ? '根据整体重心偏移换算的等效两侧载荷差，不是直接称量得到的左右货重差。'
+              : 'Equivalent support-load difference derived from the overall centre-of-gravity offset; not a direct sum of cargo weights on each side.'}>
+              {lang === 'zh'
+                ? `最大等效偏载（${analysis.dominantDirection === 'left' ? '左侧' : analysis.dominantDirection === 'right' ? '右侧' : analysis.dominantDirection === 'front' ? '前侧' : analysis.dominantDirection === 'rear' ? '后侧' : '平衡'}）`
+                : `MAX EQUIVALENT IMBALANCE (${analysis.dominantDirection.toUpperCase()})`} {analysis.dominantOffset.toFixed(0)} kg
             </span>
             {unloadedCount > 0 && (
               <span className="overflow-badge">
