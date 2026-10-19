@@ -513,3 +513,222 @@ html:has(.app.theme-light), body:has(.app.theme-light), body:has(.app.theme-ligh
 .theme-portal.theme-light .cg-box text { fill: #596a7b !important; }
 .theme-portal.theme-light .cg-box .cg-longitudinal { stroke: #2674c8 !important; }
 .theme-portal.theme-light .cg-box .cg-transverse { stroke: #e58a2d !important; }
+
+
+/* Light theme cleanup pass: flat industrial UI, one accent action, no decorative progress strips. */
+.theme-portal.theme-light {
+  --lic-bg: #f2f5f8;
+  --lic-panel: #ffffff;
+  --lic-ink: #253445;
+  --lic-muted: #637386;
+  --lic-line: #d5dde6;
+  --lic-line-strong: #b9c6d3;
+  background: var(--lic-bg) !important;
+  color: var(--lic-ink) !important;
+}
+.theme-portal.theme-light .topbar {
+  background: #f8fafc !important;
+  border: 0 !important;
+  border-bottom: 1px solid var(--lic-line) !important;
+  box-shadow: none !important;
+  overflow: visible !important;
+}
+.theme-portal.theme-light .topbar::before,
+.theme-portal.theme-light .topbar::after,
+.theme-portal.theme-light .hero-title::before,
+.theme-portal.theme-light .hero-title::after,
+.theme-portal.theme-light .hero-orbit,
+.theme-portal.theme-light .hero-rule { display: none !important; content: none !important; }
+.theme-portal.theme-light .hero-title { overflow: visible !important; }
+.theme-portal.theme-light .hero-title h1 {
+  color: #243b53 !important;
+  background: none !important;
+  -webkit-text-fill-color: #243b53 !important;
+  text-shadow: none !important;
+  filter: none !important;
+}
+.theme-portal.theme-light .beta-badge {
+  color: #8b5b12 !important; background: #fff3d6 !important;
+  border: 1px solid #e8ce91 !important; box-shadow: none !important;
+}
+.theme-portal.theme-light .top-actions label { color: #58697a !important; }
+.theme-portal.theme-light .top-actions button,
+.theme-portal.theme-light .top-actions select {
+  color: #33475b !important; background: #fff !important;
+  border: 1px solid #cbd5df !important; box-shadow: none !important;
+}
+.theme-portal.theme-light .top-actions button:hover,
+.theme-portal.theme-light .top-actions select:hover {
+  color: #1f5b91 !important; background: #f0f6fc !important; border-color: #9eb9d3 !important;
+}
+.theme-portal.theme-light .summary > div,
+.theme-portal.theme-light .sidebar,
+.theme-portal.theme-light .viewer,
+.theme-portal.theme-light .right-panel,
+.theme-portal.theme-light .custom-bar,
+.theme-portal.theme-light .kfc-card,
+.theme-portal.theme-light .kfc-meme-frame,
+.theme-portal.theme-light .bias-card,
+.theme-portal.theme-light .bias-primary,
+.theme-portal.theme-light .bias-secondary,
+.theme-portal.theme-light .bias-limit,
+.theme-portal.theme-light .cargo-card,
+.theme-portal.theme-light .property-section,
+.theme-portal.theme-light .securing-palette {
+  background: #fff !important;
+  color: var(--lic-ink) !important;
+  border-color: var(--lic-line) !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
+  backdrop-filter: none !important;
+}
+.theme-portal.theme-light .sidebar,
+.theme-portal.theme-light .viewer,
+.theme-portal.theme-light .right-panel,
+.theme-portal.theme-light .summary > div {
+  border: 1px solid var(--lic-line) !important;
+  border-radius: 4px !important;
+}
+.theme-portal.theme-light .sidebar::before,
+.theme-portal.theme-light .sidebar::after,
+.theme-portal.theme-light .right-panel::before,
+.theme-portal.theme-light .right-panel::after,
+.theme-portal.theme-light .viewer::before,
+.theme-portal.theme-light .viewer::after,
+.theme-portal.theme-light .summary > div::before,
+.theme-portal.theme-light .summary > div::after,
+.theme-portal.theme-light .cargo-card::before,
+.theme-portal.theme-light .cargo-card::after {
+  display: none !important; content: none !important; box-shadow: none !important;
+}
+.theme-portal.theme-light .sidebar-head,
+.theme-portal.theme-light .viewer-head,
+.theme-portal.theme-light .view-toolbar,
+.theme-portal.theme-light .tabs,
+.theme-portal.theme-light .viewer-foot {
+  background: #f5f8fb !important;
+  color: #253445 !important;
+  border-color: var(--lic-line) !important;
+  box-shadow: none !important;
+}
+.theme-portal.theme-light .sidebar-head h2,
+.theme-portal.theme-light .viewer-head h2,
+.theme-portal.theme-light .viewer-head span,
+.theme-portal.theme-light .viewer-status,
+.theme-portal.theme-light .viewer-status span,
+.theme-portal.theme-light .viewer-status strong,
+.theme-portal.theme-light .view-toolbar,
+.theme-portal.theme-light .view-toolbar b,
+.theme-portal.theme-light .toolbar-group b,
+.theme-portal.theme-light .sidebar-head span,
+.theme-portal.theme-light .analysis h3,
+.theme-portal.theme-light .analysis h4,
+.theme-portal.theme-light .right-panel h2,
+.theme-portal.theme-light .right-panel h3,
+.theme-portal.theme-light .right-panel h4,
+.theme-portal.theme-light .kfc-copy,
+.theme-portal.theme-light .kfc-card p {
+  color: #33475b !important;
+  text-shadow: none !important;
+}
+.theme-portal.theme-light .view-badge,
+.theme-portal.theme-light .payload-badge {
+  color: #33475b !important; background: #eef3f8 !important;
+  border: 1px solid #d5dfe8 !important; box-shadow: none !important;
+}
+.theme-portal.theme-light .cargo-list { background: transparent !important; }
+.theme-portal.theme-light .tool-row button,
+.theme-portal.theme-light .cargo-secondary-actions button {
+  color: #3d5064 !important; background: #fff !important;
+  border: 1px solid #cbd5df !important; box-shadow: none !important;
+}
+.theme-portal.theme-light .tool-row button:hover,
+.theme-portal.theme-light .cargo-secondary-actions button:hover {
+  color: #245f96 !important; background: #f0f6fc !important; border-color: #a6bfd8 !important;
+}
+.theme-portal.theme-light .tool-row:not(.cargo-secondary-actions) button:first-child {
+  color: #fff !important; background: #2563a6 !important; border-color: #2563a6 !important;
+}
+.theme-portal.theme-light .tool-row:not(.cargo-secondary-actions) button:first-child:hover {
+  color: #fff !important; background: #1f568f !important; border-color: #1f568f !important;
+}
+.theme-portal.theme-light .tool-row:not(.cargo-secondary-actions) button:not(:first-child),
+.theme-portal.theme-light .cargo-secondary-actions button {
+  color: #3d5064 !important; background: #fff !important; border-color: #cbd5df !important;
+}
+.theme-portal.theme-light .view-toolbar button,
+.theme-portal.theme-light .tabs button,
+.theme-portal.theme-light .property-actions button,
+.theme-portal.theme-light .material-toolbar button,
+.theme-portal.theme-light .scene-toolbox button {
+  color: #40556a !important; background: #fff !important;
+  border: 1px solid #d0d9e2 !important; box-shadow: none !important;
+}
+.theme-portal.theme-light .view-toolbar button.active,
+.theme-portal.theme-light .tabs button.active,
+.theme-portal.theme-light .scene-toolbox button.active {
+  color: #fff !important; background: #2563a6 !important; border-color: #2563a6 !important;
+}
+.theme-portal.theme-light .canvas-wrap,
+.theme-portal.theme-light .scene-shell,
+.theme-portal.theme-light .scene-shell canvas,
+.theme-portal.theme-light .scene-25d .stage-25d-background {
+  background: #e8eef4 !important;
+  border-color: #cbd6e1 !important;
+  box-shadow: none !important;
+}
+.theme-portal.theme-light .canvas-wrap::before,
+.theme-portal.theme-light .canvas-wrap::after,
+.theme-portal.theme-light .scene-shell::before,
+.theme-portal.theme-light .scene-shell::after,
+.theme-portal.theme-light .stage-25d-vignette { display: none !important; content: none !important; }
+.theme-portal.theme-light .scene-toolbox,
+.theme-portal.theme-light .lashing-route-hud,
+.theme-portal.theme-light .scene-label,
+.theme-portal.theme-light .scene-zone-label,
+.theme-portal.theme-light .transform-mode-hint,
+.theme-portal.theme-light .scene-25d .scene-overlay,
+.theme-portal.theme-light .bias-readout {
+  color: #26394d !important;
+  background: rgba(255,255,255,.97) !important;
+  border-color: #cbd6e1 !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
+}
+.theme-portal.theme-light .scene-toolbox *,
+.theme-portal.theme-light .lashing-route-hud *,
+.theme-portal.theme-light .scene-label *,
+.theme-portal.theme-light .scene-zone-label *,
+.theme-portal.theme-light .transform-mode-hint * {
+  color: #33475b !important;
+  text-shadow: none !important;
+}
+.theme-portal.theme-light .cargo-card.active {
+  background: #f0f6fc !important; border-color: #8eafd0 !important;
+  box-shadow: inset 3px 0 #2563a6 !important;
+}
+.theme-portal.theme-light .property-section,
+.theme-portal.theme-light .analysis,
+.theme-portal.theme-light .properties,
+.theme-portal.theme-light .props-content,
+.theme-portal.theme-light .right-panel .tab-content {
+  border-color: #e0e6ec !important; box-shadow: none !important;
+}
+.theme-portal.theme-light .kfc-card,
+.theme-portal.theme-light .kfc-copy { color: #34475a !important; }
+.theme-portal.theme-light .kfc-random-btn {
+  color: #fff !important; background: #2563a6 !important; border-color: #2563a6 !important; box-shadow: none !important;
+}
+.theme-portal.theme-light .app-subtitle,
+.theme-portal.theme-light .eyebrow,
+.theme-portal.theme-light .hint,
+.theme-portal.theme-light .muted,
+.theme-portal.theme-light .viewer-foot { color: #657589 !important; }
+.theme-portal.theme-light .cargo-data div,
+.theme-portal.theme-light .balance-grid span,
+.theme-portal.theme-light .cg-values span,
+.theme-portal.theme-light .material-stats span { color: #405368 !important; background: #f7f9fb !important; border-color: #dce4eb !important; }
+.theme-portal.theme-light .scene-zone-label,
+.theme-portal.theme-light .overflow-more { border-radius: 2px !important; }
+.theme-portal.theme-light .packing-overlay { background: rgba(240,245,250,.82) !important; }
+.theme-portal.theme-light .packing-panel { color: #26394d !important; background: #fff !important; border: 1px solid #cbd6e1 !important; box-shadow: none !important; }
