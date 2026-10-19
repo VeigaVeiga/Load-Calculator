@@ -131,6 +131,58 @@ function MaterialObject({ item, container, selected, onSelect, registerRef, onDe
 function stageFootprint(type: SecuringMaterialType, container: Container): [number,number] {if(type==='lashingBelt')return[700,Math.min(2700,container.width+300)];if(type==='airBag')return[1100,1100];if(type==='triangleWood')return[350,350];return[Math.min(container.length,2800),Math.min(container.width,2600)]}
 function stagePosition(type: SecuringMaterialType, materials: SecuringItem[], container: Container){const stageMinY=container.width+MATERIAL_STAGE_GAP,stageMaxY=stageMinY+MATERIAL_STAGE_DEPTH,centerX=container.length/2,centerY=stageMinY+MATERIAL_STAGE_DEPTH/2,[fw,fd]=stageFootprint(type,container),candidates:Array<[number,number]>=[[0,0],[-1,0],[1,0],[0,-1],[0,1],[-1,-1],[1,-1],[-1,1],[1,1],[-2,0],[2,0],[0,-2],[0,2],[-2,-1],[2,-1],[-2,1],[2,1]],stepX=Math.max(700,fw+180),stepY=Math.max(650,Math.min(1200,fd+180));const intersects=(cx:number,cy:number)=>materials.some(m=>{const[mw,md]=stageFootprint(m.type,container),mcx=m.x+m.length/2,mcy=m.type==='lashingBelt'?m.y+2:m.y+m.width/2;return Math.abs(cx-mcx)<(fw+mw)/2&&Math.abs(cy-mcy)<(fd+md)/2});for(const[gx,gy]of candidates){const cx=centerX+gx*stepX,cy=centerY+gy*stepY;if(cx-fw/2<0||cx+fw/2>container.length||cy-fd/2<stageMinY||cy+fd/2>stageMaxY)continue;if(!intersects(cx,cy))return{x:Math.max(0,cx-fw/2),y:Math.max(0,cy-(type==='lashingBelt'?2:fw/2)),z:0}}return{x:Math.max(0,centerX-fw/2),y:stageMinY+100,z:0}}
 
+
+/** Lightweight procedural skybox for the Light Industrial CAD theme. */
+function ProceduralSky() {
+  const texture = useMemo(() => {
+    const canvas = document.createElement('canvas')
+    canvas.width = 2048
+    canvas.height = 1024
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return null
+    const sky = ctx.createLinearGradient(0, 0, 0, canvas.height)
+    sky.addColorStop(0, '#4f9ddd')
+    sky.addColorStop(.34, '#83c1ee')
+    sky.addColorStop(.62, '#c3e3fa')
+    sky.addColorStop(1, '#eaf5fc')
+    ctx.fillStyle = sky
+    ctx.fillRect(0, 0, canvas.width, canvas.height)
+    // Soft, painterly cloud clusters; deterministic placement avoids rerender flicker.
+    let seed = 20261019
+    const rand = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296 }
+    for (let cluster = 0; cluster < 76; cluster++) {
+      const cx = rand() * canvas.width
+      const cy = canvas.height * (.34 + rand() * .43)
+      const scale = 18 + rand() * 52
+      const puffs = 5 + Math.floor(rand() * 10)
+      for (let puff = 0; puff < puffs; puff++) {
+        const x = cx + (rand() - .5) * scale * 3.4
+        const y = cy + (rand() - .5) * scale * .95
+        const radius = scale * (.32 + rand() * .68)
+        const g = ctx.createRadialGradient(x, y, radius * .08, x, y, radius)
+        g.addColorStop(0, 'rgba(255,255,255,.86)')
+        g.addColorStop(.48, 'rgba(255,255,255,.56)')
+        g.addColorStop(1, 'rgba(255,255,255,0)')
+        ctx.fillStyle = g
+        ctx.beginPath()
+        ctx.ellipse(x, y, radius * 1.55, radius * .72, 0, 0, Math.PI * 2)
+        ctx.fill()
+      }
+    }
+    const tex = new THREE.CanvasTexture(canvas)
+    tex.colorSpace = THREE.SRGBColorSpace
+    tex.mapping = THREE.EquirectangularReflectionMapping
+    tex.needsUpdate = true
+    return tex
+  }, [])
+  useEffect(() => () => texture?.dispose(), [texture])
+  if (!texture) return null
+  return <mesh renderOrder={-1000} frustumCulled={false}>
+    <sphereGeometry args={[85, 48, 32]} />
+    <meshBasicMaterial map={texture} side={THREE.BackSide} depthWrite={false} fog={false} toneMapped={false} />
+  </mesh>
+}
+
 function SceneContent({props}:{props:Props}){
  const{invalidate}=useThree()
  const{container,items,materials,selectedId,selectedIds,onSelect,onSelectMany,onMove,onMoveMany,onRotate,onRotateMaterial,onMaterialMove,onMaterialScale,onAddMaterial,onUpdateMaterialPath,view,dragging,onDragState,cargo,lang,showDimensions}=props
@@ -304,6 +356,6 @@ const addMaterial=(type:SecuringMaterialType)=>{if(type==='doorNet'){const exist
  const instancedCartons=useMemo(()=>items.filter(p=>p.cargoType==='carton'&&!selectedIds.includes(p.id)&&p.id!==selectedId&&!cargo.find(c=>c.id===p.cargoId)?.showName),[items,selectedIds,selectedId,cargo]),instancedIds=useMemo(()=>new Set(instancedCartons.map(p=>p.id)),[instancedCartons]),individualItems=useMemo(()=>items.filter(p=>!instancedIds.has(p.id)),[items,instancedIds])
  const visibleMaterials=useMemo(()=>view==='iso'?materials:materials.filter(m=>m.type==='doorNet'||m.y<container.width),[view,materials,container.width])
  const orthographic=view!=='iso'
- return <>{routeEdit&&<Html fullscreen><div className="lashing-route-hud">{lang==='zh'?['选择顶部起点','选择对侧底部挂钩（斜拉）','选择起点侧底部挂钩（横拉）','选择对侧顶部终点（斜拉）'][routeEdit.nodeIds.length]:'Select '+['top start','opposite-side bottom hook (diagonal)','start-side bottom hook (crosswise)','opposite-side top end (diagonal)'][routeEdit.nodeIds.length]} <button onClick={cancelLashingRoute}>{lang==='zh'?'取消':'Cancel'}</button></div></Html>}{orthographic?<OrthographicCamera makeDefault position={[0,0,10]} zoom={1}/>:<PerspectiveCamera makeDefault position={[10,8,6]} fov={42} near={.01} far={120}/>}<color attach="background" args={[isLightIndustrialTheme() ? '#e8edf2' : '#080808']}/><ambientLight intensity={isLightIndustrialTheme() ? 1.55 : 1.15}/><directionalLight position={[8,10,18]} intensity={isLightIndustrialTheme() ? 2.0 : 1.8}/><hemisphereLight intensity={isLightIndustrialTheme() ? .55 : .25} groundColor={isLightIndustrialTheme() ? '#c8d1d9' : '#080808'} color={isLightIndustrialTheme() ? '#ffffff' : '#d8d8d0'}/><group ref={containerStructureRef}><ContainerStructure container={container} lang={lang} showDimensions={showDimensions}/></group><ContainerFloor container={container}/>{view==='iso'&&<><SecuringMaterialZone container={container} lang={lang}/><OverflowCargoZone container={container} items={props.overflowItems} cargo={cargo} lang={lang}/></>}<LashingPoints container={container} selectable={!!routeEdit} allowedIds={routeAllowedIds} selectedIds={routeEdit?.nodeIds ?? []} onPointSelect={chooseRoutePoint}/><CoordinateAxes container={container}/><InstancedCartons items={instancedCartons} container={container} onSelect={selectCargo} ghost={!!routeEdit}/>{individualItems.map(p=><CargoObject key={p.id} p={p} container={container} selected={selectedIds.includes(p.id)||p.id===selectedId} onSelect={()=>selectCargo(p.id)} registerRef={registerRef} showName={!!cargo.find(c=>c.id===p.cargoId)?.showName} ghost={!!routeEdit}/>)}{visibleMaterials.map(m=><MaterialObject key={m.id} item={m} container={container} selected={m.id===props.selectedMaterialId} onSelect={()=>selectMaterial(m.id)} onDelete={()=>{props.onDeleteMaterial?.(m.id);props.onSelectMaterial?.(null);setActiveTransformId(null)}} registerRef={registerRef}/>)}{activeObject&&(activeMaterial||freePlacementEnabled)&&<TransformControls ref={transformControls} key={`${activeId}:${tool}`} object={activeObject} mode={activeMaterial&&tool==='scale'?'scale':tool} {...(tool==='rotate'?{axis:'Z'}:{})} space="local" translationSnap={null} rotationSnap={Math.PI/2} size={1.15} scaleSnap={.05} showX={true} showY={tool!=='rotate'} showZ onMouseDown={()=>{capture();onDragState(true)}} onMouseUp={()=>{commit();invalidate();requestAnimationFrame(()=>{onDragState(false);invalidate()})}} onObjectChange={handleObjectChange}/>}<CameraRig view={view} container={container} dragging={dragging} transformActive={!!activeObject&&!!(activeMaterial||freePlacementEnabled)} focusPoint={focusPoint} focusNonce={focusNonce} routeMode={!!routeEdit}/></>
+ return <>{routeEdit&&<Html fullscreen><div className="lashing-route-hud">{lang==='zh'?['选择顶部起点','选择对侧底部挂钩（斜拉）','选择起点侧底部挂钩（横拉）','选择对侧顶部终点（斜拉）'][routeEdit.nodeIds.length]:'Select '+['top start','opposite-side bottom hook (diagonal)','start-side bottom hook (crosswise)','opposite-side top end (diagonal)'][routeEdit.nodeIds.length]} <button onClick={cancelLashingRoute}>{lang==='zh'?'取消':'Cancel'}</button></div></Html>}{orthographic?<OrthographicCamera makeDefault position={[0,0,10]} zoom={1}/>:<PerspectiveCamera makeDefault position={[10,8,6]} fov={42} near={.01} far={120}/>}<color attach="background" args={[isLightIndustrialTheme() ? '#83c1ee' : '#080808']}/>{isLightIndustrialTheme() && <ProceduralSky/>}<ambientLight intensity={isLightIndustrialTheme() ? 1.55 : 1.15}/><directionalLight position={[8,10,18]} intensity={isLightIndustrialTheme() ? 2.0 : 1.8}/><hemisphereLight intensity={isLightIndustrialTheme() ? .55 : .25} groundColor={isLightIndustrialTheme() ? '#c8d1d9' : '#080808'} color={isLightIndustrialTheme() ? '#ffffff' : '#d8d8d0'}/><group ref={containerStructureRef}><ContainerStructure container={container} lang={lang} showDimensions={showDimensions}/></group><ContainerFloor container={container}/>{view==='iso'&&<><SecuringMaterialZone container={container} lang={lang}/><OverflowCargoZone container={container} items={props.overflowItems} cargo={cargo} lang={lang}/></>}<LashingPoints container={container} selectable={!!routeEdit} allowedIds={routeAllowedIds} selectedIds={routeEdit?.nodeIds ?? []} onPointSelect={chooseRoutePoint}/><CoordinateAxes container={container}/><InstancedCartons items={instancedCartons} container={container} onSelect={selectCargo} ghost={!!routeEdit}/>{individualItems.map(p=><CargoObject key={p.id} p={p} container={container} selected={selectedIds.includes(p.id)||p.id===selectedId} onSelect={()=>selectCargo(p.id)} registerRef={registerRef} showName={!!cargo.find(c=>c.id===p.cargoId)?.showName} ghost={!!routeEdit}/>)}{visibleMaterials.map(m=><MaterialObject key={m.id} item={m} container={container} selected={m.id===props.selectedMaterialId} onSelect={()=>selectMaterial(m.id)} onDelete={()=>{props.onDeleteMaterial?.(m.id);props.onSelectMaterial?.(null);setActiveTransformId(null)}} registerRef={registerRef}/>)}{activeObject&&(activeMaterial||freePlacementEnabled)&&<TransformControls ref={transformControls} key={`${activeId}:${tool}`} object={activeObject} mode={activeMaterial&&tool==='scale'?'scale':tool} {...(tool==='rotate'?{axis:'Z'}:{})} space="local" translationSnap={null} rotationSnap={Math.PI/2} size={1.15} scaleSnap={.05} showX={true} showY={tool!=='rotate'} showZ onMouseDown={()=>{capture();onDragState(true)}} onMouseUp={()=>{commit();invalidate();requestAnimationFrame(()=>{onDragState(false);invalidate()})}} onObjectChange={handleObjectChange}/>}<CameraRig view={view} container={container} dragging={dragging} transformActive={!!activeObject&&!!(activeMaterial||freePlacementEnabled)} focusPoint={focusPoint} focusNonce={focusNonce} routeMode={!!routeEdit}/></>
 }
 export default function ContainerScene(props:Props){const[selectedMaterialId,setSelectedMaterialId]=useState<string|null>(null),[toolbarHost,setToolbarHost]=useState<HTMLDivElement|null>(null);return <div className="scene-shell" style={{position:'relative',width:'100%',height:'100%'}}><Canvas frameloop="demand" dpr={[1,1.25]} gl={{antialias:true,powerPreference:'high-performance'}} camera={{position:[10,8,6],fov:42,near:.01,far:120,up:[0,0,1]}} onPointerMissed={()=>{props.onSelect(null);props.onSelectMany([]);setSelectedMaterialId(null)}}><SceneContent props={{...props,selectedMaterialId,onSelectMaterial:setSelectedMaterialId,toolbarHost}}/></Canvas><div ref={setToolbarHost} className="scene-toolbar-host" style={{position:'absolute',top:12,left:12,zIndex:50,pointerEvents:'none'}}/></div>}
