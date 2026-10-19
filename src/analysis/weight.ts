@@ -16,15 +16,28 @@ export interface WeightAnalysis {
   dominantDirection: 'front'|'rear'|'left'|'right'|'balanced'
 }
 
-export function analyzeWeight(items: PlacedCargo[], c: Container): WeightAnalysis {
-  const total = items.reduce((sum, p) => sum + p.weight, 0)
+export function analyzeWeight(
+  items: PlacedCargo[],
+  c: Container,
+  cargoWeights: Array<{ id: string; weight: number }> = [],
+): WeightAnalysis {
+  const weightByCargoId = new Map(cargoWeights.map((item) => [item.id, item.weight]))
+  // A malformed/legacy placement must not poison the entire sum with NaN,
+  // which previously made the CG fall back to the container centre and show 0 offset.
+  const weightOf = (p: PlacedCargo) => {
+    if (Number.isFinite(p.weight) && p.weight >= 0) return p.weight
+    const fallback = weightByCargoId.get(p.cargoId)
+    return Number.isFinite(fallback) && (fallback ?? -1) >= 0 ? fallback as number : 0
+  }
+  const total = items.reduce((sum, p) => sum + weightOf(p), 0)
   const moment = { x: 0, y: 0, z: 0 }
 
   for (const p of items) {
-    const d=dims(p)
-    moment.x += p.weight * (p.x + d.length / 2)
-    moment.y += p.weight * (p.y + d.width / 2)
-    moment.z += p.weight * (p.z + p.height / 2)
+    const d = dims(p)
+    const weight = weightOf(p)
+    moment.x += weight * (p.x + d.length / 2)
+    moment.y += weight * (p.y + d.width / 2)
+    moment.z += weight * (p.z + p.height / 2)
   }
 
   const cg = {
@@ -33,17 +46,17 @@ export function analyzeWeight(items: PlacedCargo[], c: Container): WeightAnalysi
     z: total ? moment.z / total : 0,
   }
 
-  const front = items.reduce((sum,p)=>sum + (p.x + dims(p).length/2 < c.length/2 ? p.weight : 0),0)
+  const front = items.reduce((sum,p)=>sum + (p.x + dims(p).length/2 < c.length/2 ? weightOf(p) : 0),0)
   const rear = total-front
-  const left = items.reduce((sum,p)=>sum + (p.y + dims(p).width/2 < c.width/2 ? p.weight : 0),0)
+  const left = items.reduce((sum,p)=>sum + (p.y + dims(p).width/2 < c.width/2 ? weightOf(p) : 0),0)
   const right = total-left
   const corners = { fl: 0, fr: 0, rl: 0, rr: 0 }
   for (const p of items) {
     const d=dims(p); const x=p.x+d.length/2; const y=p.y+d.width/2
-    if(x<c.length/2 && y<c.width/2) corners.fl+=p.weight
-    else if(x<c.length/2) corners.fr+=p.weight
-    else if(y<c.width/2) corners.rl+=p.weight
-    else corners.rr+=p.weight
+    if(x<c.length/2 && y<c.width/2) corners.fl+=weightOf(p)
+    else if(x<c.length/2) corners.fr+=weightOf(p)
+    else if(y<c.length/2) corners.rl+=weightOf(p)
+    else corners.rr+=weightOf(p)
   }
   // Continuous moment-based imbalance: zero when CG is on the container centreline,
   // independent of which side a box centre happens to fall on.
