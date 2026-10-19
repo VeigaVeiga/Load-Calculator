@@ -151,12 +151,12 @@ function compareScores(a: number[], b: number[]) {
   return 0
 }
 
-function annealingQuality(items: PlacedCargo[], container: Container) {
-  const [count, negativeMassBalance, volume] = score(items, container)
+function annealingQuality(items: PlacedCargo[], container: Container, cargo: Cargo[] = []) {
+  const [count, negativeMassBalance, volume] = score(items, container, cargo)
   const containerVolume = Math.max(1, container.length * container.width * container.height)
   const normalizedVolume = volume / containerVolume
-  const massBalance = negativeMassBalance / Math.max(1, container.length + container.width)
-  return count * 1_000_000_000 + massBalance * 1_000_000 + normalizedVolume * 1_000
+  const normalizedMassBalance = negativeMassBalance / Math.max(1, container.length + container.width)
+  return count * 1_000_000_000 + normalizedMassBalance * 1_000_000 + normalizedVolume * 1_000
 }
 
 type SequenceUnit = { key: string; volume: number; footprint: number; weight: number }
@@ -219,14 +219,14 @@ function refineBySequenceSearch(
   )
   const seed = openSourcePackCandidate(cargo, container, locked, 'sequence', order.map(item => item.key))
   if (!seed || !validatePlan(seed, container, cargo).ok) {
-    return { placed: [...incumbent], quality: annealingQuality(incumbent, container), iterations: 0 }
+    return { placed: [...incumbent], quality: annealingQuality(incumbent, container, cargo), iterations: 0 }
   }
   let current = seed
-  let currentQuality = annealingQuality(current, container)
+  let currentQuality = annealingQuality(current, container, cargo)
   let best = [...incumbent]
-  let bestScore = score(best, container)
-  let bestQuality = annealingQuality(best, container)
-  if (compareScores(score(current, container), bestScore) > 0) {
+  let bestScore = score(best, container, cargo)
+  let bestQuality = annealingQuality(best, container, cargo)
+  if (compareScores(score(current, container, cargo), bestScore) > 0) {
     best = [...current]
     bestScore = score(best, container)
     bestQuality = currentQuality
@@ -238,14 +238,14 @@ function refineBySequenceSearch(
     const candidateOrder = mutateOrder(order, random)
     const candidate = openSourcePackCandidate(cargo, container, locked, 'sequence', candidateOrder.map(item => item.key))
     if (candidate && validatePlan(candidate, container, cargo).ok) {
-      const candidateQuality = annealingQuality(candidate, container)
+      const candidateQuality = annealingQuality(candidate, container, cargo)
       const delta = candidateQuality - currentQuality
       if (delta >= 0 || random() < Math.exp(delta / Math.max(temperature, 1e-9))) {
         order = candidateOrder
         current = candidate
         currentQuality = candidateQuality
       }
-      const candidateScore = score(candidate, container)
+      const candidateScore = score(candidate, container, cargo)
       if (compareScores(candidateScore, bestScore) > 0) {
         best = [...candidate]
         bestScore = candidateScore
@@ -329,7 +329,7 @@ export function basePack(
   // never prefer it merely because it is a different arrangement.
   const floorCandidate = floorSpaceCandidate(cargo, container, locked)
   if (floorCandidate && validatePlan(floorCandidate, container, cargo).ok) {
-    const candidateScore = score(floorCandidate, container)
+    const candidateScore = score(floorCandidate, container, cargo)
     if (compareScores(candidateScore, bestScore) > 0) {
       best = floorCandidate
       bestScore = candidateScore
@@ -340,7 +340,7 @@ export function basePack(
   // LoadZa's F5 improvement stage. Keep the best valid plan, never a worse one.
   if (requested > locked.length && cargo.length > 1) {
     const refined = refineBySequenceSearch(cargo, container, locked, best, progress)
-    if (compareScores(score(refined.placed, container), bestScore) > 0) {
+    if (compareScores(score(refined.placed, container, cargo), bestScore) > 0) {
       best = refined.placed
       bestScore = score(best, container)
     }
