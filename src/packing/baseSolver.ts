@@ -352,6 +352,8 @@ function centerUpperStacks(items: PlacedCargo[], cargo: Cargo[], container: Cont
   if (items.length < 2) return items
   const lockedIds = new Set(locked.map(p => p.id))
   let best = items.map(p => ({ ...p }))
+  let candidatesTested = 0
+  const maxStackCandidates = 500
 
   const stackGroups = (plan: PlacedCargo[]) => {
     const elevated = plan.filter(p => p.z > 0.5)
@@ -388,6 +390,7 @@ function centerUpperStacks(items: PlacedCargo[], cargo: Cargo[], container: Cont
   for (let pass = 0; pass < 2; pass++) {
     let changed = false
     for (const groupSnapshot of stackGroups(best)) {
+      if (candidatesTested >= maxStackCandidates) break
       const groupIds = new Set(groupSnapshot.map(p => p.id))
       if (groupSnapshot.some(p => lockedIds.has(p.id) || p.locked)) continue
       const group = best.filter(p => groupIds.has(p.id))
@@ -428,13 +431,15 @@ function centerUpperStacks(items: PlacedCargo[], cargo: Cargo[], container: Cont
       }
 
       // Bound the Cartesian search; retain centre-directed candidates first.
-      const xOffsets = [...dxs].sort((a, b) => Math.abs(a) - Math.abs(b)).slice(0, 16)
-      const yOffsets = [...dys].sort((a, b) => Math.abs(a) - Math.abs(b)).slice(0, 16)
+      const xOffsets = [...dxs].slice(0, 8)
+      const yOffsets = [...dys].slice(0, 8)
       let localBest = best
       let localScore = score(best, container)
       for (const dx of xOffsets) {
         for (const dy of yOffsets) {
+          if (candidatesTested >= maxStackCandidates) break
           if (dx === 0 && dy === 0) continue
+          candidatesTested += 1
           const candidate = best.map(p => groupIds.has(p.id)
             ? { ...p, x: p.x + dx, y: p.y + dy, placementMode: 'automatic' as const }
             : p)
@@ -445,6 +450,7 @@ function centerUpperStacks(items: PlacedCargo[], cargo: Cargo[], container: Cont
             localScore = candidateScore
           }
         }
+        if (candidatesTested >= maxStackCandidates) break
       }
       if (localBest !== best) {
         best = localBest.map(p => ({ ...p }))
