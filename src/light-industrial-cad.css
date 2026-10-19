@@ -31,8 +31,8 @@ body:has(.app.theme-light) { color-scheme:light; }
 .theme-portal.theme-light .tool-row { gap:6px!important; }
 .theme-portal.theme-light .sidebar-head button,.theme-portal.theme-light .tool-row button,.theme-portal.theme-light .property-actions button,.theme-portal.theme-light .material-toolbar button,.theme-portal.theme-light .view-toolbar button,.theme-portal.theme-light .tabs button,.theme-portal.theme-light .scene-toolbox button,.theme-portal.theme-light .scene-tool-row button,.theme-portal.theme-light .scene-material-grid button,.theme-portal.theme-light .top-actions button { color:#40566a!important; background:#fff!important; border:1px solid var(--lic-line-strong)!important; border-radius:4px!important; box-shadow:none!important; text-shadow:none!important; }
 .theme-portal.theme-light .tool-row button { min-height:27px!important; }
-.theme-portal.theme-light .tool-row:not(.cargo-secondary-actions) button:first-child,.theme-portal.theme-light .tool-row:not(.cargo-secondary-actions) button:first-child:hover { color:#fff!important; background:var(--lic-blue)!important; border-color:var(--lic-blue)!important; }
-.theme-portal.theme-light .tool-row:not(.cargo-secondary-actions) button:not(:first-child),.theme-portal.theme-light .cargo-secondary-actions button,.theme-portal.theme-light .cargo-secondary-actions button:first-child,.theme-portal.theme-light .cargo-secondary-actions button:nth-child(2) { color:#40566a!important; background:#fff!important; border-color:var(--lic-line-strong)!important; }
+.theme-portal.theme-light .tool-row:not(.cargo-add-actions) button:first-child,.theme-portal.theme-light .tool-row:not(.cargo-add-actions) button:first-child:hover { color:#fff!important; background:var(--lic-blue)!important; border-color:var(--lic-blue)!important; }
+.theme-portal.theme-light .tool-row:not(.cargo-add-actions) button:not(:first-child),.theme-portal.theme-light .cargo-add-actions button,.theme-portal.theme-light .cargo-add-actions button:first-child,.theme-portal.theme-light .cargo-add-actions button:nth-child(2) { color:#40566a!important; background:#fff!important; border-color:var(--lic-line-strong)!important; }
 .theme-portal.theme-light .tool-row button:hover,.theme-portal.theme-light .property-actions button:hover,.theme-portal.theme-light .material-toolbar button:hover,.theme-portal.theme-light .view-toolbar button:hover:not(.active),.theme-portal.theme-light .tabs button:hover:not(.active),.theme-portal.theme-light .scene-toolbox button:hover:not(.active),.theme-portal.theme-light .scene-tool-row button:hover:not(.active),.theme-portal.theme-light .scene-material-grid button:hover { color:var(--lic-blue)!important; background:var(--lic-blue-soft)!important; border-color:#a9c8e8!important; }
 .theme-portal.theme-light .view-toolbar { display:flex; gap:5px!important; color:var(--lic-muted)!important; background:#f5f8fb!important; border-top:0!important; border-bottom:1px solid var(--lic-line)!important; box-shadow:none!important; }
 .theme-portal.theme-light .view-toolbar b,.theme-portal.theme-light .toolbar-group b { color:var(--lic-muted)!important; }
@@ -126,3 +126,38 @@ body:has(.app.theme-light) .cargo-catalog-foot button,body:has(.app.theme-light)
 .theme-portal.theme-light [class*="cargo"]:after,.theme-portal.theme-light [class*="Cargo"]:after,.theme-portal.theme-light [class*="scene"]:before,.theme-portal.theme-light [class*="Scene"]:before,.theme-portal.theme-light [class*="viewer"]:before,.theme-portal.theme-light [class*="Viewer"]:before,.theme-portal.theme-light [class*="analysis"]:before,.theme-portal.theme-light [class*="Analysis"]:before,.theme-portal.theme-light [class*="gravity"]:before,.theme-portal.theme-light [class*="Gravity"]:before { display:none!important; content:none!important; }
 @media(max-width:980px) { .theme-portal.theme-light .topbar { align-items:flex-start!important; flex-wrap:wrap!important; gap:8px!important; } .theme-portal.theme-light .workspace { gap:8px!important; } }
 @media(max-width:780px) { .theme-portal.theme-light .topbar { padding:8px 10px!important; } .theme-portal.theme-light .hero-title h1 { font-size:18px!important; } .theme-portal.theme-light .top-actions { width:100%; flex-wrap:wrap; } .theme-portal.theme-light .top-actions label { font-size:10px!important; } .theme-portal.theme-light .canvas-wrap { min-height:320px!important; } body:has(.app.theme-light) .cargo-catalog-backdrop { padding:8px!important; } body:has(.app.theme-light) .cargo-catalog-modal { width:100%!important; max-height:94vh!important; } body:has(.app.theme-light) .cargo-catalog-grid { grid-template-columns:1fr!important; padding:12px!important; gap:14px!important; } body:has(.app.theme-light) .cargo-catalog-header { padding:14px!important; } body:has(.app.theme-light) .cargo-catalog-header h2 { font-size:19px!important; } body:has(.app.theme-light) .cargo-catalog-foot { align-items:flex-start!important; flex-direction:column!important; } body:has(.app.theme-light) .cargo-catalog-foot button { align-self:flex-end!important; } }
+
+/* Correct actual component hooks: cargo-add-actions is the JSX class used by the secondary action row. */
+.theme-portal.theme-light .cargo-title,
+.theme-portal.theme-light .cargo-title *,
+.theme-portal.theme-light .cargo-card label,
+.theme-portal.theme-light .cargo-card .cargo-volume,
+.theme-portal.theme-light .cargo-card .cargo-title button,
+.theme-portal.theme-light .cargo-card .cargo-title svg { color:var(--lic-ink)!important; text-shadow:none!important; }
+.theme-portal.theme-light .cargo-title button { color:var(--lic-muted)!important; background:transparent!important; border:0!important; box-shadow:none!important; }
+.theme-portal.theme-light .cargo-title input { color:var(--lic-ink)!important; background:transparent!important; border-color:var(--lic-line)!important; box-shadow:none!important; }
+.theme-portal.theme-light .sidebar-head *,
+.theme-portal.theme-light .viewer-head *,
+.theme-portal.theme-light .viewer-status *,
+.theme-portal.theme-light .view-toolbar *,
+.theme-portal.theme-light .right-panel .tabs * { text-shadow:none!important; }
+.theme-portal.theme-light .sidebar-head button,
+.theme-portal.theme-light .viewer-head button,
+.theme-portal.theme-light .view-toolbar button.active,
+.theme-portal.theme-light .right-panel .tabs button.active,
+.theme-portal.theme-light .scene-toolbox button.active,
+.theme-portal.theme-light .scene-tool-row button.active,
+.theme-portal.theme-light .scene-material-grid button.active,
+.theme-portal.theme-light button[aria-pressed="true"] {
+  color:#fff!important;background:var(--lic-blue)!important;border-color:var(--lic-blue)!important;box-shadow:none!important;
+}
+.theme-portal.theme-light .sidebar-head button:not(.active),
+.theme-portal.theme-light .viewer-head button:not(.active) { color:#40566a!important;background:#fff!important;border-color:var(--lic-line-strong)!important; }
+.theme-portal.theme-light .cargo-add-actions button { color:#40566a!important;background:#fff!important;border:1px solid var(--lic-line-strong)!important; }
+.theme-portal.theme-light .cargo-add-actions button:hover { color:var(--lic-blue)!important;background:var(--lic-blue-soft)!important;border-color:#a9c8e8!important; }
+.theme-portal.theme-light .cargo-add-actions button.active { color:#fff!important;background:var(--lic-blue)!important;border-color:var(--lic-blue)!important; }
+.theme-portal.theme-light .cargo-catalog-modal *,
+.theme-portal.theme-light .cargo-catalog-header *,
+.theme-portal.theme-light .cargo-catalog-category *,
+.theme-portal.theme-light .cargo-catalog-foot * { text-shadow:none!important; }
+.theme-portal.theme-light .cargo-catalog-modal button:hover { box-shadow:none!important; }
