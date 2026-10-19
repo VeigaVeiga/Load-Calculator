@@ -414,7 +414,7 @@ function App() {
   const outsidePlacedCount = placed.length - loadedPlaced.length
 
   const analysis = useMemo(
-    () => analyzeWeight(loadedPlaced, container),
+    () => analyzeWeight(loadedPlaced, container, cargo),
     [loadedPlaced, container],
   )
 
