@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
 import './light-industrial-cad.css'
+import { setCurrentAppTheme } from './theme'
 import OpenSourceAcknowledgements from './OpenSourceAcknowledgements'
 import ContainerScene, { type View } from './components/ContainerScene'
 import CargoProperties from './components/CargoProperties'
@@ -1130,6 +1131,8 @@ function App() {
   if (showAcknowledgements) {
     return <OpenSourceAcknowledgements lang={lang} onBack={() => setShowAcknowledgements(false)} />
   }
+
+  setCurrentAppTheme(theme)
 
   return (
     <div className={`app theme-portal theme-${theme} ${securingMode ? 'securing-mode' : ''}`}>
