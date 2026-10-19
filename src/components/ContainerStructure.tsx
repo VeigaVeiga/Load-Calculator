@@ -5,21 +5,24 @@ import type { Container } from '../types'
 const S = .001
 const BEAM = '#d6d6ce'
 const EDGE = BEAM
+const isLightIndustrialTheme = () => typeof document !== 'undefined' && document.querySelector('.app.theme-light') !== null
+const themedBeam = () => isLightIndustrialTheme() ? '#d4dde4' : BEAM
+const themedEdge = () => isLightIndustrialTheme() ? '#7d8d9b' : EDGE
 
 function visualHeight(container: Container) { return container.height * S }
 
-function Beam({ position, size, color = BEAM, opacity = .96 }: { position: [number, number, number]; size: [number, number, number]; color?: string; opacity?: number }) {
+function Beam({ position, size, color = themedBeam(), opacity = .96 }: { position: [number, number, number]; size: [number, number, number]; color?: string; opacity?: number }) {
   return <mesh position={position} castShadow raycast={() => null}><boxGeometry args={size} /><meshStandardMaterial color={color} transparent={opacity < 1} opacity={opacity} metalness={.15} roughness={.58} /></mesh>
 }
 
 function Panel({ position, size, opacity = .08 }: { position: [number, number, number]; size: [number, number, number]; opacity?: number }) {
-  return <mesh position={position} raycast={() => null}><boxGeometry args={size} /><meshStandardMaterial color={BEAM} transparent opacity={opacity} depthWrite={false} /></mesh>
+  return <mesh position={position} raycast={() => null}><boxGeometry args={size} /><meshStandardMaterial color={themedBeam()} transparent opacity={opacity} depthWrite={false} /></mesh>
 }
 
 function SideWall({ y, container }: { y: number; container: Container }) {
   const L = container.outerLength * S, H = visualHeight(container)
   const ribs: ReactNode[] = []
-  for (let x = -Math.floor(container.outerLength / 6000) * 3000; x <= Math.floor(container.outerLength / 6000) * 3000; x += 3000) ribs.push(<Line key={x} points={[[x * S, y, 0], [x * S, y, H]]} color={EDGE} lineWidth={.38} />)
+  for (let x = -Math.floor(container.outerLength / 6000) * 3000; x <= Math.floor(container.outerLength / 6000) * 3000; x += 3000) ribs.push(<Line key={x} points={[[x * S, y, 0], [x * S, y, H]]} color={themedEdge()} lineWidth={.38} />)
   return <group><Panel position={[0, y, H / 2]} size={[L, container.wallThickness * S, H]} />{ribs}</group>
 }
 
@@ -116,7 +119,7 @@ function DoorLeaf({ container, side }: { container: Container; side: -1 | 1 }) {
 
 function EndTick({ p, axis }: { p: [number, number, number]; axis: 'x' | 'y' }) {
   const d = .025
-  return axis === 'y' ? <Line points={[[p[0] - d, p[1], p[2]], [p[0] + d, p[1], p[2]]]} color="#858580" lineWidth={.8} /> : <Line points={[[p[0], p[1] - d, p[2]], [p[0], p[1] + d, p[2]]]} color="#858580" lineWidth={.8} />
+  return axis === 'y' ? <Line points={[[p[0] - d, p[1], p[2]], [p[0] + d, p[1], p[2]]]} color={isLightIndustrialTheme() ? "#82909c" : "#858580"} lineWidth={.8} /> : <Line points={[[p[0], p[1] - d, p[2]], [p[0], p[1] + d, p[2]]]} color="#858580" lineWidth={.8} />
 }
 
 function DimensionLine({ points, label, position, axis, vertical = false }: { points: [[number, number, number], [number, number, number]]; label: string; position: [number, number, number]; axis: 'x' | 'y'; vertical?: boolean }) {
