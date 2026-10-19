@@ -129,12 +129,14 @@ function seededRandom(seed: number) {
   }
 }
 
-function score(placed: PlacedCargo[], container: Container): [number, number, number, number] {
+function score(placed: PlacedCargo[], container: Container, cargo: Cargo[] = []): [number, number, number] {
   const volume = placed.reduce((sum, p) => sum + p.length * p.width * p.height, 0)
-  const weight = placed.reduce((sum, p) => sum + Math.max(0, p.weight), 0)
+  const cargoById = new Map(cargo.map(item => [item.id, item]))
+  const weightOf = (p: PlacedCargo) => Math.max(0, cargoById.get(p.cargoId)?.weight ?? p.weight)
+  const weight = placed.reduce((sum, p) => sum + weightOf(p), 0)
   const totalWeight = Math.max(1, weight)
-  const cgX = placed.reduce((sum, p) => { const d = dims(p); return sum + (p.x + d.length / 2) * Math.max(0, p.weight) }, 0) / totalWeight
-  const cgY = placed.reduce((sum, p) => { const d = dims(p); return sum + (p.y + d.width / 2) * Math.max(0, p.weight) }, 0) / totalWeight
+  const cgX = placed.reduce((sum, p) => { const d = dims(p); return sum + (p.x + d.length / 2) * weightOf(p) }, 0) / totalWeight
+  const cgY = placed.reduce((sum, p) => { const d = dims(p); return sum + (p.y + d.width / 2) * weightOf(p) }, 0) / totalWeight
   const massBalance = Math.abs(cgX - container.length / 2) + Math.abs(cgY - container.width / 2)
 
   // Optimise the real mass centre only after maximising the number of loaded units.
