@@ -357,7 +357,6 @@ function centerUpperStacks(items: PlacedCargo[], cargo: Cargo[], container: Cont
 
   const stackGroups = (plan: PlacedCargo[]) => {
     const elevated = plan.filter(p => p.z > 0.5)
-    const byId = new Map(elevated.map(p => [p.id, p]))
     const visited = new Set<string>()
     const groups: PlacedCargo[][] = []
     for (const seed of elevated) {
