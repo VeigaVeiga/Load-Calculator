@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
+import './light-industrial-cad.css'
 import OpenSourceAcknowledgements from './OpenSourceAcknowledgements'
 import ContainerScene, { type View } from './components/ContainerScene'
 import CargoProperties from './components/CargoProperties'
@@ -250,6 +251,21 @@ function makeCustom(
 
 function App() {
   const [lang, setLang] = useState<Lang>('zh')
+  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
+    try {
+      return window.localStorage.getItem('load-calculator-theme') === 'light' ? 'light' : 'dark'
+    } catch {
+      return 'dark'
+    }
+  })
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem('load-calculator-theme', theme)
+    } catch {
+      // Theme selection still works for this session when storage is unavailable.
+    }
+  }, [theme])
   const [showAcknowledgements, setShowAcknowledgements] = useState(false)
   const [showCargoCatalog, setShowCargoCatalog] = useState(false)
   const [kfcCopy, setKfcCopy] = useState('正在获取文案…')
@@ -970,21 +986,66 @@ function App() {
     return lower.slice(0,-1).concat(upper.slice(0,-1))
   }
 
+  // Technical-plan rendering is deliberately richer than the live 3D strap.
+  // All projected points still come from the same editable lashing path.
   const lashingProjection = (points: Array<[number, number]>) => {
     if (!points.length) return ''
-    const coords = points.map(([x,y]) => `${x.toFixed(2)},${y.toFixed(2)}`).join(' ')
-    const edge = `<polyline points="${coords}" fill="none" stroke="#713c24" stroke-width="11" stroke-linecap="butt" stroke-linejoin="miter"/>`
-    const band = `<polyline points="${coords}" fill="none" stroke="#ed762b" stroke-width="7" stroke-linecap="butt" stroke-linejoin="miter"/>`
-    const seam = `<polyline points="${coords}" fill="none" stroke="#ffc18d" stroke-width="1.2" stroke-dasharray="2 3" stroke-linecap="butt" stroke-linejoin="miter"/>`
-    const loops = points.map(([x,y]) => `<ellipse cx="${x}" cy="${y}" rx="5.5" ry="4.5" fill="#ed762b" stroke="#713c24" stroke-width="1.6"/><ellipse cx="${x}" cy="${y}" rx="2.6" ry="2.2" fill="none" stroke="#b8c0c4" stroke-width="1.4"/>`).join('')
-    // Put the ratchet on the lower cross-piece (segment 2), not at the X intersection.
+    const coords = points.map(([x, y]) => `${x.toFixed(2)},${y.toFixed(2)}`).join(' ')
+    let stitchMarks = ''
+    for (let i = 0; i < points.length - 1; i++) {
+      const [x1, y1] = points[i]
+      const [x2, y2] = points[i + 1]
+      const dx = x2 - x1, dy = y2 - y1
+      const length = Math.hypot(dx, dy)
+      if (length < 12) continue
+      const nx = -dy / length, ny = dx / length
+      const count = Math.min(90, Math.floor(length / 7))
+      for (let j = 1; j < count; j++) {
+        const t = j / count
+        const x = x1 + dx * t, y = y1 + dy * t
+        stitchMarks += `<line x1="${(x - nx * 2.4).toFixed(2)}" y1="${(y - ny * 2.4).toFixed(2)}" x2="${(x + nx * 2.4).toFixed(2)}" y2="${(y + ny * 2.4).toFixed(2)}" stroke="#7d3b20" stroke-width=".8" opacity=".82"/>`
+      }
+    }
+    const outerEdge = `<polyline points="${coords}" fill="none" stroke="#58301f" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>`
+    const shadowEdge = `<polyline points="${coords}" fill="none" stroke="#a94e22" stroke-width="9.4" stroke-linecap="round" stroke-linejoin="round"/>`
+    const webbing = `<polyline points="${coords}" fill="none" stroke="#e8792e" stroke-width="7.4" stroke-linecap="round" stroke-linejoin="round"/>`
+    const edgeHighlight = `<polyline points="${coords}" fill="none" stroke="#ffc58e" stroke-width="1" stroke-dasharray="1 2.6" stroke-linecap="round" stroke-linejoin="round"/>`
+    const wovenTexture = `<polyline points="${coords}" fill="none" stroke="#b95626" stroke-width="2" stroke-dasharray=".7 2.7" stroke-linecap="butt" stroke-linejoin="round" opacity=".9"/>`
+    const seams = `<g>${stitchMarks}</g>`
+    const reinforced = points.slice(1, -1).map(([x, y], index) =>
+      `<g transform="translate(${x.toFixed(2)} ${y.toFixed(2)}) rotate(${index % 2 ? 90 : 0})"><rect x="-5.4" y="-4.4" width="10.8" height="8.8" rx="1.2" fill="#cf672b" stroke="#70391f" stroke-width="1"/><path d="M-3.8 -2.5 L3.8 -2.5 M-3.8 0 L3.8 0 M-3.8 2.5 L3.8 2.5" stroke="#f6b77d" stroke-width=".7"/></g>`
+    ).join('')
+    const makeHook = (point: [number, number], neighbor: [number, number], reverse: boolean) => {
+      const angle = Math.atan2(neighbor[1] - point[1], neighbor[0] - point[0]) * 180 / Math.PI + (reverse ? 180 : 0)
+      return `<g transform="translate(${point[0].toFixed(2)} ${point[1].toFixed(2)}) rotate(${angle.toFixed(1)})">
+        <ellipse cx="0" cy="0" rx="5.5" ry="4.2" fill="#dfe5e8" stroke="#56616a" stroke-width="1.2"/>
+        <ellipse cx="0" cy="0" rx="2.5" ry="1.8" fill="#fff" stroke="#7b8790" stroke-width=".8"/>
+        <path d="M2 -1 C5 -5 10 -5 11 -1 C12 2 9 4 6 3 L4 2" fill="none" stroke="#68747c" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M2 -1 C5 -5 10 -5 11 -1" fill="none" stroke="#e8edf0" stroke-width=".8" stroke-linecap="round"/>
+        <circle cx="4" cy="2" r="1.1" fill="#a9b2b8" stroke="#56616a" stroke-width=".6"/>
+      </g>`
+    }
+    const anchors = points.length > 1
+      ? makeHook(points[0], points[1], false) + makeHook(points[points.length - 1], points[points.length - 2], true)
+      : makeHook(points[0], [points[0][0] + 1, points[0][1]], false)
+    // Detailed ratchet assembly placed on a straight strap segment, not at a crossing.
     const buckle = points.length >= 3 ? (() => {
-      const a = points[1], b = points[2], t = .62
+      const a = points[1], b = points[2], t = .58
       const x = a[0] + (b[0] - a[0]) * t, y = a[1] + (b[1] - a[1]) * t
       const angle = Math.atan2(b[1] - a[1], b[0] - a[0]) * 180 / Math.PI
-      return `<g transform="translate(${x} ${y}) rotate(${angle})"><rect x="-7" y="-4.5" width="14" height="9" rx="1.2" fill="#8e989d" stroke="#4c5559" stroke-width="1.5"/><rect x="-4.5" y="-2.4" width="9" height="4.8" fill="#d5dadd" stroke="#4c5559" stroke-width=".8"/><line x1="-4" y1="0" x2="4" y2="0" stroke="#4c5559" stroke-width="1.2"/><path d="M-5 -4 L-2 -7 L5 -7 L7 -4" fill="none" stroke="#4c5559" stroke-width="1.4"/></g>`
+      return `<g transform="translate(${x.toFixed(2)} ${y.toFixed(2)}) rotate(${angle.toFixed(1)})">
+        <path d="M-11 -4 L-8 -7 L7 -7 L11 -3 L10 5 L-9 5 Z" fill="#64717a" stroke="#303a42" stroke-width="1.5" stroke-linejoin="round"/>
+        <rect x="-7.5" y="-4.5" width="15" height="7.5" rx="1.1" fill="#b8c2c8" stroke="#4c5860" stroke-width=".9"/>
+        <circle cx="-3.5" cy="-0.5" r="2.7" fill="#737f87" stroke="#35414a" stroke-width=".8"/>
+        <circle cx="-3.5" cy="-0.5" r="1.1" fill="#dce2e5"/>
+        <path d="M-7 -4 L-4 -6 L4 -6 L7 -4" fill="none" stroke="#eef2f4" stroke-width=".8"/>
+        <path d="M1 -5 L4 -10 L9 -13 L11 -11 L7 -6" fill="#9da8af" stroke="#46525a" stroke-width="1.1" stroke-linejoin="round"/>
+        <rect x="8" y="-14" width="7" height="3.3" rx="1" fill="#4e5961" stroke="#303a42" stroke-width=".7"/>
+        <path d="M-8 6 L8 6" stroke="#f0f3f5" stroke-width=".8"/>
+        <path d="M-6 7 L-3 9 L4 9 L7 7" fill="none" stroke="#69767e" stroke-width="1"/>
+      </g>`
     })() : ''
-    return edge + band + seam + loops + buckle
+    return outerEdge + shadowEdge + webbing + edgeHighlight + wovenTexture + seams + reinforced + anchors + buckle
   }
 
   const makeTopViewSvg=(W:number,H:number)=>{
@@ -1071,7 +1132,7 @@ function App() {
   }
 
   return (
-    <div className={`app theme-portal ${securingMode ? 'securing-mode' : ''}`}>
+    <div className={`app theme-portal theme-${theme} ${securingMode ? 'securing-mode' : ''}`}>
       <header className="topbar">
         <div className="hero-title">
           <div className="hero-orbit" aria-hidden="true" />
@@ -1148,6 +1209,16 @@ function App() {
 
           <button onClick={exportPlan}>{tr.exportPlan}</button>
           <button onClick={exportThree}>{tr.export}</button>
+          <button
+            className="theme-switch"
+            type="button"
+            aria-pressed={theme === 'light'}
+            title={theme === 'dark' ? (lang === 'zh' ? '切换到 Light Industrial CAD 浅色模式' : 'Switch to Light Industrial CAD mode') : (lang === 'zh' ? '切换到深色模式' : 'Switch to dark mode')}
+            onClick={() => setTheme(current => current === 'dark' ? 'light' : 'dark')}
+          >
+            <span aria-hidden="true">{theme === 'dark' ? '☼' : '◐'}</span>
+            {theme === 'dark' ? (lang === 'zh' ? '浅色模式' : 'Light mode') : (lang === 'zh' ? '深色模式' : 'Dark mode')}
+          </button>
         </div>
       </header>
 
