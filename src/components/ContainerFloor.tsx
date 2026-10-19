@@ -19,7 +19,7 @@ export default function ContainerFloor({container}:{container:Container}){
        lines.push(<Line key={`x-${offset}`} points={[[X,-W/2,0.008],[X,W/2,0.008]]} color={isLightIndustrialTheme() ? (major ? '#345d80' : '#6e93b5') : (major ? '#8d8d87' : '#3f3f3b')} lineWidth={major?0.9:0.28}/>)
      }else{
        const Y=offset*S
-       lines.push(<Line key={`y-${offset}`} points={[[-L/2,Y,0.008],[L/2,Y,0.008]]} color={isLightIndustrialTheme() ? (major ? '#a6b3bf' : '#d4dce3') : (major ? '#8d8d87' : '#3f3f3b')} lineWidth={major?0.9:0.28}/>)
+       lines.push(<Line key={`y-${offset}`} points={[[-L/2,Y,0.008],[L/2,Y,0.008]]} color={isLightIndustrialTheme() ? (major ? '#294f70' : '#587d9f') : (major ? '#8d8d87' : '#3f3f3b')} lineWidth={major?0.9:0.28}/>)
      }
    }
  }
