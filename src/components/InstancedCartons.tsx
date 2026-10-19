@@ -1,10 +1,11 @@
 import { useLayoutEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
-import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js'
 import type { Container, PlacedCargo } from '../types'
 
 const S = .001
-const CARTON_GEOMETRY = new RoundedBoxGeometry(1, 1, 1, 2, .035)
+// Plain boxes are enough for a loading planner; avoid rounded-corner subdivisions
+// on every instance so large carton sets stay cheap to render.
+const CARTON_GEOMETRY = new THREE.BoxGeometry(1, 1, 1)
 const baseColors = new Float32Array(CARTON_GEOMETRY.getAttribute('position').count * 3)
 baseColors.fill(1)
 CARTON_GEOMETRY.setAttribute('color', new THREE.Float32BufferAttribute(baseColors, 3))
@@ -21,6 +22,9 @@ function safeCartonColor(value?: string) {
 
 export default function InstancedCartons({ items, container, onSelect, ghost = false }: Props) {
   const meshRef = useRef<THREE.InstancedMesh>(null)
+  // Individual carton outlines help at small counts, but become a large CPU/GPU
+  // cost for hundreds of boxes. Hide them above this threshold.
+  const showOutlines = items.length <= 120
   const lineRef = useRef<THREE.LineSegments>(null)
   const material = useMemo(() => new THREE.MeshBasicMaterial({ color: 0xffffff, vertexColors: true, toneMapped: false, transparent: ghost, opacity: ghost ? .24 : 1, depthWrite: !ghost }), [ghost])
   const lineMaterial = useMemo(() => new THREE.LineBasicMaterial({ color: 0x59636b, transparent: true, opacity: ghost ? .35 : .92, depthTest: true }), [ghost])
@@ -36,7 +40,7 @@ export default function InstancedCartons({ items, container, onSelect, ghost = f
     const mesh = meshRef.current, lines = lineRef.current
     if (!mesh || !lines) return
     const source = OUTLINE_SOURCE.getAttribute('position'), sourceArray = source.array as ArrayLike<number>, verticesPerBox = source.count
-    const outline = new Float32Array(items.length * verticesPerBox * 3)
+    const outline = showOutlines ? new Float32Array(items.length * verticesPerBox * 3) : null
 
     items.forEach((p, i) => {
       // Scale uses physical, unrotated L/W; the quaternion performs the single
@@ -52,21 +56,29 @@ export default function InstancedCartons({ items, container, onSelect, ghost = f
       instanceColor.set(safeCartonColor(p.color))
       mesh.setColorAt(i, instanceColor)
 
-      for (let v = 0; v < verticesPerBox; v++) {
-        const si = v * 3, target = (i * verticesPerBox + v) * 3
-        position.set(sourceArray[si] ?? 0, sourceArray[si + 1] ?? 0, sourceArray[si + 2] ?? 0).applyMatrix4(matrix)
-        outline[target] = position.x; outline[target + 1] = position.y; outline[target + 2] = position.z
+      if (outline) {
+        for (let v = 0; v < verticesPerBox; v++) {
+          const si = v * 3, target = (i * verticesPerBox + v) * 3
+          // Expand the wireframe very slightly beyond the box surface. Keeping
+          // edges coplanar with the faces causes depth-buffer flicker (z-fighting).
+          position.set((sourceArray[si] ?? 0) * 1.001, (sourceArray[si + 1] ?? 0) * 1.001, (sourceArray[si + 2] ?? 0) * 1.001).applyMatrix4(matrix)
+          outline[target] = position.x; outline[target + 1] = position.y; outline[target + 2] = position.z
+        }
       }
     })
 
-    lineGeometry.setAttribute('position', new THREE.Float32BufferAttribute(outline, 3))
-    lineGeometry.computeBoundingSphere()
-    lines.visible = items.length > 0
+    if (outline) {
+      lineGeometry.setAttribute('position', new THREE.Float32BufferAttribute(outline, 3))
+      lineGeometry.computeBoundingSphere()
+    } else {
+      lineGeometry.deleteAttribute('position')
+    }
+    lines.visible = showOutlines && items.length > 0
     mesh.count = items.length
     mesh.instanceMatrix.needsUpdate = true
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true
     mesh.computeBoundingSphere()
-  }, [items, container.length, container.width, matrix, position, quaternion, scale, axisZ, instanceColor, lineGeometry])
+  }, [items, container.length, container.width, matrix, position, quaternion, scale, axisZ, instanceColor, lineGeometry, showOutlines])
 
   if (!items.length) return null
   return <>
