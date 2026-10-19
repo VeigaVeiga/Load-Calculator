@@ -415,7 +415,7 @@ function App() {
 
   const analysis = useMemo(
     () => analyzeWeight(loadedPlaced, container, cargo),
-    [loadedPlaced, container],
+    [loadedPlaced, container, cargo],
   )
 
   const placementWarnings = useMemo(() => {
