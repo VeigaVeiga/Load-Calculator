@@ -1235,7 +1235,6 @@ function App() {
             className="theme-switch"
             type="button"
             aria-pressed={theme === 'light'}
-            title={theme === 'dark' ? (lang === 'zh' ? '切换到 Light Industrial CAD 浅色模式' : 'Switch to Light Industrial CAD mode') : (lang === 'zh' ? '切换到深色模式' : 'Switch to dark mode')}
             onClick={() => setTheme(current => current === 'dark' ? 'light' : 'dark')}
           >
             <span aria-hidden="true">{theme === 'dark' ? '☼' : '◐'}</span>
