@@ -6,8 +6,8 @@ const S = .001
 const BEAM = '#d6d6ce'
 const EDGE = BEAM
 import { isLightIndustrialTheme } from '../theme'
-const themedBeam = () => isLightIndustrialTheme() ? '#d4dde4' : BEAM
-const themedEdge = () => isLightIndustrialTheme() ? '#7d8d9b' : EDGE
+const themedBeam = () => isLightIndustrialTheme() ? '#6f9fc9' : BEAM
+const themedEdge = () => isLightIndustrialTheme() ? '#3f6f9e' : EDGE
 
 function visualHeight(container: Container) { return container.height * S }
 
@@ -69,7 +69,7 @@ function RoofDividerLines({ container }: { container: Container }) {
     ? [-container.length / 4, 0, container.length / 4]
     : [0]
   return <group>
-    {dividerPositions.map((x) => <Line key={x} points={[[x * S, -W / 2, H - .006], [x * S, W / 2, H - .006]]} color={EDGE} lineWidth={.42} />)}
+    {dividerPositions.map((x) => <Line key={x} points={[[x * S, -W / 2, H - .006], [x * S, W / 2, H - .006]]} color={isLightIndustrialTheme() ? '#3f6f9e' : EDGE} lineWidth={.42} />)}
   </group>
 }
 
@@ -109,7 +109,7 @@ function DoorFrame({ container, sideRailY, bottomZ, topZ, rail }: { container: C
 function DoorLeaf({ container, side }: { container: Container; side: -1 | 1 }) {
   const L = container.outerLength * S, dw = container.doorWidth * S, dh = Math.min(container.doorHeight * S, visualHeight(container)), t = .035, leafW = dw / 2, x = L / 2 + .055, hingeY = side * dw / 2, openAngle = side * Math.PI / 2
   return <group position={[x, hingeY, dh / 2]} rotation={[0, 0, openAngle]}><group position={[0, -side * leafW / 2, 0]}>
-    <mesh castShadow raycast={() => null}><boxGeometry args={[t, leafW, dh]} /><meshStandardMaterial color={BEAM} metalness={.2} roughness={.55} /></mesh>
+    <mesh castShadow raycast={() => null}><boxGeometry args={[t, leafW, dh]} /><meshStandardMaterial color={isLightIndustrialTheme() ? '#6f9fc9' : BEAM} metalness={.2} roughness={.55} /></mesh>
     {[.18, .38, .58, .78].map((f, i) => <Beam key={i} position={[-.012, 0, dh * (f - .5)]} size={[.055, leafW - .04, .045]} />)}
     <Beam position={[-.018, 0, 0]} size={[.065, .045, Math.max(.01, dh - .08)]} />
     {[-.33, .33].map((f, i) => <Beam key={`v${i}`} position={[-.012, f * leafW, 0]} size={[.06, .045, Math.max(.01, dh - .06)]} />)}
