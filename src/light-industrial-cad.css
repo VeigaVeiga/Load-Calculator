@@ -897,3 +897,52 @@ html:has(.app.theme-light), body:has(.app.theme-light), body:has(.app.theme-ligh
 .theme-portal.theme-light .kfc-card * {
   text-shadow: none !important;
 }
+
+
+/* Light-theme floating load-analysis HUD: readable rows, not two boxed labels. */
+.theme-portal.theme-light .cg-hud {
+  color: #26394d !important;
+  background: rgba(250,252,254,.96) !important;
+  border: 1px solid #b8cad9 !important;
+  border-radius: 3px !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
+  backdrop-filter: none !important;
+}
+.theme-portal.theme-light .cg-hud-map rect {
+  fill: #eaf2f8 !important;
+  stroke: #607f99 !important;
+}
+.theme-portal.theme-light .cg-hud-map line {
+  stroke: #8ba4b8 !important;
+}
+.theme-portal.theme-light .cg-hud-map .cg-hud-vector {
+  stroke: #c66b2d !important;
+}
+.theme-portal.theme-light .cg-hud-map .cg-hud-dot {
+  fill: #c66b2d !important;
+  stroke: #fff !important;
+}
+.theme-portal.theme-light .cg-hud-values {
+  gap: 5px !important;
+}
+.theme-portal.theme-light .cg-hud-values span,
+.theme-portal.theme-light .cg-hud-values b {
+  color: #344b60 !important;
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+.theme-portal.theme-light .cg-hud-values b { color: #245f96 !important; }
+.theme-portal.theme-light .placement-warning {
+  color: #7d2f27 !important;
+  background: #fff5f2 !important;
+  border: 1px solid #d7a49c !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
+}
+.theme-portal.theme-light .analysis-note,
+.theme-portal.theme-light .planning-disclaimer {
+  color: #64778a !important;
+}
