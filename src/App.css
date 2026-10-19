@@ -1933,3 +1933,37 @@ body{overflow:hidden}
 .theme-portal .sidebar > .tool-row,
 .theme-portal .cargo-list{margin-left:0!important;margin-right:0!important}
 .theme-portal .cargo-list > .cargo-card.active{padding-left:9px!important;padding-right:9px!important}
+
+
+/* Flat light-mode rules override legacy industrial ornamentation from the dark theme. */
+.theme-portal.theme-light .topbar::after,
+.theme-portal.theme-light .topbar::before,
+.theme-portal.theme-light .hero-rule,
+.theme-portal.theme-light .hero-orbit,
+.theme-portal.theme-light .sidebar-head::after,
+.theme-portal.theme-light .viewer-head::after,
+.theme-portal.theme-light .tabs::after,
+.theme-portal.theme-light .viewer-foot::before,
+.theme-portal.theme-light .summary > div::after,
+.theme-portal.theme-light .cargo-card::before,
+.theme-portal.theme-light .bias-card::after { display:none!important;content:none!important; }
+.theme-portal.theme-light .topbar { background:#f8fafc!important;border:0!important;border-bottom:1px solid #d5dde6!important;box-shadow:none!important; }
+.theme-portal.theme-light .sidebar,
+.theme-portal.theme-light .viewer,
+.theme-portal.theme-light .right-panel,
+.theme-portal.theme-light .summary>div { box-shadow:none!important; }
+.theme-portal.theme-light .tool-row.cargo-secondary-actions button,
+.theme-portal.theme-light .tool-row.cargo-secondary-actions button:first-child,
+.theme-portal.theme-light .tool-row.cargo-secondary-actions button:nth-child(2),
+.theme-portal.theme-light .tool-row.cargo-secondary-actions button:hover,
+.theme-portal.theme-light .tool-row.cargo-secondary-actions button:first-child:hover,
+.theme-portal.theme-light .tool-row.cargo-secondary-actions button:nth-child(2):hover {
+ color:#3d5064!important;background:#fff!important;border:1px solid #cbd5df!important;box-shadow:none!important;
+}
+.theme-portal.theme-light .tool-row:not(.cargo-secondary-actions) button:first-child,
+.theme-portal.theme-light .tool-row:not(.cargo-secondary-actions) button:first-child:hover {
+ color:#fff!important;background:#2563a6!important;border-color:#2563a6!important;
+}
+.theme-portal.theme-light .tool-row:not(.cargo-secondary-actions) button:not(:first-child) {
+ color:#3d5064!important;background:#fff!important;border-color:#cbd5df!important;
+}
