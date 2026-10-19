@@ -146,9 +146,33 @@ function score(placed: PlacedCargo[], container: Container): [number, number, nu
   const footprintBalance = Math.abs((minX + maxX) / 2 - container.length / 2)
     + Math.abs((minY + maxY) / 2 - container.width / 2)
 
-  // Priority: place as many units as possible, centre the total mass, balance
-  // the overall footprint/edge clearances, then use occupied volume as tie-breaker.
-  return [placed.length, -massBalance, -footprintBalance, volume]
+  // Score every vertical layer independently. A centred first layer must not
+  // hide an off-centre stack above it merely because the full footprint is centred.
+  const layers = new Map<number, PlacedCargo[]>()
+  for (const p of placed) {
+    const layerKey = Math.round(p.z / 10)
+    const layer = layers.get(layerKey) ?? []
+    layer.push(p)
+    layers.set(layerKey, layer)
+  }
+  let layerBalance = 0
+  for (const layer of layers.values()) {
+    if (layer.length === 0) continue
+    const layerArea = layer.reduce((sum, p) => sum + Math.max(1, p.length * p.width), 0)
+    const layerX = layer.reduce((sum, p) => {
+      const d = dims(p)
+      return sum + (p.x + d.length / 2) * Math.max(1, p.length * p.width)
+    }, 0) / layerArea
+    const layerY = layer.reduce((sum, p) => {
+      const d = dims(p)
+      return sum + (p.y + d.width / 2) * Math.max(1, p.length * p.width)
+    }, 0) / layerArea
+    layerBalance += Math.abs(layerX - container.length / 2) + Math.abs(layerY - container.width / 2)
+  }
+
+  // Item count remains the hard priority. Next balance actual mass, then the
+  // centre of each stack layer, then the overall footprint and occupied volume.
+  return [placed.length, -massBalance, -(footprintBalance + layerBalance), volume]
 }
 
 function compareScores(a: number[], b: number[]) {
