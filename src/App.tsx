@@ -1042,7 +1042,16 @@ function App() {
     const rect=(x:number,y:number,w:number,h:number,c:string)=>`<rect x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${w.toFixed(2)}" height="${h.toFixed(2)}" fill="${c}" fill-opacity=".82" stroke="#243b4b" stroke-width="1.2"/>`
     const poly=(pts:Array<[number,number]>,fill:string)=>`<polygon points="${pts.map(([x,y])=>`${x.toFixed(2)},${y.toFixed(2)}`).join(' ')}" fill="${fill}" stroke="#243b4b" stroke-width="1.2"/>`
     let shapes=''
-    for(const p of placed){const d=p.rotation%180===0?{l:p.length,w:p.width}:{l:p.width,w:p.length};shapes+=rect(bx+p.x/container.length*boxW,by+p.y/container.width*boxH,d.l/container.length*boxW,d.w/container.width*boxH,p.color)}
+    for(const p of placed){
+      const d=p.rotation%180===0?{l:p.length,w:p.width}:{l:p.width,w:p.length}
+      const x=bx+p.x/container.length*boxW,y=by+p.y/container.width*boxH,w=d.l/container.length*boxW,h=d.w/container.width*boxH
+      shapes+=rect(x,y,w,h,p.color)
+      if(p.cargoType==='pallet'){
+        // Deck slats make a pallet recognizable in the plan view without adding heavy SVG detail.
+        for(const t of [.22,.5,.78]) shapes+=`<line x1="${x+2}" y1="${y+h*t}" x2="${x+w-2}" y2="${y+h*t}" stroke="#704b2d" stroke-width="1.4" opacity=".9"/>`
+        shapes+=`<line x1="${x+2}" y1="${y+2}" x2="${x+w-2}" y2="${y+2}" stroke="#e1c49c" stroke-width="1"/>`
+      }
+    }
     for(const m of materials){
       const mx=bx+m.x/container.length*boxW,my=by+m.y/container.width*boxH,mw=Math.max(2,m.length/container.length*boxW),mh=Math.max(2,m.width/container.width*boxH)
       if(m.type==='lashingBelt'&&m.path?.length){const clipId=`lash-top-${String(m.id).replace(/[^a-zA-Z0-9_-]/g,'')}`;shapes+=`<defs><clipPath id="${clipId}"><rect x="${bx+2}" y="${by+2}" width="${boxW-4}" height="${boxH-4}"/></clipPath></defs><g clip-path="url(#${clipId})">${lashingProjection(m.path.map(p=>[bx+p.x/container.length*boxW,by+p.y/container.width*boxH] as [number,number]))}</g>`}
@@ -1060,7 +1069,29 @@ function App() {
     const rect=(x:number,y:number,w:number,h:number,c:string)=>`<rect x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${w.toFixed(2)}" height="${h.toFixed(2)}" fill="${c}" fill-opacity=".82" stroke="#243b4b" stroke-width="1.1"/>`
     const poly=(pts:Array<[number,number]>,fill:string)=>`<polygon points="${pts.map(([x,y])=>`${x.toFixed(2)},${y.toFixed(2)}`).join(' ')}" fill="${fill}" stroke="#243b4b" stroke-width="1.2"/>`
     let left='',frontShapes=''
-    for(const p of placed){const d=p.rotation%180===0?{l:p.length,w:p.width}:{l:p.width,w:p.length};left+=rect(side.x+p.x/container.length*side.w,side.y+(1-(p.z+p.height)/container.height)*side.h,d.l/container.length*side.w,p.height/container.height*side.h,p.color);frontShapes+=rect(front.x+p.y/container.width*front.w,front.y+(1-(p.z+p.height)/container.height)*front.h,d.w/container.width*front.w,p.height/container.height*front.h,p.color)}
+    for(const p of placed){
+      const d=p.rotation%180===0?{l:p.length,w:p.width}:{l:p.width,w:p.length}
+      const sx=side.x+p.x/container.length*side.w,sy=side.y+(1-(p.z+p.height)/container.height)*side.h,sw=d.l/container.length*side.w,sh=p.height/container.height*side.h
+      const fx=front.x+p.y/container.width*front.w,fy=front.y+(1-(p.z+p.height)/container.height)*front.h,fw=d.w/container.width*front.w,fh=p.height/container.height*front.h
+      left+=rect(sx,sy,sw,sh,p.color)
+      frontShapes+=rect(fx,fy,fw,fh,p.color)
+      if(p.cargoType==='pallet'){
+        const deckH=Math.max(3,p.height*.08/container.height*side.h)
+        const baseY=side.y+(1-p.z/container.height)*side.h-deckH
+        left+=`<rect x="${sx}" y="${baseY}" width="${sw}" height="${deckH}" fill="#9a7049" stroke="#704b2d" stroke-width=".8"/>`
+        for(const t of [.2,.5,.8]){
+          const px=sx+sw*t,footW=Math.max(2,sw*.09),footH=Math.max(2,deckH*.62)
+          left+=`<rect x="${px-footW/2}" y="${baseY+deckH-footH}" width="${footW}" height="${footH}" fill="#76502f" stroke="#553a24" stroke-width=".5"/>`
+        }
+        const frontDeckH=Math.max(3,p.height*.08/container.height*front.h)
+        const frontBaseY=front.y+(1-p.z/container.height)*front.h-frontDeckH
+        frontShapes+=`<rect x="${fx}" y="${frontBaseY}" width="${fw}" height="${frontDeckH}" fill="#9a7049" stroke="#704b2d" stroke-width=".8"/>`
+        for(const t of [.2,.5,.8]){
+          const px=fx+fw*t,footW=Math.max(2,fw*.13),footH=Math.max(2,frontDeckH*.72)
+          frontShapes+=`<rect x="${px-footW/2}" y="${frontBaseY+frontDeckH-footH}" width="${footW}" height="${footH}" fill="#76502f" stroke="#553a24" stroke-width=".5"/>`
+        }
+      }
+    }
     for(const m of materials){
       const sx=side.x+(m.x+m.length/2)/container.length*side.w,sy=side.y+(1-(m.z+m.height)/container.height)*side.h,sh=Math.max(2,m.height/container.height*side.h),fx=front.x+m.y/container.width*front.w,fy=front.y+(1-(m.z+m.height)/container.height)*front.h,fw=Math.max(2,m.width/container.width*front.w)
       if(m.type==='lashingBelt'&&m.path?.length){const sidePts=m.path.map(p=>[side.x+p.x/container.length*side.w,side.y+(1-p.z/container.height)*side.h] as [number,number]);const frontPts=m.path.map(p=>[front.x+p.y/container.width*front.w,front.y+(1-p.z/container.height)*front.h] as [number,number]);const sid=`lash-side-${String(m.id).replace(/[^a-zA-Z0-9_-]/g,'')}`,fid=`lash-front-${String(m.id).replace(/[^a-zA-Z0-9_-]/g,'')}`;left+=`<defs><clipPath id="${sid}"><rect x="${side.x+2}" y="${side.y+2}" width="${side.w-4}" height="${side.h-4}"/></clipPath></defs><g clip-path="url(#${sid})">${lashingProjection(sidePts)}</g>`;frontShapes+=`<defs><clipPath id="${fid}"><rect x="${front.x+2}" y="${front.y+2}" width="${front.w-4}" height="${front.h-4}"/></clipPath></defs><g clip-path="url(#${fid})">${lashingProjection(frontPts)}</g>`}
