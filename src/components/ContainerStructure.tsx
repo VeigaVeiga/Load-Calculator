@@ -5,7 +5,7 @@ import type { Container } from '../types'
 const S = .001
 const BEAM = '#d6d6ce'
 const EDGE = BEAM
-const isLightIndustrialTheme = () => typeof document !== 'undefined' && document.querySelector('.app.theme-light') !== null
+import { isLightIndustrialTheme } from '../theme'
 const themedBeam = () => isLightIndustrialTheme() ? '#d4dde4' : BEAM
 const themedEdge = () => isLightIndustrialTheme() ? '#7d8d9b' : EDGE
 
