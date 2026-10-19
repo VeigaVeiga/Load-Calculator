@@ -10,6 +10,7 @@ const server = await createServer({
 try {
   const { basePack } = await server.ssrLoadModule('/src/packing/baseSolver.ts')
   const { validatePlan } = await server.ssrLoadModule('/src/packing/geometry.ts')
+  const { analyzeWeight } = await server.ssrLoadModule('/src/analysis/weight.ts')
 
   const container = (maxPayload = 26000) => ({
     id: '40HQ',
@@ -180,7 +181,28 @@ try {
     assert.equal(result.placed.length, 15, 'mixed-ibc-machinery: expected all 10 IBC + 5 machines to fit')
   }
 
-  console.log('Packing regression checks passed: homogeneous grid, mixed pallet/carton, payload limit, IBC + machinery.');
+
+  // Regression 5: the weight analysis must include elevated cargo and recover
+  // from stale zero weights in placed snapshots using the current cargo list.
+  {
+    const box = container()
+    const shipment = [
+      cargo({ id: 'pallets', type: 'pallet', quantity: 1, length: 1200, width: 1000, height: 1200, weight: 400 }),
+      cargo({ id: 'cartons', type: 'carton', quantity: 1, length: 400, width: 300, height: 300, weight: 20 }),
+    ]
+    const placed = [
+      { id: 'pallets#1', cargoId: 'pallets', cargoType: 'pallet', x: 5416, y: 676, z: 0, length: 1200, width: 1000, height: 1200, rotation: 0, weight: 0, color: '#9a6638', placementMode: 'automatic', locked: false },
+      { id: 'cartons#1', cargoId: 'cartons', cargoType: 'carton', x: 7416, y: 676, z: 1200, length: 400, width: 300, height: 300, rotation: 0, weight: 0, color: '#c7ced3', placementMode: 'automatic', locked: false },
+    ]
+    const analysis = analyzeWeight(placed, box, shipment)
+    assert.equal(analysis.total, 420, 'weight-analysis: must use current cargo weights for all placed levels')
+    assert.ok(Math.abs(analysis.cg.x - box.length / 2) > 1, 'weight-analysis: off-centre upper cargo must affect longitudinal CG')
+    assert.ok(Math.abs(analysis.cg.y - box.width / 2) > 1, 'weight-analysis: off-centre upper cargo must affect transverse CG')
+    assert.ok(analysis.longitudinalOffset > 0, 'weight-analysis: longitudinal imbalance must not report zero')
+    assert.ok(analysis.transverseOffsetMm > 1, 'weight-analysis: transverse offset must not report zero')
+  }
+
+  console.log('Packing regression checks passed: homogeneous grid, mixed pallet/carton, payload limit, IBC + machinery, stacked-cargo weight analysis.');
 
 } finally {
   await server.close()
