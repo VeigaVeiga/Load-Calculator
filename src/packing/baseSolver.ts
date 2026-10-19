@@ -1,5 +1,5 @@
 import type { Cargo, Container, PlacedCargo } from '../types'
-import { dims, footprintOverlap, supportMetrics, validatePlacement, validatePlan } from './geometry'
+import { dims, validatePlacement, validatePlan } from './geometry'
 import { binpackingJsCandidate, openSourcePackCandidate } from './openSourceSolver'
 
 export type SolverResult = {
@@ -146,33 +146,10 @@ function score(placed: PlacedCargo[], container: Container): [number, number, nu
   const footprintBalance = Math.abs((minX + maxX) / 2 - container.length / 2)
     + Math.abs((minY + maxY) / 2 - container.width / 2)
 
-  // Score every vertical layer independently. A centred first layer must not
-  // hide an off-centre stack above it merely because the full footprint is centred.
-  const layers = new Map<number, PlacedCargo[]>()
-  for (const p of placed) {
-    const layerKey = Math.round(p.z / 10)
-    const layer = layers.get(layerKey) ?? []
-    layer.push(p)
-    layers.set(layerKey, layer)
-  }
-  let layerBalance = 0
-  for (const layer of layers.values()) {
-    if (layer.length === 0) continue
-    const layerArea = layer.reduce((sum, p) => sum + Math.max(1, p.length * p.width), 0)
-    const layerX = layer.reduce((sum, p) => {
-      const d = dims(p)
-      return sum + (p.x + d.length / 2) * Math.max(1, p.length * p.width)
-    }, 0) / layerArea
-    const layerY = layer.reduce((sum, p) => {
-      const d = dims(p)
-      return sum + (p.y + d.width / 2) * Math.max(1, p.length * p.width)
-    }, 0) / layerArea
-    layerBalance += Math.abs(layerX - container.length / 2) + Math.abs(layerY - container.width / 2)
-  }
-
-  // Item count remains the hard priority. Next balance actual mass, then the
-  // centre of each stack layer, then the overall footprint and occupied volume.
-  return [placed.length, -massBalance, -(footprintBalance + layerBalance), volume]
+  // Rank by placed count, real mass balance, overall footprint and volume.
+  // Do not reward visual centering of individual layers: physical CG is handled
+  // by the mass term and the weight-analysis module.
+  return [placed.length, -massBalance, -footprintBalance, volume]
 }
 
 function compareScores(a: number[], b: number[]) {
@@ -292,175 +269,6 @@ function refineBySequenceSearch(
   return { placed: best, quality: bestQuality, iterations }
 }
 
-function nudgeTowardCenter(items: PlacedCargo[], cargo: Cargo[], container: Container, locked: PlacedCargo[]): PlacedCargo[] {
-  if (items.length < 2) return items
-  const fixedIds = new Set(locked.map(p => p.id))
-  const movableIds = new Set(items.filter(p => !p.locked && !fixedIds.has(p.id)).map(p => p.id))
-  if (!movableIds.size) return items
-
-  const weight = items.reduce((sum, p) => sum + Math.max(0, p.weight), 0)
-  if (weight <= 0) return items
-  const cgX = items.reduce((sum, p) => { const d = dims(p); return sum + (p.x + d.length / 2) * Math.max(0, p.weight) }, 0) / weight
-  const cgY = items.reduce((sum, p) => { const d = dims(p); return sum + (p.y + d.width / 2) * Math.max(0, p.weight) }, 0) / weight
-  const minX = Math.min(...items.map(p => p.x))
-  const minY = Math.min(...items.map(p => p.y))
-  const maxX = Math.max(...items.map(p => p.x + dims(p).length))
-  const maxY = Math.max(...items.map(p => p.y + dims(p).width))
-  const cgDx = container.length / 2 - cgX
-  const cgDy = container.width / 2 - cgY
-  const footprintDx = container.length / 2 - (minX + maxX) / 2
-  const footprintDy = container.width / 2 - (minY + maxY) / 2
-  const blendDx = cgDx * 0.7 + footprintDx * 0.3
-  const blendDy = cgDy * 0.7 + footprintDy * 0.3
-  const snap = (n: number) => Math.round(n / 50) * 50
-  const shifts = (target: number, cg: number, footprint: number) => [...new Set([
-    // Keep exact millimetre corrections as candidates: 50 mm snap-only shifts
-    // can leave a persistent 10–25 mm transverse CG error on a single row.
-    0, target, cg, footprint, (target * 0.7 + cg * 0.2 + footprint * 0.1),
-    snap(target), snap(cg), snap(footprint),
-    ...[-800, -400, -200, -100, -50, 50, 100, 200, 400, 800].map(delta => snap(target) + delta),
-  ])]
-  const dxs = shifts(blendDx, cgDx, footprintDx)
-  const dys = shifts(blendDy, cgDy, footprintDy)
-
-  let best = items
-  let bestScore = score(items, container)
-  // Treat the unlocked shipment as one rigid arrangement: every movable unit
-  // receives exactly the same translation, so layers/stacking are not torn apart.
-  for (const dx of dxs) {
-    for (const dy of dys) {
-      if (dx === 0 && dy === 0) continue
-      const candidate = items.map(p => movableIds.has(p.id) ? { ...p, x: p.x + dx, y: p.y + dy } : p)
-      if (!validatePlan(candidate, container, cargo).ok) continue
-      const candidateScore = score(candidate, container)
-      if (compareScores(candidateScore, bestScore) > 0) {
-        best = candidate
-        bestScore = candidateScore
-      }
-    }
-  }
-  return best
-}
-
-/**
- * Reposition complete elevated stacks after the initial pack. Moving the whole
- * vertical group preserves stack relationships; validation prevents unsupported
- * overhangs, collisions, or loss of cargo. This targets avoidable off-centre
- * upper loads that a rigid whole-plan translation cannot correct.
- */
-function centerUpperStacks(items: PlacedCargo[], cargo: Cargo[], container: Container, locked: PlacedCargo[]) {
-  if (items.length < 2) return items
-  const lockedIds = new Set(locked.map(p => p.id))
-  let best = items.map(p => ({ ...p }))
-  let candidatesTested = 0
-  const maxStackCandidates = 500
-
-  const stackGroups = (plan: PlacedCargo[]) => {
-    const elevated = plan.filter(p => p.z > 0.5)
-    const visited = new Set<string>()
-    const groups: PlacedCargo[][] = []
-    for (const seed of elevated) {
-      if (visited.has(seed.id)) continue
-      const group: PlacedCargo[] = []
-      const queue = [seed]
-      visited.add(seed.id)
-      while (queue.length) {
-        const p = queue.pop()!
-        group.push(p)
-        for (const q of elevated) {
-          if (visited.has(q.id)) continue
-          const touching = (
-            Math.abs(p.z + p.height - q.z) <= 0.5 ||
-            Math.abs(q.z + q.height - p.z) <= 0.5
-          ) && footprintOverlap(p, q)
-          if (touching) {
-            visited.add(q.id)
-            queue.push(q)
-          }
-        }
-      }
-      if (group.some(p => !lockedIds.has(p.id) && !p.locked)) groups.push(group)
-    }
-    return groups.sort((a, b) => Math.min(...b.map(p => p.z)) - Math.min(...a.map(p => p.z)))
-  }
-
-  // Two passes are enough for the common pallet + upper-carton layout, while
-  // keeping this bounded for larger plans.
-  for (let pass = 0; pass < 2; pass++) {
-    let changed = false
-    for (const groupSnapshot of stackGroups(best)) {
-      if (candidatesTested >= maxStackCandidates) break
-      const groupIds = new Set(groupSnapshot.map(p => p.id))
-      if (groupSnapshot.some(p => lockedIds.has(p.id) || p.locked)) continue
-      const group = best.filter(p => groupIds.has(p.id))
-      if (!group.length) continue
-      const minZ = Math.min(...group.map(p => p.z))
-      const bottom = group.filter(p => Math.abs(p.z - minZ) <= 0.5)
-      const minX = Math.min(...group.map(p => p.x))
-      const minY = Math.min(...group.map(p => p.y))
-      const maxX = Math.max(...group.map(p => p.x + dims(p).length))
-      const maxY = Math.max(...group.map(p => p.y + dims(p).width))
-      const totalWeight = group.reduce((sum, p) => sum + Math.max(0, p.weight), 0)
-      const cgX = totalWeight > 0 ? group.reduce((sum, p) => sum + (p.x + dims(p).length / 2) * Math.max(0, p.weight), 0) / totalWeight : (minX + maxX) / 2
-      const cgY = totalWeight > 0 ? group.reduce((sum, p) => sum + (p.y + dims(p).width / 2) * Math.max(0, p.weight), 0) / totalWeight : (minY + maxY) / 2
-      const snap = (n: number) => Math.round(n / 10) * 10
-      const dxs = new Set<number>([
-        0,
-        snap(container.length / 2 - cgX),
-        snap(container.length / 2 - (minX + maxX) / 2),
-      ])
-      const dys = new Set<number>([
-        0,
-        snap(container.width / 2 - cgY),
-        snap(container.width / 2 - (minY + maxY) / 2),
-      ])
-
-      for (const p of bottom) {
-        const supporters = supportMetrics(p, best.filter(q => q.id !== p.id)).supporters
-        const d = dims(p)
-        for (const support of supporters) {
-          const sd = dims(support)
-          dxs.add(snap(support.x + sd.length / 2 - (p.x + d.length / 2)))
-          dys.add(snap(support.y + sd.width / 2 - (p.y + d.width / 2)))
-          dxs.add(snap(support.x - p.x))
-          dxs.add(snap(support.x + sd.length - (p.x + d.length)))
-          dys.add(snap(support.y - p.y))
-          dys.add(snap(support.y + sd.width - (p.y + d.width)))
-        }
-      }
-
-      // Bound the Cartesian search; retain centre-directed candidates first.
-      const xOffsets = [...dxs].slice(0, 8)
-      const yOffsets = [...dys].slice(0, 8)
-      let localBest = best
-      let localScore = score(best, container)
-      for (const dx of xOffsets) {
-        for (const dy of yOffsets) {
-          if (candidatesTested >= maxStackCandidates) break
-          if (dx === 0 && dy === 0) continue
-          candidatesTested += 1
-          const candidate = best.map(p => groupIds.has(p.id)
-            ? { ...p, x: p.x + dx, y: p.y + dy, placementMode: 'automatic' as const }
-            : p)
-          if (!validatePlan(candidate, container, cargo).ok) continue
-          const candidateScore = score(candidate, container)
-          if (compareScores(candidateScore, localScore) > 0) {
-            localBest = candidate
-            localScore = candidateScore
-          }
-        }
-        if (candidatesTested >= maxStackCandidates) break
-      }
-      if (localBest !== best) {
-        best = localBest.map(p => ({ ...p }))
-        changed = true
-      }
-    }
-    if (!changed) break
-  }
-  return best
-}
-
 /**
  * Automatic packing is delegated to the MIT-licensed binpack3d library
  * (a TypeScript port of py3dbp's corner-point heuristic). We run a small,
@@ -548,8 +356,8 @@ export function basePack(
       bestScore = score(best, container)
     }
   }
-  best = centerUpperStacks(best, cargo, container, locked)
-  best = nudgeTowardCenter(best, cargo, container, locked)
+  // Preserve the solver's physically valid placement; do not apply a final
+  // geometry-only translation that can mask a genuinely off-centre load.
   progress?.(98)
 
   const result = { placed: best, unplaced: completeUnplaced(cargo, best) }
