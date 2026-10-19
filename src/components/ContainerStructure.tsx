@@ -15,7 +15,7 @@ function Beam({ position, size, color = themedBeam(), opacity = .96 }: { positio
   return <mesh position={position} castShadow raycast={() => null}><boxGeometry args={size} /><meshStandardMaterial color={color} transparent={opacity < 1} opacity={opacity} metalness={.15} roughness={.58} /></mesh>
 }
 
-function Panel({ position, size, opacity = .08 }: { position: [number, number, number]; size: [number, number, number]; opacity?: number }) {
+function Panel({ position, size, opacity = (isLightIndustrialTheme() ? .22 : .08) }: { position: [number, number, number]; size: [number, number, number]; opacity?: number }) {
   return <mesh position={position} raycast={() => null}><boxGeometry args={size} /><meshStandardMaterial color={themedBeam()} transparent opacity={opacity} depthWrite={false} /></mesh>
 }
 
@@ -56,7 +56,7 @@ function HeadWall({ container, x, sideRailY, bottomZ, topZ, rail }: { container:
 
 function Roof({ container }: { container: Container }) {
   const L = container.outerLength * S, W = container.outerWidth * S, H = visualHeight(container), t = container.roofThickness * S
-  return <Panel position={[0, 0, H - t / 2]} size={[L, W, t]} opacity={.045} />
+  return <Panel position={[0, 0, H - t / 2]} size={[L, W, t]} opacity={isLightIndustrialTheme() ? .18 : .045} />
 }
 
 // Three transverse roof members restore the visible top segmentation without
