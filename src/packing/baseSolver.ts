@@ -137,19 +137,9 @@ function score(placed: PlacedCargo[], container: Container): [number, number, nu
   const cgY = placed.reduce((sum, p) => { const d = dims(p); return sum + (p.y + d.width / 2) * Math.max(0, p.weight) }, 0) / totalWeight
   const massBalance = Math.abs(cgX - container.length / 2) + Math.abs(cgY - container.width / 2)
 
-  // Balance the complete cargo footprint as well as its mass. This makes layouts
-  // with similar weight centres prefer more even front/back and left/right edge gaps.
-  const minX = placed.length ? Math.min(...placed.map(p => p.x)) : 0
-  const minY = placed.length ? Math.min(...placed.map(p => p.y)) : 0
-  const maxX = placed.length ? Math.max(...placed.map(p => p.x + dims(p).length)) : 0
-  const maxY = placed.length ? Math.max(...placed.map(p => p.y + dims(p).width)) : 0
-  const footprintBalance = Math.abs((minX + maxX) / 2 - container.length / 2)
-    + Math.abs((minY + maxY) / 2 - container.width / 2)
-
-  // Rank by placed count, real mass balance, overall footprint and volume.
-  // Do not reward visual centering of individual layers: physical CG is handled
-  // by the mass term and the weight-analysis module.
-  return [placed.length, -massBalance, -footprintBalance, volume]
+  // Optimise the real mass centre only after maximising the number of loaded units.
+  // Do not reward geometric/visual centring of the cargo footprint.
+  return [placed.length, -massBalance, volume]
 }
 
 function compareScores(a: number[], b: number[]) {
@@ -162,12 +152,11 @@ function compareScores(a: number[], b: number[]) {
 }
 
 function annealingQuality(items: PlacedCargo[], container: Container) {
-  const [count, negativeMassBalance, negativeFootprintBalance, volume] = score(items, container)
+  const [count, negativeMassBalance, volume] = score(items, container)
   const containerVolume = Math.max(1, container.length * container.width * container.height)
   const normalizedVolume = volume / containerVolume
   const massBalance = negativeMassBalance / Math.max(1, container.length + container.width)
-  const footprintBalance = negativeFootprintBalance / Math.max(1, container.length + container.width)
-  return count * 1_000_000_000 + massBalance * 1_000_000 + footprintBalance * 10_000 + normalizedVolume * 1_000
+  return count * 1_000_000_000 + massBalance * 1_000_000 + normalizedVolume * 1_000
 }
 
 type SequenceUnit = { key: string; volume: number; footprint: number; weight: number }
