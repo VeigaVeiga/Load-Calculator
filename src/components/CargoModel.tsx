@@ -109,7 +109,7 @@ function CargoModel({ p, container, selected, onPointerDown, onPointerUp, onPoin
       const boxL = (rawL - gapX * (cols + 1)) / cols
       const boxW = (rawW - gapY * (rows + 1)) / rows
       return <>
-        <group position={[0, 0, (-rawH / 2 + deckH / 2) * S}>
+        <group position={[0, 0, (-rawH / 2 + deckH / 2) * S]}>
           <MemoBox size={[L, W, detail(plankH)]} position={[0, 0, -deckH * S * .28]} color="#9b7048" roughness={.9} eventProps={eventProps} outline opacity={ghostOpacity} />
           {[-.34, 0, .34].map((t, i) => <MemoBox key={`deck-${i}`} position={[0, t * W * .78, deckH * S * .06]} size={[L * .98, W * .19, detail(plankH)]} color={i === 1 ? '#b68a5b' : '#c19a6c'} roughness={.88} outline opacity={ghostOpacity} />)}
           {[-.39, 0, .39].map((t, i) => <MemoBox key={`runner-${i}`} position={[t * L, 0, -deckH * S * .24]} size={[Math.max(70, rawL * .12) * S, W * .76, detail(runnerH)]} color="#785637" roughness={.9} outline opacity={ghostOpacity} />)}
@@ -182,7 +182,7 @@ function CargoModel({ p, container, selected, onPointerDown, onPointerUp, onPoin
       {/* Galvanized cage uprights and horizontal rails. */}
       {[-.43, -.14, .14, .43].map((t, i) => <MemoBox key={`ibc-x-${i}`} position={[t * L, 0, 0]} size={[detail(rawL * .025, 9), W * .99, H * .99]} color="#aab5b8" roughness={.4} outline opacity={ghostOpacity} />)}
       {[-.43, -.14, .14, .43].map((t, i) => <MemoBox key={`ibc-y-${i}`} position={[0, t * W, 0]} size={[L * .99, detail(rawW * .025, 9), H * .99]} color="#aab5b8" roughness={.4} outline opacity={ghostOpacity} />)}
-      {[-.43, .43].map((x, i) => [-.43, .43].map((y, j) => <MemoBox key={`ibc-corner-${i}-${j}`} position={[x * L, y * W, 0]} size={[detail(rawL * .035, 12), detail(rawW * .035, 12), H]} color="#89969a" roughness={.4} outline opacity={ghostOpacity} />)}
+      {[-.43, .43].map((x, i) => [-.43, .43].map((y, j) => <MemoBox key={`ibc-corner-${i}-${j}`} position={[x * L, y * W, 0]} size={[detail(rawL * .035, 12), detail(rawW * .035, 12), H]} color="#89969a" roughness={.4} outline opacity={ghostOpacity} />))}
       <MemoBox size={[L * .2, W * .2, detail(rawH * .035, 12)]} position={[0, 0, H * .465]} color="#354247" roughness={.42} outline opacity={ghostOpacity} />
       <mesh position={[L * .08, -W * .12, H * .48]} raycast={() => null}><cylinderGeometry args={[detail(rawW * .045, 8), detail(rawW * .045, 8), detail(rawH * .025, 8), 12]} /><meshStandardMaterial color="#48575b" roughness={.5} /></mesh>
     </> : vehicle ? <>
