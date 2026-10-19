@@ -17,7 +17,7 @@ export type View = 'iso' | 'top' | 'front' | 'left' | 'right'
 export type SceneTool = 'translate' | 'rotate' | 'scale'
 export type SelectionMode = 'single' | 'box'
 const S = .001
-const isLightIndustrialTheme = () => typeof document !== 'undefined' && document.querySelector('.app.theme-light') !== null
+import { isLightIndustrialTheme } from '../theme'
 const MATERIAL_STAGE_GAP = 500
 const MATERIAL_STAGE_DEPTH = 3000
 
