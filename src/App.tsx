@@ -1014,7 +1014,12 @@ function App() {
   const scaleMaterial = (id:string, factors:{x:number;y:number;z:number}) => {
     const clamp=(value:number)=>Math.max(.25,Math.min(4,value))
     const fx=clamp(factors.x),fy=clamp(factors.y),fz=clamp(factors.z)
-    setMaterials(items=>items.map(m=>m.id===id?{...m,length:Math.max(100,Math.round(m.length*fx/10)*10),width:Math.max(100,Math.round(m.width*fy/10)*10),height:Math.max(80,Math.round(m.height*fz/10)*10)}:m))
+    setMaterials(items=>items.map(m=>{
+      if(m.id!==id)return m
+      const length=Math.max(100,Math.round(m.length*fx/10)*10),width=Math.max(100,Math.round(m.width*fy/10)*10),height=Math.max(80,Math.round(m.height*fz/10)*10)
+      // Scale around the TransformControls pivot (the material centre), not its lower corner.
+      return {...m,x:Math.round((m.x+(m.length-length)/2)/10)*10,y:Math.round((m.y+(m.width-width)/2)/10)*10,z:Math.round((m.z+(m.height-height)/2)/10)*10,length,width,height}
+    }))
   }
 
   const materialCounts = useMemo(
