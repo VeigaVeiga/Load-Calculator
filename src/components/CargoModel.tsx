@@ -115,18 +115,7 @@ function CargoModel({ p, container, selected, onPointerDown, onPointerUp, onPoin
     geometry.computeVertexNormals()
     return geometry
   }, [L, W, H])
-      const cabinGeometry = useMemo(() => {
-        const x0=-L*.31, x1=L*.28, xt0=-L*.19, xt1=L*.19
-        const z0=-H*.015, z1=H*.43, y=W*.335
-        const v=[
-          x0,-y,z0, x1,-y,z0, x1,y,z0, x0,y,z0,
-          xt0,-y*.91,z1, xt1,-y*.91,z1, xt1,y*.91,z1, xt0,y*.91,z1,
-        ]
-        const idx=[0,1,2,0,2,3, 4,7,6,4,6,5, 0,4,5,0,5,1, 1,5,6,1,6,2, 2,6,7,2,7,3, 3,7,4,3,4,0]
-        const g=new THREE.BufferGeometry()
-        g.setAttribute('position',new THREE.Float32BufferAttribute(v,3));g.setIndex(idx);g.computeVertexNormals()
-        return g
-      }, [L,W,H])
+
 
   return <group position={pos} rotation={[0, 0, local ? 0 : p.rotation * Math.PI / 180]}>
     {pallet ? <>
