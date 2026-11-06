@@ -73,35 +73,34 @@ function VehicleCargoModel({ length, width, height, selected, opacity, eventProp
   const fitted = useMemo(() => {
     const root = scene.clone(true)
 
-    // glTF is Y-up and conventionally uses +Z as the vehicle's forward/longitudinal
-    // axis. Map source Z -> planner X (length), source X -> planner Y (width),
-    // and source Y -> planner Z (height). Do not infer orientation from bounds:
-    // a bounding-box ratio cannot tell which face is the car's underside.
+    // Explicitly map the sedan's conventional glTF axes to the planner:
+    // source +Z (vehicle length) -> planner +X; source +X (width) -> +Y;
+    // source +Y (up) -> +Z. Never guess vehicle orientation from ratios.
     const rotation = new THREE.Matrix4().makeBasis(
+      new THREE.Vector3(0, 1, 0),
       new THREE.Vector3(0, 0, 1),
       new THREE.Vector3(1, 0, 0),
-      new THREE.Vector3(0, 1, 0),
     )
     root.quaternion.setFromRotationMatrix(rotation)
     root.position.set(0, 0, 0)
     root.updateMatrixWorld(true)
 
     const bounds = new THREE.Box3().setFromObject(root)
-    const size = bounds.getSize(new THREE.Vector3())
+    const sourceSize = bounds.getSize(new THREE.Vector3())
     const center = bounds.getCenter(new THREE.Vector3())
-    const scaleX = length / Math.max(size.x, .0001)
-    const scaleY = width / Math.max(size.y, .0001)
-    const scaleZ = height / Math.max(size.z, .0001)
+    if (sourceSize.x <= 0 || sourceSize.y <= 0 || sourceSize.z <= 0) {
+      return { root }
+    }
 
-    // Fit the model to the declared cargo envelope. The preset dimensions are
-    // the authoritative vehicle dimensions; the imported asset is visual only.
-    root.position.set(
-      -center.x,
-      -center.y,
-      -bounds.min.z,
-    )
+    // Match the entered length/width/height independently. Uniform fitting
+    // previously shrank the whole car to the smallest mismatched axis.
     const fitRoot = new THREE.Group()
-    fitRoot.scale.set(scaleX, scaleY, scaleZ)
+    fitRoot.scale.set(
+      length / sourceSize.x,
+      width / sourceSize.y,
+      height / sourceSize.z,
+    )
+    root.position.set(-center.x, -center.y, -bounds.min.z)
     fitRoot.add(root)
 
     root.traverse(node => {
