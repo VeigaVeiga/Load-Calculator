@@ -57,12 +57,30 @@ export function analyzeWeight(
   const left = items.reduce((sum,p)=>sum + (p.y + dims(p).width/2 < c.width/2 ? weightOf(p) : 0),0)
   const right = total-left
   const corners = { fl: 0, fr: 0, rl: 0, rr: 0 }
+  // Distribute each unit's weight across floor quadrants by footprint area.
+  // A centre-based bucket incorrectly assigns a centred pallet entirely to one
+  // corner, creating a discontinuous penalty in the optimizer.
   for (const p of items) {
-    const d=dims(p); const x=p.x+d.length/2; const y=p.y+d.width/2
-    if(x<c.length/2 && y<c.width/2) corners.fl+=weightOf(p)
-    else if(x<c.length/2) corners.fr+=weightOf(p)
-    else if(y<c.length/2) corners.rl+=weightOf(p)
-    else corners.rr+=weightOf(p)
+    const d = dims(p)
+    const x1 = p.x
+    const x2 = p.x + d.length
+    const y1 = p.y
+    const y2 = p.y + d.width
+    const xMid = c.length / 2
+    const yMid = c.width / 2
+    const areas = {
+      fl: Math.max(0, Math.min(x2, xMid) - Math.max(x1, 0)) * Math.max(0, Math.min(y2, yMid) - Math.max(y1, 0)),
+      fr: Math.max(0, Math.min(x2, xMid) - Math.max(x1, 0)) * Math.max(0, Math.min(y2, c.width) - Math.max(y1, yMid)),
+      rl: Math.max(0, Math.min(x2, c.length) - Math.max(x1, xMid)) * Math.max(0, Math.min(y2, yMid) - Math.max(y1, 0)),
+      rr: Math.max(0, Math.min(x2, c.length) - Math.max(x1, xMid)) * Math.max(0, Math.min(y2, c.width) - Math.max(y1, yMid)),
+    }
+    const coveredArea = areas.fl + areas.fr + areas.rl + areas.rr
+    if (coveredArea <= 0) continue
+    const weight = weightOf(p)
+    corners.fl += weight * areas.fl / coveredArea
+    corners.fr += weight * areas.fr / coveredArea
+    corners.rl += weight * areas.rl / coveredArea
+    corners.rr += weight * areas.rr / coveredArea
   }
   // Continuous moment-based imbalance: zero when CG is on the container centreline,
   // independent of which side a box centre happens to fall on.
