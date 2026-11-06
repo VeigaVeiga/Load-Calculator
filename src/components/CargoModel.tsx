@@ -96,6 +96,25 @@ function CargoModel({ p, container, selected, onPointerDown, onPointerUp, onPoin
   const ghostOpacity = ghostOpacityOverride ?? (ghost ? .24 : 1)
   const eventProps = useMemo(() => ({ onPointerDown, onPointerMove, onPointerUp, onClick }), [onPointerDown, onPointerMove, onPointerUp, onClick])
   const detail = (n: number, min = 2) => Math.max(min, n) * S
+  // Build the vehicle cabin geometry unconditionally to preserve React hook order.
+  const cabinGeometry = useMemo(() => {
+    const x0 = -L * .31, x1 = L * .28, xt0 = -L * .19, xt1 = L * .19
+    const z0 = -H * .015, z1 = H * .43, y = W * .335
+    const vertices = [
+      x0, -y, z0, x1, -y, z0, x1, y, z0, x0, y, z0,
+      xt0, -y * .91, z1, xt1, -y * .91, z1, xt1, y * .91, z1, xt0, y * .91, z1,
+    ]
+    const indices = [
+      0, 1, 2, 0, 2, 3, 4, 7, 6, 4, 6, 5,
+      0, 4, 5, 0, 5, 1, 1, 5, 6, 1, 6, 2,
+      2, 6, 7, 2, 7, 3, 3, 7, 4, 3, 4, 0,
+    ]
+    const geometry = new THREE.BufferGeometry()
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3))
+    geometry.setIndex(indices)
+    geometry.computeVertexNormals()
+    return geometry
+  }, [L, W, H])
       const cabinGeometry = useMemo(() => {
         const x0=-L*.31, x1=L*.28, xt0=-L*.19, xt1=L*.19
         const z0=-H*.015, z1=H*.43, y=W*.335
@@ -207,7 +226,7 @@ function CargoModel({ p, container, selected, onPointerDown, onPointerUp, onPoin
           <mesh rotation={[Math.PI/2,0,0]} raycast={()=>null}><cylinderGeometry args={[wheelR,wheelR,wheelW,32]}/><meshStandardMaterial color="#171b1d" roughness={.9}/></mesh>
           <mesh position={[0,side*wheelW*.53,0]} rotation={[Math.PI/2,0,0]} raycast={()=>null}><cylinderGeometry args={[wheelR*.62,wheelR*.62,wheelW*.14,24]}/><meshStandardMaterial color="#b5c0c4" metalness={.72} roughness={.28}/></mesh>
           <mesh position={[0,side*wheelW*.62,0]} rotation={[Math.PI/2,0,0]} raycast={()=>null}><cylinderGeometry args={[wheelR*.18,wheelR*.18,wheelW*.16,16]}/><meshStandardMaterial color="#59666c" metalness={.65} roughness={.3}/></mesh>
-        </group>)))}
+        </group>))}
         {[-1,1].map(side=><group key={`car-lamps-${side}`}>
           <MemoBox size={[detail(rawL*.045,16),W*.17,H*.055]} position={[L*.475,side*W*.25,-H*.13]} color="#f2e6bd" roughness={.25} opacity={ghostOpacity}/>
           <MemoBox size={[detail(rawL*.035,14),W*.16,H*.06]} position={[-L*.475,side*W*.25,-H*.13]} color="#c95149" roughness={.28} opacity={ghostOpacity}/>
