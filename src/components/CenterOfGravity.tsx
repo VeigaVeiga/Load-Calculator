@@ -18,7 +18,7 @@ export default function CenterOfGravity({ analysis, container, lang = 'zh' }: {
         <span>{lang === 'zh' ? '装载重心 · 俯视与分层' : 'LOAD CG · PLAN & LAYERS'}</span>
       </div>
 
-      <div className="cg-box" style={{ padding: '8px 10px' }}>
+      <div className="cg-plan-box" style={{ padding: '8px 10px', background: '#070707', border: '1px solid #333', borderRadius: 4 }}>
         <svg viewBox="0 0 180 100" role="img" aria-label={lang === 'zh' ? '集装箱平面重心位置' : 'Container plan CG position'} style={{ width: '100%', height: 'auto', display: 'block' }}>
           <rect x="18" y="14" width="144" height="72" rx="1" fill="none" stroke="currentColor" strokeWidth="1.2" />
           <line x1="90" y1="14" x2="90" y2="86" stroke="#2674c8" strokeWidth="1.4" />
