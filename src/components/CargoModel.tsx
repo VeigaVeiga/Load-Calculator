@@ -94,7 +94,10 @@ function VehicleCargoModel({ length, width, height, selected, opacity, eventProp
     // Find the right-handed axis orientation whose proportions best match a
     // road vehicle: long along X, width along Y and height along Z.
     for (const permutation of permutations) {
-      for (const sx of signs) for (const sy of signs) for (const sz of signs) {
+      // glTF assets use +Y as the up direction. Keep that source axis mapped
+      // to positive planner Z; allowing its sign to flip makes the car upside down.
+      if (permutation[2] !== 1) continue
+      for (const sx of signs) for (const sy of signs) for (const sz of [1]) {
         const basis = [
           axes[permutation[0]].clone().multiplyScalar(sx),
           axes[permutation[1]].clone().multiplyScalar(sy),
