@@ -79,43 +79,63 @@ function objective(items: PlacedCargo[], container: Container) {
   return weightedDistributionScore(items, container)
 }
 
-function supportClusterIndices(items: PlacedCargo[], startIndex: number) {
-  // Treat every vertically connected stack as one movable unit. Moving only
-  // its bottom carton would invalidate the support of all cartons above it.
-  const members = new Set<number>([startIndex])
-  const queue = [startIndex]
-  while (queue.length) {
-    const currentIndex = queue.shift()!
-    const current = items[currentIndex]
-    const currentDims = dims(current)
-    for (let i = 0; i < items.length; i += 1) {
-      if (members.has(i)) continue
-      const candidate = items[i]
-      const candidateDims = dims(candidate)
+function buildSupportClusters(items: PlacedCargo[]) {
+  // Build the support graph once in O(n²), then move each connected vertical
+  // stack as a rigid group. This avoids both floating cargo and repeated BFS.
+  const parent = items.map((_, index) => index)
+  const find = (index: number): number => {
+    while (parent[index] !== index) {
+      parent[index] = parent[parent[index]]
+      index = parent[index]
+    }
+    return index
+  }
+  const unite = (a: number, b: number) => {
+    const rootA = find(a)
+    const rootB = find(b)
+    if (rootA !== rootB) parent[rootB] = rootA
+  }
+
+  for (let i = 0; i < items.length; i += 1) {
+    const a = items[i]
+    const ad = dims(a)
+    for (let j = i + 1; j < items.length; j += 1) {
+      const b = items[j]
       const verticalTouch =
-        Math.abs(current.z + current.height - candidate.z) <= EPS ||
-        Math.abs(candidate.z + candidate.height - current.z) <= EPS
+        Math.abs(a.z + a.height - b.z) <= EPS ||
+        Math.abs(b.z + b.height - a.z) <= EPS
+      if (!verticalTouch) continue
+      const bd = dims(b)
       const footprintTouch =
-        current.x < candidate.x + candidateDims.length - EPS &&
-        current.x + currentDims.length > candidate.x + EPS &&
-        current.y < candidate.y + candidateDims.width - EPS &&
-        current.y + currentDims.width > candidate.y + EPS
-      if (verticalTouch && footprintTouch) {
-        members.add(i)
-        queue.push(i)
-      }
+        a.x < b.x + bd.length - EPS &&
+        a.x + ad.length > b.x + EPS &&
+        a.y < b.y + bd.width - EPS &&
+        a.y + ad.width > b.y + EPS
+      if (footprintTouch) unite(i, j)
     }
   }
-  return [...members]
+
+  const groups = new Map<number, number[]>()
+  for (let i = 0; i < items.length; i += 1) {
+    const root = find(i)
+    const group = groups.get(root) ?? []
+    group.push(i)
+    groups.set(root, group)
+  }
+  return items.map((_, i) => groups.get(find(i)) ?? [i])
+}
+
+function supportClusterIndices(items: PlacedCargo[], index: number) {
+  return buildSupportClusters(items)[index] ?? [index]
 }
 
 function floorMovable(items: PlacedCargo[]) {
+  const clusters = buildSupportClusters(items)
   return items
-    .map((p, i) => ({ p, i }))
-    .filter(({ p, i }) => {
-      if (p.locked || p.z > EPS) return false
-      return !supportClusterIndices(items, i).some(index => items[index].locked)
-    })
+    .map((p, i) => ({ p, i, members: clusters[i] }))
+    .filter(({ p, members }) =>
+      !p.locked && p.z <= EPS && !members.some(index => items[index].locked)
+    )
 }
 
 function candidateTranslate(
