@@ -288,6 +288,11 @@ try {
     ]
     assert.equal(validatePlan(placed, box, shipment).ok, true, 'upper-layer-balance: initial plan must be supported')
     const before = analyzeWeight(placed, box, shipment)
+    const centredPallet = analyzeWeight([placed[0]], box, shipment)
+    assert.ok(
+      Math.max(...Object.values(centredPallet.corners)) - Math.min(...Object.values(centredPallet.corners)) < 1,
+      'upper-layer-balance: a centred pallet footprint must distribute evenly across floor quadrants',
+    )
     assert.ok(before.maxLayerTransverseOffsetMm > 300, 'upper-layer-balance: per-layer analysis must expose the displaced upper layer')
     const optimized = await optimizeLoad(placed, box, {
       cargoWeights: shipment.map(item => ({ id: item.id, weight: item.weight })),
@@ -295,7 +300,6 @@ try {
     })
     const pallet = optimized.placed.find(item => item.cargoId === 'foundation-pallet')
     const upper = optimized.placed.find(item => item.cargoId === 'upper-carton')
-    console.log('upper-layer-balance debug', { pallet: [pallet.x, pallet.y], upper: [upper.x, upper.y], scoreBefore: optimized.scoreBefore, scoreAfter: optimized.scoreAfter })
     assert.deepEqual([pallet.x, pallet.y], [5416, 676], 'upper-layer-balance: lower support must remain in place')
     assert.ok(Math.abs((upper.x + 200) - box.length / 2) < 6, 'upper-layer-balance: upper carton must move toward the longitudinal centre')
     assert.ok(Math.abs((upper.y + 150) - box.width / 2) < 6, 'upper-layer-balance: upper carton must move toward the transverse centre')
