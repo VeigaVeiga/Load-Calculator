@@ -92,15 +92,20 @@ function VehicleCargoModel({ length, width, height, selected, opacity, eventProp
       return { root }
     }
 
-    // Match the entered length/width/height independently. Uniform fitting
-    // previously shrank the whole car to the smallest mismatched axis.
+    // Use the declared vehicle length as the real-world calibration reference.
+    // Keep one uniform scale so the imported sedan retains its factory proportions;
+    // independently stretching X/Y/Z makes wheels and body visibly distorted.
+    const scale = length / sourceSize.x
     const fitRoot = new THREE.Group()
-    fitRoot.scale.set(
-      length / sourceSize.x,
-      width / sourceSize.y,
-      height / sourceSize.z,
+    fitRoot.scale.setScalar(scale)
+
+    // CargoModel's origin is the centre of its declared bounding envelope.
+    // Therefore the tyre contact plane belongs at -height/2, not at local Z=0.
+    root.position.set(
+      -center.x,
+      -center.y,
+      -height / (2 * scale) - bounds.min.z,
     )
-    root.position.set(-center.x, -center.y, -bounds.min.z)
     fitRoot.add(root)
 
     root.traverse(node => {
