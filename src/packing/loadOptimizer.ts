@@ -79,10 +79,43 @@ function objective(items: PlacedCargo[], container: Container) {
   return weightedDistributionScore(items, container)
 }
 
+function supportClusterIndices(items: PlacedCargo[], startIndex: number) {
+  // Treat every vertically connected stack as one movable unit. Moving only
+  // its bottom carton would invalidate the support of all cartons above it.
+  const members = new Set<number>([startIndex])
+  const queue = [startIndex]
+  while (queue.length) {
+    const currentIndex = queue.shift()!
+    const current = items[currentIndex]
+    const currentDims = dims(current)
+    for (let i = 0; i < items.length; i += 1) {
+      if (members.has(i)) continue
+      const candidate = items[i]
+      const candidateDims = dims(candidate)
+      const verticalTouch =
+        Math.abs(current.z + current.height - candidate.z) <= EPS ||
+        Math.abs(candidate.z + candidate.height - current.z) <= EPS
+      const footprintTouch =
+        current.x < candidate.x + candidateDims.length - EPS &&
+        current.x + currentDims.length > candidate.x + EPS &&
+        current.y < candidate.y + candidateDims.width - EPS &&
+        current.y + currentDims.width > candidate.y + EPS
+      if (verticalTouch && footprintTouch) {
+        members.add(i)
+        queue.push(i)
+      }
+    }
+  }
+  return [...members]
+}
+
 function floorMovable(items: PlacedCargo[]) {
   return items
     .map((p, i) => ({ p, i }))
-    .filter(({ p }) => !p.locked && p.z <= EPS)
+    .filter(({ p, i }) => {
+      if (p.locked || p.z > EPS) return false
+      return !supportClusterIndices(items, i).some(index => items[index].locked)
+    })
 }
 
 function candidateTranslate(
@@ -94,22 +127,30 @@ function candidateTranslate(
 ) {
   const p = items[index]
   if (!p || p.locked || p.z > EPS) return null
-  const d = dims(p)
-  if (x < -EPS || y < -EPS || x + d.length > container.length + EPS || y + d.width > container.width + EPS) return null
-  const next = items.map((q) => ({ ...q }))
-  next[index] = {
-    ...p,
-    x: Math.round(x / 10) * 10,
-    y: Math.round(y / 10) * 10,
-    placementMode: 'automatic',
+  const members = supportClusterIndices(items, index)
+  if (members.some(member => items[member].locked)) return null
+  const targetX = Math.round(x / 10) * 10
+  const targetY = Math.round(y / 10) * 10
+  const dx = targetX - p.x
+  const dy = targetY - p.y
+  for (const member of members) {
+    const item = items[member]
+    const d = dims(item)
+    if (item.x + dx < -EPS || item.y + dy < -EPS ||
+      item.x + dx + d.length > container.length + EPS ||
+      item.y + dy + d.width > container.width + EPS) return null
   }
-  return next
+  const memberSet = new Set(members)
+  return items.map((item, i) => memberSet.has(i)
+    ? { ...item, x: item.x + dx, y: item.y + dy, placementMode: 'automatic' as const }
+    : { ...item })
 }
 
 function candidateSwap(items: PlacedCargo[], aIndex: number, bIndex: number) {
   const a = items[aIndex]
   const b = items[bIndex]
   if (!a || !b || a.locked || b.locked || a.z > EPS || b.z > EPS) return null
+  if (supportClusterIndices(items, aIndex).length > 1 || supportClusterIndices(items, bIndex).length > 1) return null
 
   const next = items.map((p) => ({ ...p }))
   next[aIndex] = {
@@ -133,6 +174,7 @@ function candidateSwap(items: PlacedCargo[], aIndex: number, bIndex: number) {
 function candidateRotate(items: PlacedCargo[], index: number, container: Container) {
   const p = items[index]
   if (!p || p.locked || p.z > EPS || p.rotatable === false || p.length === p.width) return null
+  if (supportClusterIndices(items, index).length > 1) return null
   const rotation = p.rotation % 180 === 0 ? 90 : 0
   const d = dims({ ...p, rotation })
   const x = Math.min(p.x, container.length - d.length)
