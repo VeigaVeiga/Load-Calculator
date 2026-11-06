@@ -201,10 +201,13 @@ function SceneContent({props}:{props:Props}){
   applyMulti()
   const guideIds=selectedIds.length?selectedIds:(selectedId?[selectedId]:[])
   if(guideIds.length>1){
+   // Linear scan: avoid selectedIds × items.find() quadratic work for large SKUs.
+   const selectedSet=new Set(guideIds)
    let minX=Infinity,maxX=-Infinity,minY=Infinity,maxY=-Infinity
-   for(const id of guideIds){
-    const p=items.find(q=>q.id===id),o=refs.current[id]
-    if(!p||!o)continue
+   for(const p of items){
+    if(!selectedSet.has(p.id))continue
+    const o=refs.current[p.id]
+    if(!o)continue
     const r=((Math.round(o.rotation.z/(Math.PI/2))*90)%360+360)%360,d=dims({...p,rotation:r})
     const cx=o.position.x/S+container.length/2,cy=o.position.y/S+container.width/2
     minX=Math.min(minX,cx-d.length/2);maxX=Math.max(maxX,cx+d.length/2)
@@ -221,7 +224,9 @@ function SceneContent({props}:{props:Props}){
     setBatchGuide({x:centerX+snapX-container.length/2,y:centerY+snapY-container.width/2})
    }
   }else setBatchGuide(null)
-  if(!activeMaterial){
+  // Batch drags defer collision checks until release; checking every member against
+  // every other item at every pointer event caused quadratic work and UI freezes.
+  if(!activeMaterial&&!batchSelected){
    const ids=selectedIds.length?selectedIds:(selectedId?[selectedId]:[])
    for(const id of ids){
     const p=items.find(q=>q.id===id),o=refs.current[id]
@@ -397,6 +402,6 @@ const addMaterial=(type:SecuringMaterialType)=>{if(type==='doorNet'){const exist
  <Line points={[[batchGuide.x*S,-container.width*S/2,.035],[batchGuide.x*S,container.width*S/2,.035]]} color="#37c99a" lineWidth={2.4} depthTest={false} renderOrder={1000}/>
  <Line points={[[-container.length*S/2,0,.03],[container.length*S/2,0,.03]]} color="#168cff" lineWidth={2.6} depthTest={false} renderOrder={1000}/>
  <Line points={[[0,-container.width*S/2,.03],[0,container.width*S/2,.03]]} color="#ff9a28" lineWidth={2.6} depthTest={false} renderOrder={1000}/>
- </group>}{view==='iso'&&<><SecuringMaterialZone container={container} lang={lang}/><OverflowCargoZone container={container} items={props.overflowItems} cargo={cargo} lang={lang}/></>}<LashingPoints container={container} selectable={!!routeEdit} allowedIds={routeAllowedIds} selectedIds={routeEdit?.nodeIds ?? []} onPointSelect={chooseRoutePoint}/><CoordinateAxes container={container}/><InstancedCartons items={instancedCartons} container={container} onSelect={selectCargo} ghost={!!routeEdit||!!props.batchMode}/>{individualItems.map(p=><CargoObject key={p.id} p={p} container={container} selected={selectedIds.includes(p.id)||p.id===selectedId} onSelect={()=>selectCargo(p.id)} registerRef={registerRef} showName={!!cargo.find(c=>c.id===p.cargoId)?.showName} ghost={!!routeEdit||(!!props.batchMode&&!selectedIds.includes(p.id)&&p.id!==selectedId)}/>)}{visibleMaterials.map(m=><MaterialObject key={m.id} item={m} container={container} selected={m.id===props.selectedMaterialId} onSelect={()=>selectMaterial(m.id)} onDelete={()=>{props.onDeleteMaterial?.(m.id);props.onSelectMaterial?.(null);setActiveTransformId(null)}} registerRef={registerRef}/>)}{batchSelected&&<primitive object={batchPivot.current}/>} {activeObject&&(activeMaterial||freePlacementEnabled)&&<TransformControls ref={transformControls} key={String(activeId)+':'+tool} object={activeObject} mode={activeMaterial&&tool==='scale'?'scale':tool} {...(tool==='rotate'?{axis:'Z'}:{})} space="local" translationSnap={null} rotationSnap={Math.PI/2} size={1.15} scaleSnap={.05} showX={true} showY={tool!=='rotate'} showZ onMouseDown={()=>{capture();onDragState(true)}} onMouseUp={()=>{commit();invalidate();requestAnimationFrame(()=>{onDragState(false);invalidate()})}} onObjectChange={handleObjectChange}/>}<CameraRig view={view} container={container} dragging={dragging} transformActive={!!activeObject&&!!(activeMaterial||freePlacementEnabled)} focusPoint={focusPoint} focusNonce={focusNonce} routeMode={!!routeEdit}/></>
+ </group>}{view==='iso'&&<><SecuringMaterialZone container={container} lang={lang}/><OverflowCargoZone container={container} items={props.overflowItems} cargo={cargo} lang={lang}/></>}<LashingPoints container={container} selectable={!!routeEdit} allowedIds={routeAllowedIds} selectedIds={routeEdit?.nodeIds ?? []} onPointSelect={chooseRoutePoint}/><CoordinateAxes container={container}/><InstancedCartons items={instancedCartons} container={container} onSelect={selectCargo} ghost={!!routeEdit||!!props.batchMode}/>{individualItems.map(p=><CargoObject key={p.id} p={p} container={container} selected={selectedIds.includes(p.id)||p.id===selectedId} onSelect={()=>selectCargo(p.id)} registerRef={registerRef} showName={!!cargo.find(c=>c.id===p.cargoId)?.showName} ghost={!!routeEdit||!!props.batchMode}/>)}{visibleMaterials.map(m=><MaterialObject key={m.id} item={m} container={container} selected={m.id===props.selectedMaterialId} onSelect={()=>selectMaterial(m.id)} onDelete={()=>{props.onDeleteMaterial?.(m.id);props.onSelectMaterial?.(null);setActiveTransformId(null)}} registerRef={registerRef}/>)}{batchSelected&&<primitive object={batchPivot.current}/>} {activeObject&&(activeMaterial||freePlacementEnabled)&&<TransformControls ref={transformControls} key={String(activeId)+':'+tool} object={activeObject} mode={activeMaterial&&tool==='scale'?'scale':tool} {...(tool==='rotate'?{axis:'Z'}:{})} space="local" translationSnap={null} rotationSnap={Math.PI/2} size={1.15} scaleSnap={.05} showX={true} showY={tool!=='rotate'} showZ onMouseDown={()=>{capture();onDragState(true)}} onMouseUp={()=>{commit();invalidate();requestAnimationFrame(()=>{onDragState(false);invalidate()})}} onObjectChange={handleObjectChange}/>}<CameraRig view={view} container={container} dragging={dragging} transformActive={!!activeObject&&!!(activeMaterial||freePlacementEnabled)} focusPoint={focusPoint} focusNonce={focusNonce} routeMode={!!routeEdit}/></>
 }
 export default function ContainerScene(props:Props){const[selectedMaterialId,setSelectedMaterialId]=useState<string|null>(null),[toolbarHost,setToolbarHost]=useState<HTMLDivElement|null>(null);return <div className="scene-shell" style={{position:'relative',width:'100%',height:'100%'}}><Canvas frameloop="demand" dpr={[1,1.25]} gl={{antialias:true,powerPreference:'high-performance'}} camera={{position:[10,8,6],fov:42,near:.01,far:120,up:[0,0,1]}} onPointerMissed={()=>{props.onSelect(null);props.onSelectMany([]);setSelectedMaterialId(null)}}><SceneContent props={{...props,selectedMaterialId,onSelectMaterial:setSelectedMaterialId,toolbarHost}}/></Canvas><div ref={setToolbarHost} className="scene-toolbar-host" style={{position:'absolute',top:12,left:12,zIndex:50,pointerEvents:'none'}}/></div>}
