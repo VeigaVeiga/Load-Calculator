@@ -72,21 +72,26 @@ function VehicleCargoModel({ length, width, height, selected, opacity, eventProp
   const { scene } = useGLTF('/models/passenger-sedan.glb')
   const fitted = useMemo(() => {
     const root = scene.clone(true)
-    // The downloaded asset's up/forward axes are not consistent with the
-    // planner. Try all 24 right-handed 90-degree axis permutations and pick
-    // the one whose bounds are length >= width >= height (Z-up).
     const permutations: number[][] = [
       [0, 1, 2], [0, 2, 1], [1, 0, 2],
       [1, 2, 0], [2, 0, 1], [2, 1, 0],
     ]
     const signs = [-1, 1]
-    let bestBounds = new THREE.Box3()
-    let bestScore = -Infinity
     const axes = [
       new THREE.Vector3(1, 0, 0),
       new THREE.Vector3(0, 1, 0),
       new THREE.Vector3(0, 0, 1),
     ]
+    const targetRatios = [
+      length / Math.max(width, .0001),
+      length / Math.max(height, .0001),
+      width / Math.max(height, .0001),
+    ]
+    let bestBounds = new THREE.Box3()
+    let bestScore = Infinity
+
+    // Find the right-handed axis orientation whose proportions best match a
+    // road vehicle: long along X, width along Y and height along Z.
     for (const permutation of permutations) {
       for (const sx of signs) for (const sy of signs) for (const sz of signs) {
         const basis = [
@@ -99,31 +104,41 @@ function VehicleCargoModel({ length, width, height, selected, opacity, eventProp
         root.quaternion.setFromRotationMatrix(rotation)
         root.position.set(0, 0, 0)
         root.updateMatrixWorld(true)
-        const candidateBounds = new THREE.Box3().setFromObject(root)
-        const candidateSize = candidateBounds.getSize(new THREE.Vector3())
-        const score = candidateSize.x * 100 + candidateSize.y * 10 - candidateSize.z
-        if (score > bestScore) {
+        const bounds = new THREE.Box3().setFromObject(root)
+        const size = bounds.getSize(new THREE.Vector3())
+        if (size.x <= 0 || size.y <= 0 || size.z <= 0) continue
+        const ratios = [
+          size.x / size.y,
+          size.x / size.z,
+          size.y / size.z,
+        ]
+        const score = ratios.reduce((sum, ratio, i) =>
+          sum + Math.abs(Math.log(Math.max(ratio, .0001) / targetRatios[i])), 0)
+        if (score < bestScore) {
           bestScore = score
-          bestBounds.copy(candidateBounds)
+          bestBounds.copy(bounds)
         }
       }
     }
 
     const size = bestBounds.getSize(new THREE.Vector3())
-    // Match the cargo's declared outer dimensions exactly on all three axes.
-    // This prevents the vehicle model from floating inside an unrelated
-    // uniform-scale envelope or appearing larger/smaller than its dimensions.
-    const scale = new THREE.Vector3(
+    // Keep the imported car's proportions. Fit it uniformly inside the
+    // declared vehicle envelope instead of stretching each axis independently.
+    const scale = Math.min(
       length / Math.max(size.x, .0001),
       width / Math.max(size.y, .0001),
       height / Math.max(size.z, .0001),
     )
     const center = bestBounds.getCenter(new THREE.Vector3())
-    // Scale in planner/world axes after the orientation has been corrected.
-    // A parent fit group avoids applying X/Y/Z scaling in the asset's old axes.
-    root.position.copy(center).negate()
+    // The cargo origin is at its geometric centre. Centre the car in X/Y and
+    // put the lowest point (normally the tyres) exactly on the cargo bottom.
+    root.position.set(
+      -center.x,
+      -center.y,
+      -height / (2 * scale) - bestBounds.min.z,
+    )
     const fitRoot = new THREE.Group()
-    fitRoot.scale.copy(scale)
+    fitRoot.scale.setScalar(scale)
     fitRoot.add(root)
 
     root.traverse(node => {
@@ -214,8 +229,8 @@ function CargoModel({ p, container, selected, onPointerDown, onPointerUp, onPoin
         {[-1, 1].flatMap(x => [-1, 1].map(y => <MemoBox key={`crate-post-${x}-${y}`} position={[x * (L - postX) * .5, y * (W - postY) * .5, 0]} size={[postX, postY, H]} color="#85552f" roughness={.9} outline opacity={ghostOpacity}/>))}
         {[-1, 1].flatMap(y => [-1, 1].map(z => <MemoBox key={`crate-long-rail-${y}-${z}`} position={[0, y * (W - railY) * .5, z > 0 ? zTop : zBottom]} size={[L - postX * .5, railY, railZ]} color="#b47a43" roughness={.88} outline opacity={ghostOpacity}/>))}
         {[-1, 1].flatMap(x => [-1, 1].map(z => <MemoBox key={`crate-end-rail-${x}-${z}`} position={[x * (L - railX) * .5, 0, z > 0 ? zTop : zBottom]} size={[railX, W - postY * .5, railZ]} color="#a96f3b" roughness={.88} outline opacity={ghostOpacity}/>))}
-        {[-1, 1].flatMap(y => [ -.24, 0, .24 ].map((t, i) => <MemoBox key={`crate-side-slat-${y}-${i}`} position={[0, y * (W - board) * .5, t * H]} size={[L * .91, board, Math.max(24, rawH * .075) * S]} color="#c18b52" roughness={.9} opacity={ghostOpacity}/>))}
-        {[-1, 1].flatMap(x => [ -.24, 0, .24 ].map((t, i) => <MemoBox key={`crate-end-slat-${x}-${i}`} position={[x * (L - board) * .5, 0, t * H]} size={[board, W * .91, Math.max(24, rawH * .075) * S]} color="#bd844a" roughness={.9} opacity={ghostOpacity}/>))}
+        {[-1, 1].flatMap(y => [ -.24, 0, .24 ].map((t, i) => <MemoBox key={`crate-side-slat-${y}-${i}`} position={[0, y * (W / 2 - postY / 2), t * H]} size={[Math.max(1, L - postX * 2), board, Math.max(24, rawH * .075) * S]} color="#c18b52" roughness={.9} opacity={ghostOpacity}/>))}
+        {[-1, 1].flatMap(x => [ -.24, 0, .24 ].map((t, i) => <MemoBox key={`crate-end-slat-${x}-${i}`} position={[x * (L / 2 - postX / 2), 0, t * H]} size={[board, Math.max(1, W - postY * 2), Math.max(24, rawH * .075) * S]} color="#bd844a" roughness={.9} opacity={ghostOpacity}/>))}
         {[-.32, .32].map((y, i) => <MemoBox key={`crate-floor-${i}`} position={[0, y * W, zBottom - railZ * .35]} size={[L * .96, board, railZ * .7]} color="#79502e" roughness={.92} opacity={ghostOpacity}/> )}
         <MemoBox size={[L * .98, W * .08, railZ * .8]} position={[0, 0, -H * .5 + railZ * .25]} color="#79502e" roughness={.92} opacity={ghostOpacity}/>
       </>
