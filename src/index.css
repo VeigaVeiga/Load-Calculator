@@ -20,3 +20,7 @@ html,body,#root{font-size:15px}.top-actions label{font-size:12px}.top-actions se
 .cg-legend i{display:inline-block;width:20px;height:0;border-top:2px solid}
 .cg-legend-blue{border-color:#2674c8!important}
 .cg-legend-orange{border-top:2px dashed #e58a2d!important}
+
+/* Keep the SKU picker label legible and visually consistent with toolbar controls. */
+.view-toolbar .batch-select-label span{font-size:9px;letter-spacing:normal;font-weight:600;color:#65706c;margin-right:0}
+.view-toolbar .batch-select-label select{font-size:9px;letter-spacing:normal}
