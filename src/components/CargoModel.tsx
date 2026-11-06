@@ -72,81 +72,36 @@ function VehicleCargoModel({ length, width, height, selected, opacity, eventProp
   const { scene } = useGLTF('/models/passenger-sedan.glb')
   const fitted = useMemo(() => {
     const root = scene.clone(true)
-    const permutations: number[][] = [
-      [0, 1, 2], [0, 2, 1], [1, 0, 2],
-      [1, 2, 0], [2, 0, 1], [2, 1, 0],
-    ]
-    const signs = [-1, 1]
-    const axes = [
+
+    // glTF is Y-up and conventionally uses +Z as the vehicle's forward/longitudinal
+    // axis. Map source Z -> planner X (length), source X -> planner Y (width),
+    // and source Y -> planner Z (height). Do not infer orientation from bounds:
+    // a bounding-box ratio cannot tell which face is the car's underside.
+    const rotation = new THREE.Matrix4().makeBasis(
+      new THREE.Vector3(0, 0, 1),
       new THREE.Vector3(1, 0, 0),
       new THREE.Vector3(0, 1, 0),
-      new THREE.Vector3(0, 0, 1),
-    ]
-    const targetRatios = [
-      length / Math.max(width, .0001),
-      length / Math.max(height, .0001),
-      width / Math.max(height, .0001),
-    ]
-    let bestBounds = new THREE.Box3()
-    const bestRotation = new THREE.Quaternion()
-    let bestScore = Infinity
-
-    // Find the right-handed axis orientation whose proportions best match a
-    // road vehicle: long along X, width along Y and height along Z.
-    for (const permutation of permutations) {
-      // glTF assets use +Y as the up direction. Keep that source axis mapped
-      // to positive planner Z; allowing its sign to flip makes the car upside down.
-      if (permutation[2] !== 1) continue
-      for (const sx of signs) for (const sy of signs) for (const sz of [1]) {
-        const basis = [
-          axes[permutation[0]].clone().multiplyScalar(sx),
-          axes[permutation[1]].clone().multiplyScalar(sy),
-          axes[permutation[2]].clone().multiplyScalar(sz),
-        ]
-        const rotation = new THREE.Matrix4().makeBasis(basis[0], basis[1], basis[2])
-        if (rotation.determinant() < 0) continue
-        root.quaternion.setFromRotationMatrix(rotation)
-        root.position.set(0, 0, 0)
-        root.updateMatrixWorld(true)
-        const bounds = new THREE.Box3().setFromObject(root)
-        const size = bounds.getSize(new THREE.Vector3())
-        if (size.x <= 0 || size.y <= 0 || size.z <= 0) continue
-        const ratios = [
-          size.x / size.y,
-          size.x / size.z,
-          size.y / size.z,
-        ]
-        const score = ratios.reduce((sum, ratio, i) =>
-          sum + Math.abs(Math.log(Math.max(ratio, .0001) / targetRatios[i])), 0)
-        if (score < bestScore) {
-          bestScore = score
-          bestBounds.copy(bounds)
-          bestRotation.setFromRotationMatrix(rotation)
-        }
-      }
-    }
-
-    root.quaternion.copy(bestRotation)
+    )
+    root.quaternion.setFromRotationMatrix(rotation)
     root.position.set(0, 0, 0)
     root.updateMatrixWorld(true)
-    const size = bestBounds.getSize(new THREE.Vector3())
-    // Keep the imported car's proportions. Fit it uniformly inside the
-    // declared vehicle envelope instead of stretching each axis independently.
-    const scale = Math.min(
-      length / Math.max(size.x, .0001),
-      width / Math.max(size.y, .0001),
-      height / Math.max(size.z, .0001),
-    )
-    const center = bestBounds.getCenter(new THREE.Vector3())
-    // The cargo origin is at its geometric centre. Centre the car in X/Y and
-    // put the lowest point (normally the tyres) exactly on the cargo bottom.
+
+    const bounds = new THREE.Box3().setFromObject(root)
+    const size = bounds.getSize(new THREE.Vector3())
+    const center = bounds.getCenter(new THREE.Vector3())
+    const scaleX = length / Math.max(size.x, .0001)
+    const scaleY = width / Math.max(size.y, .0001)
+    const scaleZ = height / Math.max(size.z, .0001)
+
+    // Fit the model to the declared cargo envelope. The preset dimensions are
+    // the authoritative vehicle dimensions; the imported asset is visual only.
     root.position.set(
       -center.x,
       -center.y,
-      -height / (2 * scale) - bestBounds.min.z,
+      -bounds.min.z,
     )
     const fitRoot = new THREE.Group()
-    fitRoot.scale.setScalar(scale)
+    fitRoot.scale.set(scaleX, scaleY, scaleZ)
     fitRoot.add(root)
 
     root.traverse(node => {
