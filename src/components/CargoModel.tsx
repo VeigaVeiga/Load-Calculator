@@ -1,7 +1,7 @@
-import { Html } from '@react-three/drei'
+import { Html, useGLTF } from '@react-three/drei'
 import type { Container, PlacedCargo } from '../types'
 import { dims } from '../packing/geometry'
-import { memo, useMemo } from 'react'
+import { memo, Suspense, useMemo } from 'react'
 import * as THREE from 'three'
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js'
 
@@ -59,6 +59,68 @@ const MemoBox = memo(Box, (a, b) =>
   a.eventProps === b.eventProps && (a.opacity ?? 1) === (b.opacity ?? 1),
 )
 
+type VehicleCargoModelProps = {
+  length: number
+  width: number
+  height: number
+  selected: boolean
+  opacity: number
+  eventProps: any
+}
+
+function VehicleCargoModel({ length, width, height, selected, opacity, eventProps }: VehicleCargoModelProps) {
+  const { scene } = useGLTF('/models/passenger-sedan.glb')
+  const fitted = useMemo(() => {
+    const root = scene.clone(true)
+    // glTF assets are Y-up; the planner uses Z-up. Align the longest
+    // horizontal axis with the container length axis.
+    root.rotation.set(-Math.PI / 2, 0, 0)
+    root.updateMatrixWorld(true)
+    let bounds = new THREE.Box3().setFromObject(root)
+    let size = bounds.getSize(new THREE.Vector3())
+    if (size.y > size.x) {
+      root.rotation.set(-Math.PI / 2, 0, Math.PI / 2)
+      root.updateMatrixWorld(true)
+      bounds = new THREE.Box3().setFromObject(root)
+      size = bounds.getSize(new THREE.Vector3())
+    }
+
+    const scale = Math.min(
+      (length * .96) / Math.max(size.x, .0001),
+      (width * .90) / Math.max(size.y, .0001),
+      (height * .92) / Math.max(size.z, .0001),
+    )
+    const center = bounds.getCenter(new THREE.Vector3())
+    root.position.set(-center.x * scale, -center.y * scale, -center.z * scale)
+
+    root.traverse(node => {
+      const mesh = node as THREE.Mesh
+      if (!mesh.isMesh) return
+      mesh.castShadow = true
+      mesh.receiveShadow = true
+      const applyAppearance = (source: THREE.Material) => {
+        const material = source.clone()
+        material.transparent = opacity < 1 || material.transparent
+        material.opacity *= opacity
+        if (opacity < 1) material.depthWrite = false
+        if (selected && material instanceof THREE.MeshStandardMaterial) {
+          material.emissive.set('#b88920')
+          material.emissiveIntensity = .16
+        }
+        return material
+      }
+      mesh.material = Array.isArray(mesh.material)
+        ? mesh.material.map(applyAppearance)
+        : applyAppearance(mesh.material)
+    })
+    return { root, scale }
+  }, [scene, length, width, height, selected, opacity])
+
+  return <group {...eventProps}>
+    <primitive object={fitted.root} scale={fitted.scale} />
+  </group>
+}
+
 type CargoModelProps = {
   p: PlacedCargo
   container: Container
@@ -96,27 +158,6 @@ function CargoModel({ p, container, selected, onPointerDown, onPointerUp, onPoin
   const ghostOpacity = ghostOpacityOverride ?? (ghost ? .24 : 1)
   const eventProps = useMemo(() => ({ onPointerDown, onPointerMove, onPointerUp, onClick }), [onPointerDown, onPointerMove, onPointerUp, onClick])
   const detail = (n: number, min = 2) => Math.max(min, n) * S
-  // Build the vehicle cabin geometry unconditionally to preserve React hook order.
-  const cabinGeometry = useMemo(() => {
-    const x0 = -L * .31, x1 = L * .28, xt0 = -L * .19, xt1 = L * .19
-    const z0 = -H * .015, z1 = H * .43, y = W * .335
-    const vertices = [
-      x0, -y, z0, x1, -y, z0, x1, y, z0, x0, y, z0,
-      xt0, -y * .91, z1, xt1, -y * .91, z1, xt1, y * .91, z1, xt0, y * .91, z1,
-    ]
-    const indices = [
-      0, 1, 2, 0, 2, 3, 4, 7, 6, 4, 6, 5,
-      0, 4, 5, 0, 5, 1, 1, 5, 6, 1, 6, 2,
-      2, 6, 7, 2, 7, 3, 3, 7, 4, 3, 4, 0,
-    ]
-    const geometry = new THREE.BufferGeometry()
-    geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3))
-    geometry.setIndex(indices)
-    geometry.computeVertexNormals()
-    return geometry
-  }, [L, W, H])
-
-
   return <group position={pos} rotation={[0, 0, local ? 0 : p.rotation * Math.PI / 180]}>
     {pallet ? <>
       {/* Lightweight legacy pallet model: one load block and a simple deck/runner structure. */}
@@ -195,36 +236,9 @@ function CargoModel({ p, container, selected, onPointerDown, onPointerUp, onPoin
       {[-.43, .43].map((x, i) => [-.43, .43].map((y, j) => <MemoBox key={`ibc-corner-${i}-${j}`} position={[x * L, y * W, 0]} size={[detail(rawL * .035, 12), detail(rawW * .035, 12), H]} color="#89969a" roughness={.4} outline opacity={ghostOpacity} />))}
       <MemoBox size={[L * .2, W * .2, detail(rawH * .035, 12)]} position={[0, 0, H * .465]} color="#354247" roughness={.42} outline opacity={ghostOpacity} />
       <mesh position={[L * .08, -W * .12, H * .48]} raycast={() => null}><cylinderGeometry args={[detail(rawW * .045, 8), detail(rawW * .045, 8), detail(rawH * .025, 8), 12]} /><meshStandardMaterial color="#48575b" roughness={.5} /></mesh>
-    </> : vehicle ? (() => {
-      // More detailed compact passenger car with sculpted proportions, sloped cabin, glazing and alloy wheels.
-      const bodyColor = selected ? '#f2c94c' : '#477b9a'
-      const wheelR=Math.min(rawH*.17,rawW*.115)*S
-      const wheelW=Math.min(rawW*.09,rawH*.085)*S
-      return <>
-        <MemoBox size={[L*.98,W*.82,H*.28]} position={[L*.01,0,-H*.16]} color={bodyColor} roughness={.3} eventProps={eventProps} outline opacity={ghostOpacity}/>
-        <MemoBox size={[L*.23,W*.79,H*.12]} position={[L*.36,0,-H*.08]} color={bodyColor} roughness={.3} opacity={ghostOpacity}/>
-        <mesh geometry={cabinGeometry} material={materialFor(selected ? '#f2c94c' : '#5d8da5',.3,ghostOpacity)} castShadow receiveShadow/>
-        {[-1,1].map(side=><group key={`car-glass-${side}`}>
-          <MemoBox position={[-L*.055,side*W*.338,H*.22]} size={[L*.31,W*.012,H*.16]} color="#203a49" roughness={.2} opacity={ghostOpacity}/>
-          <MemoBox position={[L*.17,side*W*.338,H*.20]} size={[L*.19,W*.012,H*.15]} color="#203a49" roughness={.2} opacity={ghostOpacity}/>
-          <MemoBox position={[-L*.055,side*W*.345,H*.315]} size={[L*.29,W*.012,H*.018]} color="#a9c7d3" roughness={.28} opacity={ghostOpacity}/>
-        </group>)}
-        <MemoBox size={[L*.19,W*.62,H*.018]} position={[-L*.06,0,H*.425]} color="#243e4b" roughness={.22} opacity={ghostOpacity}/>
-        <MemoBox size={[L*.14,W*.68,H*.018]} position={[L*.20,0,H*.40]} color="#243e4b" roughness={.22} opacity={ghostOpacity}/>
-        {[-.31,.31].flatMap((x,i)=>[-1,1].map((side,j)=><group key={`car-wheel-${i}-${j}`} position={[x*L,side*W*.405,-H*.28]}>
-          <mesh rotation={[Math.PI/2,0,0]} raycast={()=>null}><cylinderGeometry args={[wheelR,wheelR,wheelW,32]}/><meshStandardMaterial color="#171b1d" roughness={.9}/></mesh>
-          <mesh position={[0,side*wheelW*.53,0]} rotation={[Math.PI/2,0,0]} raycast={()=>null}><cylinderGeometry args={[wheelR*.62,wheelR*.62,wheelW*.14,24]}/><meshStandardMaterial color="#b5c0c4" metalness={.72} roughness={.28}/></mesh>
-          <mesh position={[0,side*wheelW*.62,0]} rotation={[Math.PI/2,0,0]} raycast={()=>null}><cylinderGeometry args={[wheelR*.18,wheelR*.18,wheelW*.16,16]}/><meshStandardMaterial color="#59666c" metalness={.65} roughness={.3}/></mesh>
-        </group>))}
-        {[-1,1].map(side=><group key={`car-lamps-${side}`}>
-          <MemoBox size={[detail(rawL*.045,16),W*.17,H*.055]} position={[L*.475,side*W*.25,-H*.13]} color="#f2e6bd" roughness={.25} opacity={ghostOpacity}/>
-          <MemoBox size={[detail(rawL*.035,14),W*.16,H*.06]} position={[-L*.475,side*W*.25,-H*.13]} color="#c95149" roughness={.28} opacity={ghostOpacity}/>
-          <MemoBox size={[L*.11,detail(rawW*.018,10),H*.025]} position={[L*.30,side*W*.416,-H*.16]} color="#d7e0e2" roughness={.3} opacity={ghostOpacity}/>
-        </group>)}
-        <MemoBox size={[L*.08,W*.86,H*.045]} position={[L*.49,0,-H*.25]} color="#606c70" roughness={.55} opacity={ghostOpacity}/>
-        <MemoBox size={[L*.08,W*.86,H*.045]} position={[-L*.49,0,-H*.25]} color="#606c70" roughness={.55} opacity={ghostOpacity}/>
-      </>
-    })() : machinery ? <>
+    </> : vehicle ? <Suspense fallback={<MemoBox size={[L * .98, W * .84, H * .72]} color={selected ? '#f2c94c' : '#9b5144'} roughness={.45} eventProps={eventProps} outline opacity={ghostOpacity} />}>
+      <VehicleCargoModel length={L} width={W} height={H} selected={selected} opacity={ghostOpacity} eventProps={eventProps} />
+    </Suspense> : machinery ? <>
       <MemoBox size={[L * .96, W * .94, H * .72]} position={[0, 0, H * .04]} color={selected ? '#f2c94c' : '#7f8985'} roughness={.58} eventProps={eventProps} outline opacity={ghostOpacity} />
       <MemoBox size={[L * .99, W * .97, detail(rawH * .09, 24)]} position={[0, 0, -H * .42]} color="#515d59" roughness={.62} outline opacity={ghostOpacity} />
       <MemoBox size={[L * .74, W * .72, H * .14]} position={[0, 0, H * .43]} color="#5c6863" roughness={.55} outline opacity={ghostOpacity} />
