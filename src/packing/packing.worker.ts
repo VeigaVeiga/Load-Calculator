@@ -1,4 +1,5 @@
 import { basePack } from './baseSolver'
+import { optimizeLoad } from './loadOptimizer'
 import type { Cargo, Container, PlacedCargo } from '../types'
 
 type Request = {
@@ -12,13 +13,24 @@ const ctx = self as unknown as {
   postMessage: (value: unknown) => void
 }
 
-ctx.onmessage = (event) => {
+ctx.onmessage = async (event) => {
   try {
     const { cargo, container, locked } = event.data
-    const result = basePack(cargo, container, locked, percent => {
-      ctx.postMessage({ type: 'progress', percent })
+
+    // Stage 1: maximize valid loaded units before considering balance.
+    const packed = basePack(cargo, container, locked, percent => {
+      ctx.postMessage({ type: 'progress', percent: Math.round(percent * 0.72) })
     })
-    ctx.postMessage({ type: 'result', result })
+
+    // Stage 2: optimize the real mass centre without reducing the packed count.
+    const optimized = await optimizeLoad(packed.placed, container, {
+      progress: percent => {
+        ctx.postMessage({ type: 'progress', percent: 72 + Math.round(percent * 0.27) })
+      },
+      maxIterations: packed.placed.length > 150 ? 100 : packed.placed.length > 80 ? 180 : 320,
+    })
+
+    ctx.postMessage({ type: 'result', result: { ...packed, placed: optimized.placed } })
   } catch (error) {
     ctx.postMessage({
       type: 'error',
