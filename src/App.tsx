@@ -1835,8 +1835,8 @@ function App() {
                   cy={Math.max(9, Math.min(49, 29 - ((analysis.cg.x - container.length / 2) / Math.max(1, container.length)) * 38))} r="3.5" />
               </svg>
               <div className="cg-hud-values">
-                <span>{lang === 'zh' ? '左右偏移' : 'L/R OFFSET'} <b>{analysis.transverseOffsetMm.toFixed(0)} mm</b></span>
-                <span>{lang === 'zh' ? '前后偏重' : 'F/R IMBAL.'} <b>{(analysis.longitudinalOffset / 1000).toFixed(2)} t</b></span>
+                <span>{lang === 'zh' ? '左右偏移' : 'L/R OFFSET'} <b>{analysis.transverseOffsetMm.toFixed(1)} mm</b></span>
+                <span>{lang === 'zh' ? '前后偏重' : 'F/R IMBAL.'} <b>{(analysis.longitudinalOffset / 1000).toFixed(3)} t</b></span>
               </div>
             </div>
           </div>
@@ -1852,7 +1852,7 @@ function App() {
               : 'Equivalent support-load difference derived from the overall centre-of-gravity offset; not a direct sum of cargo weights on each side.'}>
               {lang === 'zh'
                 ? `最大等效偏载（${analysis.dominantDirection === 'left' ? '左侧' : analysis.dominantDirection === 'right' ? '右侧' : analysis.dominantDirection === 'front' ? '前侧' : analysis.dominantDirection === 'rear' ? '后侧' : '平衡'}）`
-                : `MAX EQUIVALENT IMBALANCE (${analysis.dominantDirection.toUpperCase()})`} {analysis.dominantOffset.toFixed(0)} kg
+                : `MAX EQUIVALENT IMBALANCE (${analysis.dominantDirection.toUpperCase()})`} {analysis.dominantOffset.toFixed(1)} kg
             </span>
             {unloadedCount > 0 && (
               <span className="overflow-badge">
@@ -1961,7 +1961,17 @@ function App() {
                   <b>{(analysis.longitudinalOffset / 1000).toFixed(2)} t</b>
                 </div>
               </div>
-              <p className="analysis-note">{lang === 'zh' ? '以上数据仅供参考' : 'For reference only.'}</p>
+              <div className="bias-limits layer-bias-limits">
+                <div className="bias-limit">
+                  <span>{lang === 'zh' ? '单层最大左右偏移' : 'MAX LAYER L/R OFFSET'}</span>
+                  <b>{analysis.maxLayerTransverseOffsetMm.toFixed(1)} mm</b>
+                </div>
+                <div className="bias-limit">
+                  <span>{lang === 'zh' ? '单层最大前后偏重（估算）' : 'MAX LAYER F/R IMBALANCE'}</span>
+                  <b>{(analysis.maxLayerLongitudinalOffset / 1000).toFixed(3)} t</b>
+                </div>
+              </div>
+              <p className="analysis-note">{lang === 'zh' ? '整体重心可能因不同层相互抵消而居中；单层偏移单独列出。以上数据仅供参考' : 'Opposing layer offsets can cancel in the overall CG; per-layer offsets are shown separately. For reference only.'}</p>
               <CenterOfGravity analysis={analysis} container={container} lang={lang}/>
             </div>
           )}
