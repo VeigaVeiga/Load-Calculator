@@ -11,6 +11,7 @@ try {
   const { basePack } = await server.ssrLoadModule('/src/packing/baseSolver.ts')
   const { validatePlan } = await server.ssrLoadModule('/src/packing/geometry.ts')
   const { analyzeWeight } = await server.ssrLoadModule('/src/analysis/weight.ts')
+  const { optimizeLoad } = await server.ssrLoadModule('/src/packing/loadOptimizer.ts')
 
   const container = (maxPayload = 26000) => ({
     id: '40HQ',
@@ -226,6 +227,26 @@ try {
     assert.equal(analysis.cg.x, 2200, 'stacked-weight: X CG must include all four units')
     assert.equal(analysis.cg.y, 550, 'stacked-weight: Y CG must include all four units')
     assert.equal(analysis.cg.z, 600, 'stacked-weight: Z CG must include all four vertical levels')
+  }
+
+  // Regression 7: the optimizer's own objective must use the same current SKU
+  // weights as the analysis panel, even when placed snapshots are stale.
+  {
+    const box = container()
+    const shipment = [
+      cargo({ id: 'heavy-front', weight: 100, quantity: 1 }),
+      cargo({ id: 'light-rear', weight: 10, quantity: 1 }),
+    ]
+    const placed = [
+      { id: 'heavy-front#1', cargoId: 'heavy-front', cargoType: 'carton', x: 0, y: 900, z: 0, length: 400, width: 300, height: 300, rotation: 0, weight: 0, color: '#aaa', placementMode: 'automatic', locked: false },
+      { id: 'light-rear#1', cargoId: 'light-rear', cargoType: 'carton', x: 10000, y: 900, z: 0, length: 400, width: 300, height: 300, rotation: 0, weight: 0, color: '#aaa', placementMode: 'automatic', locked: false },
+    ]
+    const optimized = await optimizeLoad(placed, box, {
+      cargoWeights: shipment.map(item => ({ id: item.id, weight: item.weight })),
+      maxIterations: 100,
+    })
+    assert.ok(optimized.scoreBefore > 1, 'optimizer-weight: stale zero snapshots must not erase real mass imbalance')
+    assert.equal(optimized.placed.length, placed.length, 'optimizer-weight: balancing must preserve loaded unit count')
   }
 
   console.log('Packing regression checks passed: homogeneous grid, mixed pallet/carton, payload limit, IBC + machinery, stacked-cargo weight analysis.');
