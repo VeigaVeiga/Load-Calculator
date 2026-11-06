@@ -249,7 +249,60 @@ try {
     assert.equal(optimized.placed.length, placed.length, 'optimizer-weight: balancing must preserve loaded unit count')
   }
 
-  console.log('Packing regression checks passed: homogeneous grid, mixed pallet/carton, payload limit, IBC + machinery, stacked-cargo weight analysis.');
+  // Regression 8: upper layers must be independently balanceable while
+  // remaining fully supported; an already-centred pallet must not be dragged
+  // around merely because the carton above it is offset.
+  {
+    const box = container()
+    const shipment = [
+      cargo({
+        id: 'foundation-pallet',
+        type: 'pallet',
+        quantity: 1,
+        length: 1200,
+        width: 1000,
+        height: 1200,
+        weight: 400,
+        stackable: false,
+        loadBearing: true,
+        maxStackLayers: 1,
+        maxLoadOnTop: 5000,
+      }),
+      cargo({
+        id: 'upper-carton',
+        type: 'carton',
+        quantity: 1,
+        length: 400,
+        width: 300,
+        height: 300,
+        weight: 20,
+        stackable: true,
+        loadBearing: true,
+        maxStackLayers: 2,
+        maxLoadOnTop: 100,
+      }),
+    ]
+    const placed = [
+      { id: 'foundation-pallet#1', cargoId: 'foundation-pallet', cargoType: 'pallet', x: 5416, y: 676, z: 0, length: 1200, width: 1000, height: 1200, rotation: 0, weight: 400, color: '#9a6638', placementMode: 'automatic', locked: false, stackable: false, loadBearing: true, maxStackLayers: 1, maxLoadOnTop: 5000 },
+      { id: 'upper-carton#1', cargoId: 'upper-carton', cargoType: 'carton', x: 6216, y: 676, z: 1200, length: 400, width: 300, height: 300, rotation: 0, weight: 20, color: '#c7ced3', placementMode: 'automatic', locked: false, stackable: true, loadBearing: true, maxStackLayers: 2, maxLoadOnTop: 100 },
+    ]
+    assert.equal(validatePlan(placed, box, shipment).ok, true, 'upper-layer-balance: initial plan must be supported')
+    const before = analyzeWeight(placed, box, shipment)
+    assert.ok(before.maxLayerTransverseOffsetMm > 300, 'upper-layer-balance: per-layer analysis must expose the displaced upper layer')
+    const optimized = await optimizeLoad(placed, box, {
+      cargoWeights: shipment.map(item => ({ id: item.id, weight: item.weight })),
+      maxIterations: 100,
+    })
+    const pallet = optimized.placed.find(item => item.cargoId === 'foundation-pallet')
+    const upper = optimized.placed.find(item => item.cargoId === 'upper-carton')
+    assert.deepEqual([pallet.x, pallet.y], [5416, 676], 'upper-layer-balance: lower support must remain in place')
+    assert.ok(Math.abs((upper.x + 200) - box.length / 2) < 1, 'upper-layer-balance: upper carton must move toward the longitudinal centre')
+    assert.ok(Math.abs((upper.y + 150) - box.width / 2) < 1, 'upper-layer-balance: upper carton must move toward the transverse centre')
+    assert.equal(optimized.placed.length, placed.length, 'upper-layer-balance: optimization must preserve cargo count')
+    assert.equal(validatePlan(optimized.placed, box, shipment).ok, true, 'upper-layer-balance: optimized plan must remain supported')
+  }
+
+  console.log('Packing regression checks passed: homogeneous grid, mixed pallet/carton, payload limit, IBC + machinery, stacked-cargo weight analysis, independent upper-layer balancing.');
 
 } finally {
   await server.close()
