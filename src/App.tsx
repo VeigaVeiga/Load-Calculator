@@ -1954,11 +1954,11 @@ function App() {
               <div className="bias-limits">
                 <div className={`bias-limit ${analysis.transverseOffsetMm > 30 ? 'is-over-limit' : ''}`}>
                   <span>{lang === 'zh' ? '左右偏载参考值' : 'TRANSVERSE OFFSET · REFERENCE'}</span>
-                  <b>{analysis.transverseOffsetMm.toFixed(0)} mm</b>
+                  <b>{analysis.transverseOffsetMm.toFixed(1)} mm</b>
                 </div>
                 <div className={`bias-limit ${analysis.longitudinalOffset > 3000 ? 'is-over-limit' : ''}`}>
                   <span>{lang === 'zh' ? '前后偏重参考值（估算）' : 'LONGITUDINAL IMBALANCE · EST.'}</span>
-                  <b>{(analysis.longitudinalOffset / 1000).toFixed(2)} t</b>
+                  <b>{(analysis.longitudinalOffset / 1000).toFixed(3)} t</b>
                 </div>
               </div>
               <div className="bias-limits layer-bias-limits">
