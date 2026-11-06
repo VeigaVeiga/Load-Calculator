@@ -268,7 +268,7 @@ function App() {
 
   useEffect(() => {
     const isZh = lang === 'zh'
-    const title = isZh ? '铁路装柜模拟 Beta | 免费铁路货物装载规划工具' : 'Rail LoadForge Beta | Free Rail Cargo Loading Planner'
+    const title = isZh ? '铁路装柜模拟 | 免费铁路货物装载规划工具' : 'Rail LoadForge | Free Rail Cargo Loading Planner'
     const description = isZh
       ? '免费的铁路集装箱 3D 装载模拟工具。创建铁路集装箱装载方案，直观查看货物摆放，分析重量分布，并导出装载计划。'
       : 'Free 3D rail cargo loading simulation software. Create railway container loading plans, visualize cargo placement, analyze weight distribution and export loading plans.'
