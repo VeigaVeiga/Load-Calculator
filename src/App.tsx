@@ -305,6 +305,7 @@ function App() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [selectionMode, setSelectionMode] = useState<'single'|'box'>('single')
+  const [batchCargoId, setBatchCargoId] = useState('')
 
   const [tab, setTab] = useState<'cargo' | 'analysis' | 'secure'>('cargo')
 
@@ -496,6 +497,60 @@ function App() {
   const selectMany = (ids: string[]) => {
     setSelectedIds(ids)
     setSelectedId(ids[0] ?? null)
+  }
+
+  // Select every placed unit of one SKU and recursively include cargo resting
+  // on that batch. Moving a foundation must never leave another SKU suspended.
+  const selectCargoBatch = (cargoId: string) => {
+    setBatchCargoId(cargoId)
+    if (!cargoId) {
+      setSelectionMode('single')
+      selectMany([])
+      setFreePlacement(false)
+      return
+    }
+
+    const batch = placed.filter((item) => item.cargoId === cargoId)
+    if (batch.length === 0) {
+      selectMany([])
+      return
+    }
+
+    const ids = new Set(batch.map((item) => item.id))
+    let changed = true
+    while (changed) {
+      changed = false
+      for (const upper of placed) {
+        if (ids.has(upper.id) || upper.z <= 0.5) continue
+        const directSupports = supportMetrics(
+          upper,
+          placed.filter((item) => item.id !== upper.id),
+        ).supporters
+        if (directSupports.some((support) => ids.has(support.id))) {
+          ids.add(upper.id)
+          changed = true
+        }
+      }
+    }
+
+    const group = placed.filter((item) => ids.has(item.id))
+    if (group.some((item) => item.locked)) {
+      setMessage(lang === 'zh'
+        ? '该批次包含锁定货物，请先解除锁定后再整体移动'
+        : 'This batch contains locked cargo. Unlock it before moving the group.')
+      setBatchCargoId('')
+      selectMany([])
+      setFreePlacement(false)
+      return
+    }
+
+    setSelectionMode('box')
+    setFreePlacement(true)
+    selectMany(group.map((item) => item.id))
+    const dependentCount = Math.max(0, group.length - batch.length)
+    setMessage(lang === 'zh'
+      ? `已选中 ${batch.length} 件同 SKU 货物${dependentCount ? `，并包含其上方 ${dependentCount} 件承载货物` : ''}`
+      : `Selected ${batch.length} units of this SKU${dependentCount ? ` plus ${dependentCount} supported item(s)` : ''}`)
   }
 
   const setP = (
@@ -1753,8 +1808,22 @@ function App() {
               <label className="dimension-toggle"><input type="checkbox" checked={showDimensions} onChange={e=>setShowDimensions(e.target.checked)}/>{lang==='zh'?'容器尺寸标注':'Container Dimensions'}</label>
             </div>
             <div className="toolbar-group"><b>{lang==='zh'?'模式':'MODE'}</b>
-              <button className={selectionMode==='single'?'active':''} onClick={()=>{setSelectionMode('single');setSelectedIds([])}}>{tr.singleSelect}</button>
-              <button className={selectionMode==='box'?'active':''} onClick={()=>setSelectionMode('box')}>{lang==='zh'?'多选':'MULTI SELECT'}</button>
+              <label className="batch-select-label" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                <span>{lang === 'zh' ? '整批移动 SKU' : 'Move SKU batch'}</span>
+                <select
+                  aria-label={lang === 'zh' ? '选择需要整体移动的货物 SKU' : 'Select cargo SKU to move as a batch'}
+                  value={batchCargoId}
+                  onChange={(event) => selectCargoBatch(event.target.value)}
+                  style={{ maxWidth: 190, minWidth: 120 }}
+                >
+                  <option value="">{lang === 'zh' ? '选择货物名称…' : 'Select cargo…'}</option>
+                  {cargo.filter((item) => placed.some((unit) => unit.cargoId === item.id)).map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.name} · {placed.filter((unit) => unit.cargoId === item.id).length}
+                    </option>
+                  ))}
+                </select>
+              </label>
               <button className={freePlacement?'active':''} onClick={()=>setFreePlacement(v=>!v)}>{tr.freePlacement}</button>
             </div>
           </div>
