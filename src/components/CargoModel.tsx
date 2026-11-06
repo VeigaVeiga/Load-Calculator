@@ -88,6 +88,7 @@ function VehicleCargoModel({ length, width, height, selected, opacity, eventProp
       width / Math.max(height, .0001),
     ]
     let bestBounds = new THREE.Box3()
+    const bestRotation = new THREE.Quaternion()
     let bestScore = Infinity
 
     // Find the right-handed axis orientation whose proportions best match a
@@ -117,10 +118,14 @@ function VehicleCargoModel({ length, width, height, selected, opacity, eventProp
         if (score < bestScore) {
           bestScore = score
           bestBounds.copy(bounds)
+          bestRotation.setFromRotationMatrix(rotation)
         }
       }
     }
 
+    root.quaternion.copy(bestRotation)
+    root.position.set(0, 0, 0)
+    root.updateMatrixWorld(true)
     const size = bestBounds.getSize(new THREE.Vector3())
     // Keep the imported car's proportions. Fit it uniformly inside the
     // declared vehicle envelope instead of stretching each axis independently.
