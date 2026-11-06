@@ -21,11 +21,11 @@ export const materialFor = (color: string, roughness: number, opacity = 1) => {
   return material
 }
 
-const edgeMaterialFor = (color: string) => {
-  const key = `edge:${color}`
+const edgeMaterialFor = (color: string, opacity = 1) => {
+  const key = `edge:${color}:${opacity}`
   let material = EDGE_MATERIAL_CACHE.get(key)
   if (!material) {
-    material = new THREE.LineBasicMaterial({ color: '#4d5458', transparent: true, opacity: .78 })
+    material = new THREE.LineBasicMaterial({ color: '#4d5458', transparent: true, opacity: .78 * opacity, depthWrite: false })
     EDGE_MATERIAL_CACHE.set(key, material)
   }
   return material
@@ -43,7 +43,7 @@ type BoxProps = {
 
 function Box({ size, position = [0, 0, 0], color, roughness = .7, eventProps, outline = false, opacity = 1 }: BoxProps) {
   const material = useMemo(() => materialFor(color, roughness, opacity), [color, roughness, opacity])
-  const edgeMaterial = useMemo(() => edgeMaterialFor(color), [color])
+  const edgeMaterial = useMemo(() => edgeMaterialFor(color, opacity), [color, opacity])
   return <group position={position}>
     <mesh geometry={UNIT_BOX} material={material} scale={size} {...eventProps} />
     {outline && <lineSegments geometry={UNIT_EDGES} material={edgeMaterial} scale={size} raycast={() => null} />}
@@ -71,9 +71,10 @@ type CargoModelProps = {
   local?: boolean
   hovered?: boolean
   ghost?: boolean
+  ghostOpacity?: number
 }
 
-function CargoModel({ p, container, selected, onPointerDown, onPointerUp, onPointerMove, onClick, showName = false, local = false, hovered = false, ghost = false }: CargoModelProps) {
+function CargoModel({ p, container, selected, onPointerDown, onPointerUp, onPointerMove, onClick, showName = false, local = false, hovered = false, ghost = false, ghostOpacity: ghostOpacityOverride }: CargoModelProps) {
   const d = dims(p)
   const L = Math.max(1, p.length) * S
   const W = Math.max(1, p.width) * S
@@ -92,7 +93,7 @@ function CargoModel({ p, container, selected, onPointerDown, onPointerUp, onPoin
   const ibc = p.cargoType === 'ibc'
   const vehicle = p.cargoType === 'vehicle'
   const machinery = p.cargoType === 'machinery'
-  const ghostOpacity = ghost ? .24 : 1
+  const ghostOpacity = ghostOpacityOverride ?? (ghost ? .24 : 1)
   const eventProps = useMemo(() => ({ onPointerDown, onPointerMove, onPointerUp, onClick }), [onPointerDown, onPointerMove, onPointerUp, onClick])
   const detail = (n: number, min = 2) => Math.max(min, n) * S
 
@@ -207,7 +208,7 @@ const cargoEqual = (a: CargoModelProps, b: CargoModelProps) => {
     ap.x === bp.x && ap.y === bp.y && ap.z === bp.z && ap.length === bp.length &&
     ap.width === bp.width && ap.height === bp.height && ap.rotation === bp.rotation &&
     ap.color === bp.color && a.selected === b.selected && a.showName === b.showName &&
-    a.local === b.local && a.hovered === b.hovered && a.ghost === b.ghost && a.container.length === b.container.length &&
+    a.local === b.local && a.hovered === b.hovered && a.ghost === b.ghost && a.ghostOpacity === b.ghostOpacity && a.container.length === b.container.length &&
     a.container.width === b.container.width && a.container.height === b.container.height
 }
 
