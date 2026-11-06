@@ -11,6 +11,8 @@ export type OptimizationResult = {
 }
 
 type OptimizeOptions = {
+  /** Current cargo definitions are authoritative when placed snapshots contain stale weights. */
+  cargoWeights?: Array<{ id: string; weight: number }>
   signal?: AbortSignal
   progress?: (percent: number) => void
   maxIterations?: number
@@ -26,8 +28,13 @@ function seededRandom(seed: number) {
   }
 }
 
-function weightedDistributionScore(items: PlacedCargo[], container: Container) {
-  const a = analyzeWeight(items, container)
+function weightedDistributionScore(items: PlacedCargo[], container: Container, cargoWeights: Array<{ id: string; weight: number }> = []) {
+  const a = analyzeWeight(items, container, cargoWeights)
+  const weightByCargoId = new Map(cargoWeights.map(item => [item.id, item.weight]))
+  const weightOf = (p: PlacedCargo) => {
+    const current = weightByCargoId.get(p.cargoId)
+    return current !== undefined && Number.isFinite(current) && current >= 0 ? current : Number.isFinite(p.weight) && p.weight >= 0 ? p.weight : 0
+  }
   const total = Math.max(1, a.total)
   const cx = container.length / 2
   const cy = container.width / 2
@@ -58,8 +65,8 @@ function weightedDistributionScore(items: PlacedCargo[], container: Container) {
   for (const p of items) {
     const d = dims(p)
     const center = p.x + d.length / 2
-    if (center < container.length * 0.2) front += p.weight
-    if (center > container.length * 0.8) rear += p.weight
+    if (center < container.length * 0.2) front += weightOf(p)
+    if (center > container.length * 0.8) rear += weightOf(p)
   }
   const endImbalance = Math.abs(front - rear) / total
 
@@ -70,13 +77,13 @@ function weightedDistributionScore(items: PlacedCargo[], container: Container) {
   return cgX * 55 + cgY * 110 + quadrant * 3 + cgZ * 4 + endImbalance * 8
 }
 
-function objective(items: PlacedCargo[], container: Container) {
+function objective(items: PlacedCargo[], container: Container, cargoWeights: Array<{ id: string; weight: number }> = []) {
   const validation = validatePlan(items, container)
   if (!validation.ok) return 1_000_000 + validation.errors.length * 10_000
 
   // Preserve the original number of loaded units as an absolute constraint.
   // This optimizer is not allowed to "solve" imbalance by throwing cargo out.
-  return weightedDistributionScore(items, container)
+  return weightedDistributionScore(items, container, cargoWeights)
 }
 
 function buildSupportClusters(items: PlacedCargo[]) {
@@ -266,7 +273,7 @@ export async function optimizeLoad(
   options: OptimizeOptions = {},
 ): Promise<OptimizationResult> {
   if (initial.length < 2) {
-    const score = objective(initial, container)
+    const score = objective(initial, container, options.cargoWeights)
     return { placed: initial.map((p) => ({ ...p })), iterations: 0, improved: false, scoreBefore: score, scoreAfter: score }
   }
 
@@ -308,7 +315,7 @@ export async function optimizeLoad(
         placementMode: 'automatic' as const,
       }))
       if (!validateCandidate(candidate, container, expectedCount)) continue
-      const score = objective(candidate, container)
+      const score = objective(candidate, container, options.cargoWeights)
       if (score + 1e-9 < bestScore) {
         best = candidate.map(p => ({ ...p }))
         bestScore = score
@@ -420,6 +427,6 @@ export async function optimizeLoad(
     iterations: maxIterations,
     improved: bestScore + 1e-9 < before,
     scoreBefore: before,
-    scoreAfter: objective(final, container),
+    scoreAfter: objective(final, container, options.cargoWeights),
   }
 }
