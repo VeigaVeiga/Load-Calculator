@@ -283,7 +283,7 @@ try {
       }),
     ]
     const placed = [
-      { id: 'foundation-pallet#1', cargoId: 'foundation-pallet', cargoType: 'pallet', x: 5416, y: 676, z: 0, length: 1200, width: 1000, height: 1200, rotation: 0, weight: 400, color: '#9a6638', placementMode: 'automatic', locked: false, stackable: false, loadBearing: true, maxStackLayers: 1, maxLoadOnTop: 5000 },
+      { id: 'foundation-pallet#1', cargoId: 'foundation-pallet', cargoType: 'pallet', x: 5416, y: 676, z: 0, length: 1200, width: 1000, height: 1200, rotation: 0, weight: 400, color: '#9a6638', placementMode: 'automatic', locked: true, stackable: false, loadBearing: true, maxStackLayers: 1, maxLoadOnTop: 5000 },
       { id: 'upper-carton#1', cargoId: 'upper-carton', cargoType: 'carton', x: 6216, y: 676, z: 1200, length: 400, width: 300, height: 300, rotation: 0, weight: 20, color: '#c7ced3', placementMode: 'automatic', locked: false, stackable: true, loadBearing: true, maxStackLayers: 2, maxLoadOnTop: 100 },
     ]
     assert.equal(validatePlan(placed, box, shipment).ok, true, 'upper-layer-balance: initial plan must be supported')
