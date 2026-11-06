@@ -129,7 +129,7 @@ function VehicleCargoModel({ length, height, selected, opacity, eventProps }: Ve
         : applyAppearance(mesh.material)
     })
     return { root: fitRoot }
-  }, [scene, length, width, height, selected, opacity])
+  }, [scene, length, height, selected, opacity])
 
   return <group {...eventProps}>
     <primitive object={fitted.root} />
