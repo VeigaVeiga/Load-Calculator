@@ -34,6 +34,7 @@ export default function OpenSourceAcknowledgements({ lang, onBack }: Props) {
             <tr><td><b>KFC-Crazy-Thursday</b></td><td><a href="https://github.com/whitescent/KFC-Crazy-Thursday" target="_blank" rel="noreferrer">GitHub ↗</a></td></tr>
             <tr><td><b>AyachiNene</b></td><td><a href="https://github.com/FriedRiceNoodles/AyachiNene" target="_blank" rel="noreferrer">GitHub ↗</a></td></tr>
             <tr><td><b>V50</b></td><td><a href="https://github.com/vikiboss/v50" target="_blank" rel="noreferrer">GitHub ↗</a></td></tr>
+            <tr><td><b>{zh ? "乘用车 3D 模型（TopoSphere）" : "Passenger sedan 3D model (TopoSphere)"}</b></td><td><a href="https://www.sloyd.ai/free-3d-models/model/a-red-mid-sized-four-door-sedan-1990s-to-early-2000s-04dtwkw5" target="_blank" rel="noreferrer">Sloyd model ↗</a> · <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noreferrer">CC BY 4.0 ↗</a><div className="ack-small">{zh ? "作者：TopoSphere；模型由 Sloyd 生成。" : "Created by TopoSphere; generated with Sloyd."}</div></td></tr>
             <tr><td><b>{zh ? '梗图来源（作者：zkl2333）' : 'Meme image (credited to zkl2333)'}</b></td><td><a href="https://vme.im/jokes/I_kwDOLrzjj87mnH0a" target="_blank" rel="noreferrer">{zh ? '原始页面 ↗' : 'Original page ↗'}</a> · <a href="https://vme.im/authors/zkl2333" target="_blank" rel="noreferrer">{zh ? '作者主页 ↗' : 'Author profile ↗'}</a></td></tr>
           </tbody></table></div>
         </section>
