@@ -306,6 +306,7 @@ function App() {
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [selectionMode, setSelectionMode] = useState<'single'|'box'>('single')
   const [batchCargoId, setBatchCargoId] = useState('')
+  const [batchMode, setBatchMode] = useState(false)
 
   const [tab, setTab] = useState<'cargo' | 'analysis' | 'secure'>('cargo')
 
@@ -490,6 +491,13 @@ function App() {
   )
 
   const selectOne = (id: string | null) => {
+    if (batchMode && id) {
+      const item = placed.find((p) => p.id === id)
+      if (item) {
+        selectCargoBatch(item.cargoId)
+        return
+      }
+    }
     setSelectedId(id)
     setSelectedIds(id ? [id] : [])
   }
@@ -545,6 +553,7 @@ function App() {
     }
 
     setSelectionMode('box')
+    setBatchMode(true)
     setFreePlacement(true)
     selectMany(group.map((item) => item.id))
     const dependentCount = Math.max(0, group.length - batch.length)
@@ -1808,12 +1817,38 @@ function App() {
               <label className="dimension-toggle"><input type="checkbox" checked={showDimensions} onChange={e=>setShowDimensions(e.target.checked)}/>{lang==='zh'?'容器尺寸标注':'Container Dimensions'}</label>
             </div>
             <div className="toolbar-group"><b>{lang==='zh'?'模式':'MODE'}</b>
+              <button
+                type="button"
+                className={batchMode ? 'active' : ''}
+                aria-pressed={batchMode}
+                onClick={() => {
+                  const next = !batchMode
+                  setBatchMode(next)
+                  if (next && batchCargoId) selectCargoBatch(batchCargoId)
+                  if (!next) {
+                    setSelectedIds([])
+                    setSelectedId(null)
+                    setFreePlacement(false)
+                    setSelectionMode('single')
+                  }
+                }}
+              >{lang === 'zh' ? (batchMode ? '整批移动：开启' : '整批移动：关闭') : (batchMode ? 'Batch move: ON' : 'Batch move: OFF')}</button>
               <label className="batch-select-label" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                <span>{lang === 'zh' ? '整批移动 SKU' : 'Move SKU batch'}</span>
+                <span>{lang === 'zh' ? '选择 SKU' : 'Select SKU'}</span>
                 <select
                   aria-label={lang === 'zh' ? '选择需要整体移动的货物 SKU' : 'Select cargo SKU to move as a batch'}
                   value={batchCargoId}
-                  onChange={(event) => selectCargoBatch(event.target.value)}
+                  onChange={(event) => {
+                    const id = event.target.value
+                    setBatchCargoId(id)
+                    if (id) {
+                      setBatchMode(true)
+                      selectCargoBatch(id)
+                    } else if (batchMode) {
+                      setSelectedIds([])
+                      setSelectedId(null)
+                    }
+                  }}
                   style={{ maxWidth: 190, minWidth: 120 }}
                 >
                   <option value="">{lang === 'zh' ? '选择货物名称…' : 'Select cargo…'}</option>
@@ -1847,6 +1882,8 @@ function App() {
               selectedId={selectedId}
               selectedIds={selectedIds}
               selectionMode={selectionMode}
+              batchMode={batchMode}
+              onSelectBatch={selectCargoBatch}
               onSelect={selectOne}
               onSelectMany={selectMany}
               onMove={move}
