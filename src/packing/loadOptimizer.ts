@@ -282,7 +282,7 @@ export async function optimizeLoad(
     Math.round(container.length * 31 + container.width * 17 + initial.length * 13),
   )
   const expectedCount = initial.length
-  const before = objective(initial, container)
+  const before = objective(initial, container, options.cargoWeights)
 
   let current = initial.map((p) => ({ ...p }))
   let currentScore = before
@@ -295,7 +295,7 @@ export async function optimizeLoad(
   // arrangement toward the centre is collision-free and preserves stacking.
   // Locked plans are left untouched by this phase.
   if (!current.some(p => p.locked)) {
-    const analysis = analyzeWeight(current, container)
+    const analysis = analyzeWeight(current, container, options.cargoWeights)
     const minX = Math.min(...current.map(p => p.x))
     const maxX = Math.max(...current.map(p => p.x + dims(p).length))
     const minY = Math.min(...current.map(p => p.y))
@@ -329,7 +329,7 @@ export async function optimizeLoad(
 
   const movable = floorMovable(current)
   if (movable.length === 0) {
-    return { placed: best, iterations: 0, improved: false, scoreBefore: before, scoreAfter: before }
+    return { placed: best, iterations: 0, improved: bestScore + 1e-9 < before, scoreBefore: before, scoreAfter: objective(best, container, options.cargoWeights) }
   }
 
   // Start with deterministic physically meaningful anchors. This gives the
@@ -341,7 +341,7 @@ export async function optimizeLoad(
     for (const [x, y] of anchors) {
       const candidate = candidateTranslate(current, i, x, y, container)
       if (!candidate || !validateCandidate(candidate, container, expectedCount)) continue
-      const score = objective(candidate, container)
+      const score = objective(candidate, container, options.cargoWeights)
       if (score + 1e-9 < localScore) {
         localBest = candidate
         localScore = score
@@ -399,7 +399,7 @@ export async function optimizeLoad(
       continue
     }
 
-    const score = objective(candidate, container)
+    const score = objective(candidate, container, options.cargoWeights)
     const delta = score - currentScore
     const accept = delta <= 0 || rng() < Math.exp(-delta / Math.max(0.02, temperature))
 
