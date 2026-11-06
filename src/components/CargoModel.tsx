@@ -96,6 +96,18 @@ function CargoModel({ p, container, selected, onPointerDown, onPointerUp, onPoin
   const ghostOpacity = ghostOpacityOverride ?? (ghost ? .24 : 1)
   const eventProps = useMemo(() => ({ onPointerDown, onPointerMove, onPointerUp, onClick }), [onPointerDown, onPointerMove, onPointerUp, onClick])
   const detail = (n: number, min = 2) => Math.max(min, n) * S
+      const cabinGeometry = useMemo(() => {
+        const x0=-L*.31, x1=L*.28, xt0=-L*.19, xt1=L*.19
+        const z0=-H*.015, z1=H*.43, y=W*.335
+        const v=[
+          x0,-y,z0, x1,-y,z0, x1,y,z0, x0,y,z0,
+          xt0,-y*.91,z1, xt1,-y*.91,z1, xt1,y*.91,z1, xt0,y*.91,z1,
+        ]
+        const idx=[0,1,2,0,2,3, 4,7,6,4,6,5, 0,4,5,0,5,1, 1,5,6,1,6,2, 2,6,7,2,7,3, 3,7,4,3,4,0]
+        const g=new THREE.BufferGeometry()
+        g.setAttribute('position',new THREE.Float32BufferAttribute(v,3));g.setIndex(idx);g.computeVertexNormals()
+        return g
+      }, [L,W,H])
 
   return <group position={pos} rotation={[0, 0, local ? 0 : p.rotation * Math.PI / 180]}>
     {pallet ? <>
@@ -126,7 +138,6 @@ function CargoModel({ p, container, selected, onPointerDown, onPointerUp, onPoin
         <MemoBox size={[L * .98, W * .08, railZ * .8]} position={[0, 0, -H * .5 + railZ * .25]} color="#79502e" roughness={.92} opacity={ghostOpacity}/>
       </>
     })() : drum ? (() => {
-    </>: drum ? (() => {
       const diameter = Math.min(rawL, rawW) * .91 * S
       const radius = diameter / 2
       return <>
@@ -179,18 +190,6 @@ function CargoModel({ p, container, selected, onPointerDown, onPointerUp, onPoin
     </> : vehicle ? (() => {
       // More detailed compact passenger car with sculpted proportions, sloped cabin, glazing and alloy wheels.
       const bodyColor = selected ? '#f2c94c' : '#477b9a'
-      const cabinGeometry = useMemo(() => {
-        const x0=-L*.31, x1=L*.28, xt0=-L*.19, xt1=L*.19
-        const z0=-H*.015, z1=H*.43, y=W*.335
-        const v=[
-          x0,-y,z0, x1,-y,z0, x1,y,z0, x0,y,z0,
-          xt0,-y*.91,z1, xt1,-y*.91,z1, xt1,y*.91,z1, xt0,y*.91,z1,
-        ]
-        const idx=[0,1,2,0,2,3, 4,7,6,4,6,5, 0,4,5,0,5,1, 1,5,6,1,6,2, 2,6,7,2,7,3, 3,7,4,3,4,0]
-        const g=new THREE.BufferGeometry()
-        g.setAttribute('position',new THREE.Float32BufferAttribute(v,3));g.setIndex(idx);g.computeVertexNormals()
-        return g
-      }, [L,W,H])
       const wheelR=Math.min(rawH*.17,rawW*.115)*S
       const wheelW=Math.min(rawW*.09,rawH*.085)*S
       return <>
@@ -218,7 +217,6 @@ function CargoModel({ p, container, selected, onPointerDown, onPointerUp, onPoin
         <MemoBox size={[L*.08,W*.86,H*.045]} position={[-L*.49,0,-H*.25]} color="#606c70" roughness={.55} opacity={ghostOpacity}/>
       </>
     })() : machinery ? <>
-    </> : machinery ? <>
       <MemoBox size={[L * .96, W * .94, H * .72]} position={[0, 0, H * .04]} color={selected ? '#f2c94c' : '#7f8985'} roughness={.58} eventProps={eventProps} outline opacity={ghostOpacity} />
       <MemoBox size={[L * .99, W * .97, detail(rawH * .09, 24)]} position={[0, 0, -H * .42]} color="#515d59" roughness={.62} outline opacity={ghostOpacity} />
       <MemoBox size={[L * .74, W * .72, H * .14]} position={[0, 0, H * .43]} color="#5c6863" roughness={.55} outline opacity={ghostOpacity} />
