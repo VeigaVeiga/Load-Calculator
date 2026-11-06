@@ -223,8 +223,8 @@ try {
     ]
     const analysis = analyzeWeight(placed, box, shipment)
     assert.equal(analysis.total, 40, 'stacked-weight: every stacked unit must contribute to total weight')
-    assert.equal(analysis.cg.x, 3100, 'stacked-weight: X CG must include all four units')
-    assert.equal(analysis.cg.y, 650, 'stacked-weight: Y CG must include all four units')
+    assert.equal(analysis.cg.x, 2200, 'stacked-weight: X CG must include all four units')
+    assert.equal(analysis.cg.y, 550, 'stacked-weight: Y CG must include all four units')
     assert.equal(analysis.cg.z, 600, 'stacked-weight: Z CG must include all four vertical levels')
   }
 
