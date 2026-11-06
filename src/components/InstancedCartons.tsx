@@ -22,9 +22,9 @@ function safeCartonColor(value?: string) {
 
 export default function InstancedCartons({ items, container, onSelect, ghost = false }: Props) {
   const meshRef = useRef<THREE.InstancedMesh>(null)
-  // Individual carton outlines help at small counts, but become a large CPU/GPU
-  // cost for hundreds of boxes. Hide them above this threshold.
-  const showOutlines = items.length <= 120
+  // Keep per-carton edges visible at every quantity. A single batched
+  // LineSegments draw call preserves individual box boundaries efficiently.
+  const showOutlines = true
   const lineRef = useRef<THREE.LineSegments>(null)
   const material = useMemo(() => new THREE.MeshBasicMaterial({ color: 0xffffff, vertexColors: true, toneMapped: false, transparent: ghost, opacity: ghost ? .24 : 1, depthWrite: !ghost }), [ghost])
   const lineMaterial = useMemo(() => new THREE.LineBasicMaterial({ color: 0x59636b, transparent: true, opacity: ghost ? .35 : .92, depthTest: true }), [ghost])

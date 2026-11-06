@@ -29,7 +29,7 @@ const MAX_CARGO_VOLUME_CBM = 120
 
 const T = {
   zh: {
-    title: '集装箱装载规划器',
+    title: '铁路集装箱装柜模拟',
     cargo: '货物列表',
     add: '添加货物',
     carton: '纸箱',
@@ -89,7 +89,7 @@ const T = {
     delete: '删除',
     units: '件',
     placed: '已放置',
-    grid: '网格 100 mm · 吸附 10 mm',
+    grid: '友情链接',
     dragHint: '默认自由视角；开启“自由摆放”后可拖动货物',
     axis: 'X 长度 → · Y 宽度 → · Z 高度 ↑',
     none: '无',
@@ -118,7 +118,7 @@ const T = {
   },
 
   en: {
-    title: 'Container Loading Planner',
+    title: 'Railway Container Loading Simulator',
     cargo: 'Cargo List',
     add: 'Add Cargo',
     carton: 'Carton',
@@ -178,7 +178,7 @@ const T = {
     delete: 'Delete',
     units: 'units',
     placed: 'placed',
-    grid: 'Grid 100 mm · Snap 10 mm',
+    grid: 'Partner Website',
     dragHint: 'Free camera by default; enable Free Placement to drag cargo',
     axis: 'X Length → · Y Width → · Z Height ↑',
     none: 'None',
@@ -251,7 +251,12 @@ function makeCustom(
 }
 
 function App() {
-  const [lang, setLang] = useState<Lang>('zh')
+  const [lang, setLang] = useState<Lang>(() => {
+    const browserLanguages = typeof navigator === 'undefined'
+      ? []
+      : (navigator.languages?.length ? navigator.languages : [navigator.language])
+    return browserLanguages.some((value) => value.toLowerCase().startsWith('zh')) ? 'zh' : 'en'
+  })
   // Light mode is temporarily disabled until its visual issues are resolved.
   const [theme] = useState<'dark' | 'light'>('dark')
   const [showAcknowledgements, setShowAcknowledgements] = useState(false)
@@ -260,6 +265,11 @@ function App() {
   const [kfcCopies, setKfcCopies] = useState<string[]>([])
   const [kfcLoading, setKfcLoading] = useState(false)
   const tr = T[lang]
+
+  useEffect(() => {
+    document.title = `${tr.title} Beta`
+    document.documentElement.lang = lang === 'zh' ? 'zh-CN' : 'en'
+  }, [lang, tr.title])
 
   const [containerId, setContainerId] = useState('40HQ')
 
@@ -1825,14 +1835,14 @@ function App() {
                   cy={Math.max(9, Math.min(49, 29 - ((analysis.cg.x - container.length / 2) / Math.max(1, container.length)) * 38))} r="3.5" />
               </svg>
               <div className="cg-hud-values">
-                <span>{lang === 'zh' ? '左右偏移' : 'L/R OFFSET'} <b>{analysis.transverseOffsetMm.toFixed(0)} mm</b></span>
-                <span>{lang === 'zh' ? '前后偏重' : 'F/R IMBAL.'} <b>{(analysis.longitudinalOffset / 1000).toFixed(2)} t</b></span>
+                <span>{lang === 'zh' ? '左右偏移' : 'L/R OFFSET'} <b>{analysis.transverseOffsetMm.toFixed(1)} mm</b></span>
+                <span>{lang === 'zh' ? '前后偏重' : 'F/R IMBAL.'} <b>{(analysis.longitudinalOffset / 1000).toFixed(3)} t</b></span>
               </div>
             </div>
           </div>
 
           <div className="viewer-foot">
-            <span>{tr.grid}</span>
+            <a href="https://trustrain-logistics.com/" target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'underline', textUnderlineOffset: 3 }}>{lang === 'zh' ? '友情链接：' : 'Partner Website: '}trustrain-logistics.com</a>
             <span className="planning-disclaimer">
               {lang === 'zh' ? '本站装柜工具仅供学习参考' : 'For educational reference only.'}
             </span>
@@ -1842,7 +1852,7 @@ function App() {
               : 'Equivalent support-load difference derived from the overall centre-of-gravity offset; not a direct sum of cargo weights on each side.'}>
               {lang === 'zh'
                 ? `最大等效偏载（${analysis.dominantDirection === 'left' ? '左侧' : analysis.dominantDirection === 'right' ? '右侧' : analysis.dominantDirection === 'front' ? '前侧' : analysis.dominantDirection === 'rear' ? '后侧' : '平衡'}）`
-                : `MAX EQUIVALENT IMBALANCE (${analysis.dominantDirection.toUpperCase()})`} {analysis.dominantOffset.toFixed(0)} kg
+                : `MAX EQUIVALENT IMBALANCE (${analysis.dominantDirection.toUpperCase()})`} {analysis.dominantOffset.toFixed(1)} kg
             </span>
             {unloadedCount > 0 && (
               <span className="overflow-badge">
@@ -1944,14 +1954,24 @@ function App() {
               <div className="bias-limits">
                 <div className={`bias-limit ${analysis.transverseOffsetMm > 30 ? 'is-over-limit' : ''}`}>
                   <span>{lang === 'zh' ? '左右偏载参考值' : 'TRANSVERSE OFFSET · REFERENCE'}</span>
-                  <b>{analysis.transverseOffsetMm.toFixed(0)} mm</b>
+                  <b>{analysis.transverseOffsetMm.toFixed(1)} mm</b>
                 </div>
                 <div className={`bias-limit ${analysis.longitudinalOffset > 3000 ? 'is-over-limit' : ''}`}>
                   <span>{lang === 'zh' ? '前后偏重参考值（估算）' : 'LONGITUDINAL IMBALANCE · EST.'}</span>
-                  <b>{(analysis.longitudinalOffset / 1000).toFixed(2)} t</b>
+                  <b>{(analysis.longitudinalOffset / 1000).toFixed(3)} t</b>
                 </div>
               </div>
-              <p className="analysis-note">{lang === 'zh' ? '以上数据仅供参考' : 'For reference only.'}</p>
+              <div className="bias-limits layer-bias-limits">
+                <div className="bias-limit">
+                  <span>{lang === 'zh' ? '单层最大左右偏移' : 'MAX LAYER L/R OFFSET'}</span>
+                  <b>{analysis.maxLayerTransverseOffsetMm.toFixed(1)} mm</b>
+                </div>
+                <div className="bias-limit">
+                  <span>{lang === 'zh' ? '单层最大前后偏重（估算）' : 'MAX LAYER F/R IMBALANCE'}</span>
+                  <b>{(analysis.maxLayerLongitudinalOffset / 1000).toFixed(3)} t</b>
+                </div>
+              </div>
+              <p className="analysis-note">{lang === 'zh' ? '整体重心可能因不同层相互抵消而居中；单层偏移单独列出。以上数据仅供参考' : 'Opposing layer offsets can cancel in the overall CG; per-layer offsets are shown separately. For reference only.'}</p>
               <CenterOfGravity analysis={analysis} container={container} lang={lang}/>
             </div>
           )}

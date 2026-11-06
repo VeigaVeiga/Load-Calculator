@@ -11,6 +11,8 @@ export type OptimizationResult = {
 }
 
 type OptimizeOptions = {
+  /** Current cargo definitions are authoritative when placed snapshots contain stale weights. */
+  cargoWeights?: Array<{ id: string; weight: number }>
   signal?: AbortSignal
   progress?: (percent: number) => void
   maxIterations?: number
@@ -26,8 +28,13 @@ function seededRandom(seed: number) {
   }
 }
 
-function weightedDistributionScore(items: PlacedCargo[], container: Container) {
-  const a = analyzeWeight(items, container)
+function weightedDistributionScore(items: PlacedCargo[], container: Container, cargoWeights: Array<{ id: string; weight: number }> = []) {
+  const a = analyzeWeight(items, container, cargoWeights)
+  const weightByCargoId = new Map(cargoWeights.map(item => [item.id, item.weight]))
+  const weightOf = (p: PlacedCargo) => {
+    const current = weightByCargoId.get(p.cargoId)
+    return current !== undefined && Number.isFinite(current) && current >= 0 ? current : Number.isFinite(p.weight) && p.weight >= 0 ? p.weight : 0
+  }
   const total = Math.max(1, a.total)
   const cx = container.length / 2
   const cy = container.width / 2
@@ -58,8 +65,8 @@ function weightedDistributionScore(items: PlacedCargo[], container: Container) {
   for (const p of items) {
     const d = dims(p)
     const center = p.x + d.length / 2
-    if (center < container.length * 0.2) front += p.weight
-    if (center > container.length * 0.8) rear += p.weight
+    if (center < container.length * 0.2) front += weightOf(p)
+    if (center > container.length * 0.8) rear += weightOf(p)
   }
   const endImbalance = Math.abs(front - rear) / total
 
@@ -67,22 +74,76 @@ function weightedDistributionScore(items: PlacedCargo[], container: Container) {
   // exactly on the centreline. Half-container buckets are only a weak
   // secondary signal because a centreline item must not be counted as an
   // entire-side imbalance merely due to a strict < comparison.
-  return cgX * 55 + cgY * 110 + quadrant * 3 + cgZ * 4 + endImbalance * 8
+  // Keep every loading level reasonably centred as well as the combined mass.
+  // This prevents opposing layer offsets from cancelling to a misleading zero
+  // in the overall CG while upper cargo remains visibly displaced.
+  const layerBalance = a.layers.reduce((sum, layer) => {
+    if (layer.total <= 0) return sum
+    const layerX = Math.abs(layer.cg.x - cx) / Math.max(1, cx)
+    const layerY = Math.abs(layer.cg.y - cy) / Math.max(1, cy)
+    return sum + (layerX * 0.5 + layerY) * (layer.total / total)
+  }, 0)
+
+  return cgX * 55 + cgY * 110 + quadrant * 3 + cgZ * 4 + endImbalance * 8 + layerBalance * 42
 }
 
-function objective(items: PlacedCargo[], container: Container) {
+function objective(items: PlacedCargo[], container: Container, cargoWeights: Array<{ id: string; weight: number }> = []) {
   const validation = validatePlan(items, container)
   if (!validation.ok) return 1_000_000 + validation.errors.length * 10_000
 
   // Preserve the original number of loaded units as an absolute constraint.
   // This optimizer is not allowed to "solve" imbalance by throwing cargo out.
-  return weightedDistributionScore(items, container)
+  return weightedDistributionScore(items, container, cargoWeights)
 }
 
-function floorMovable(items: PlacedCargo[]) {
+function buildAboveGroups(items: PlacedCargo[]) {
+  // Directional support graph: moving a cargo unit carries only the cargo
+  // stacked above it. Lower supports stay in place, allowing each upper layer
+  // to be balanced independently while candidate validation protects support.
+  const children = items.map(() => [] as number[])
+  for (let i = 0; i < items.length; i += 1) {
+    const lower = items[i]
+    const lowerDims = dims(lower)
+    for (let j = 0; j < items.length; j += 1) {
+      if (i === j) continue
+      const upper = items[j]
+      if (Math.abs(lower.z + lower.height - upper.z) > EPS) continue
+      const upperDims = dims(upper)
+      const overlaps =
+        lower.x < upper.x + upperDims.length - EPS &&
+        lower.x + lowerDims.length > upper.x + EPS &&
+        lower.y < upper.y + upperDims.width - EPS &&
+        lower.y + lowerDims.width > upper.y + EPS
+      if (overlaps) children[i].push(j)
+    }
+  }
+
+  return items.map((_, root) => {
+    const visited = new Set<number>([root])
+    const stack = [root]
+    while (stack.length) {
+      const current = stack.pop()!
+      for (const child of children[current]) {
+        if (visited.has(child)) continue
+        visited.add(child)
+        stack.push(child)
+      }
+    }
+    return [...visited]
+  })
+}
+
+function aboveGroupIndices(items: PlacedCargo[], index: number) {
+  return buildAboveGroups(items)[index] ?? [index]
+}
+
+function movableItems(items: PlacedCargo[]) {
+  const groups = buildAboveGroups(items)
   return items
-    .map((p, i) => ({ p, i }))
-    .filter(({ p }) => !p.locked && p.z <= EPS)
+    .map((p, i) => ({ p, i, members: groups[i] }))
+    .filter(({ p, members }) =>
+      !p.locked && !members.some(index => items[index].locked)
+    )
 }
 
 function candidateTranslate(
@@ -93,23 +154,32 @@ function candidateTranslate(
   container: Container,
 ) {
   const p = items[index]
-  if (!p || p.locked || p.z > EPS) return null
-  const d = dims(p)
-  if (x < -EPS || y < -EPS || x + d.length > container.length + EPS || y + d.width > container.width + EPS) return null
-  const next = items.map((q) => ({ ...q }))
-  next[index] = {
-    ...p,
-    x: Math.round(x / 10) * 10,
-    y: Math.round(y / 10) * 10,
-    placementMode: 'automatic',
+  if (!p || p.locked) return null
+  const members = aboveGroupIndices(items, index)
+  if (members.some(member => items[member].locked)) return null
+  const targetX = Math.round(x / 10) * 10
+  const targetY = Math.round(y / 10) * 10
+  const dx = targetX - p.x
+  const dy = targetY - p.y
+  if (Math.abs(dx) < EPS && Math.abs(dy) < EPS) return null
+  for (const member of members) {
+    const item = items[member]
+    const d = dims(item)
+    if (item.x + dx < -EPS || item.y + dy < -EPS ||
+      item.x + dx + d.length > container.length + EPS ||
+      item.y + dy + d.width > container.width + EPS) return null
   }
-  return next
+  const memberSet = new Set(members)
+  return items.map((item, i) => memberSet.has(i)
+    ? { ...item, x: item.x + dx, y: item.y + dy, placementMode: 'automatic' as const }
+    : { ...item })
 }
 
 function candidateSwap(items: PlacedCargo[], aIndex: number, bIndex: number) {
   const a = items[aIndex]
   const b = items[bIndex]
   if (!a || !b || a.locked || b.locked || a.z > EPS || b.z > EPS) return null
+  if (aboveGroupIndices(items, aIndex).length > 1 || aboveGroupIndices(items, bIndex).length > 1) return null
 
   const next = items.map((p) => ({ ...p }))
   next[aIndex] = {
@@ -133,6 +203,7 @@ function candidateSwap(items: PlacedCargo[], aIndex: number, bIndex: number) {
 function candidateRotate(items: PlacedCargo[], index: number, container: Container) {
   const p = items[index]
   if (!p || p.locked || p.z > EPS || p.rotatable === false || p.length === p.width) return null
+  if (aboveGroupIndices(items, index).length > 1) return null
   const rotation = p.rotation % 180 === 0 ? 90 : 0
   const d = dims({ ...p, rotation })
   const x = Math.min(p.x, container.length - d.length)
@@ -181,7 +252,10 @@ function generateAnchors(
   add(p.x, container.width / 2 - d.width / 2)
 
   for (const q of items) {
-    if (q.id === p.id || q.z > EPS) continue
+    if (q.id === p.id) continue
+    const sameLevel = Math.abs(q.z - p.z) <= EPS
+    const directSupport = Math.abs(q.z + q.height - p.z) <= EPS
+    if (!sameLevel && !directSupport) continue
     const qd = dims(q)
     // Edge-adjacent placements only: preserve one coordinate while aligning
     // the other to a neighbour, plus a small set of corner combinations.
@@ -204,7 +278,7 @@ export async function optimizeLoad(
   options: OptimizeOptions = {},
 ): Promise<OptimizationResult> {
   if (initial.length < 2) {
-    const score = objective(initial, container)
+    const score = objective(initial, container, options.cargoWeights)
     return { placed: initial.map((p) => ({ ...p })), iterations: 0, improved: false, scoreBefore: score, scoreAfter: score }
   }
 
@@ -213,7 +287,7 @@ export async function optimizeLoad(
     Math.round(container.length * 31 + container.width * 17 + initial.length * 13),
   )
   const expectedCount = initial.length
-  const before = objective(initial, container)
+  const before = objective(initial, container, options.cargoWeights)
 
   let current = initial.map((p) => ({ ...p }))
   let currentScore = before
@@ -226,7 +300,7 @@ export async function optimizeLoad(
   // arrangement toward the centre is collision-free and preserves stacking.
   // Locked plans are left untouched by this phase.
   if (!current.some(p => p.locked)) {
-    const analysis = analyzeWeight(current, container)
+    const analysis = analyzeWeight(current, container, options.cargoWeights)
     const minX = Math.min(...current.map(p => p.x))
     const maxX = Math.max(...current.map(p => p.x + dims(p).length))
     const minY = Math.min(...current.map(p => p.y))
@@ -246,7 +320,7 @@ export async function optimizeLoad(
         placementMode: 'automatic' as const,
       }))
       if (!validateCandidate(candidate, container, expectedCount)) continue
-      const score = objective(candidate, container)
+      const score = objective(candidate, container, options.cargoWeights)
       if (score + 1e-9 < bestScore) {
         best = candidate.map(p => ({ ...p }))
         bestScore = score
@@ -258,9 +332,9 @@ export async function optimizeLoad(
     }
   }
 
-  const movable = floorMovable(current)
+  const movable = movableItems(current)
   if (movable.length === 0) {
-    return { placed: best, iterations: 0, improved: false, scoreBefore: before, scoreAfter: before }
+    return { placed: best, iterations: 0, improved: bestScore + 1e-9 < before, scoreBefore: before, scoreAfter: objective(best, container, options.cargoWeights) }
   }
 
   // Start with deterministic physically meaningful anchors. This gives the
@@ -272,7 +346,7 @@ export async function optimizeLoad(
     for (const [x, y] of anchors) {
       const candidate = candidateTranslate(current, i, x, y, container)
       if (!candidate || !validateCandidate(candidate, container, expectedCount)) continue
-      const score = objective(candidate, container)
+      const score = objective(candidate, container, options.cargoWeights)
       if (score + 1e-9 < localScore) {
         localBest = candidate
         localScore = score
@@ -293,7 +367,7 @@ export async function optimizeLoad(
   for (let iteration = 0; iteration < maxIterations; iteration += 1) {
     if (options.signal?.aborted) throw new Error('Load optimization cancelled')
 
-    const active = floorMovable(current)
+    const active = movableItems(current)
     if (!active.length) break
 
     const selected = active[Math.floor(rng() * active.length)]
@@ -330,7 +404,7 @@ export async function optimizeLoad(
       continue
     }
 
-    const score = objective(candidate, container)
+    const score = objective(candidate, container, options.cargoWeights)
     const delta = score - currentScore
     const accept = delta <= 0 || rng() < Math.exp(-delta / Math.max(0.02, temperature))
 
@@ -358,6 +432,6 @@ export async function optimizeLoad(
     iterations: maxIterations,
     improved: bestScore + 1e-9 < before,
     scoreBefore: before,
-    scoreAfter: objective(final, container),
+    scoreAfter: objective(final, container, options.cargoWeights),
   }
 }

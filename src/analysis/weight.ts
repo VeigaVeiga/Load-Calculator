@@ -14,6 +14,10 @@ export interface WeightAnalysis {
   transverseOffsetMm: number
   dominantOffset: number
   dominantDirection: 'front'|'rear'|'left'|'right'|'balanced'
+  /** Per-floor-level centres; overall CG can hide opposing layer offsets. */
+  layers: Array<{ z: number; total: number; cg: { x: number; y: number }; transverseOffsetMm: number; longitudinalOffset: number }>
+  maxLayerTransverseOffsetMm: number
+  maxLayerLongitudinalOffset: number
 }
 
 export function analyzeWeight(
@@ -53,12 +57,30 @@ export function analyzeWeight(
   const left = items.reduce((sum,p)=>sum + (p.y + dims(p).width/2 < c.width/2 ? weightOf(p) : 0),0)
   const right = total-left
   const corners = { fl: 0, fr: 0, rl: 0, rr: 0 }
+  // Distribute each unit's weight across floor quadrants by footprint area.
+  // A centre-based bucket incorrectly assigns a centred pallet entirely to one
+  // corner, creating a discontinuous penalty in the optimizer.
   for (const p of items) {
-    const d=dims(p); const x=p.x+d.length/2; const y=p.y+d.width/2
-    if(x<c.length/2 && y<c.width/2) corners.fl+=weightOf(p)
-    else if(x<c.length/2) corners.fr+=weightOf(p)
-    else if(y<c.length/2) corners.rl+=weightOf(p)
-    else corners.rr+=weightOf(p)
+    const d = dims(p)
+    const x1 = p.x
+    const x2 = p.x + d.length
+    const y1 = p.y
+    const y2 = p.y + d.width
+    const xMid = c.length / 2
+    const yMid = c.width / 2
+    const areas = {
+      fl: Math.max(0, Math.min(x2, xMid) - Math.max(x1, 0)) * Math.max(0, Math.min(y2, yMid) - Math.max(y1, 0)),
+      fr: Math.max(0, Math.min(x2, xMid) - Math.max(x1, 0)) * Math.max(0, Math.min(y2, c.width) - Math.max(y1, yMid)),
+      rl: Math.max(0, Math.min(x2, c.length) - Math.max(x1, xMid)) * Math.max(0, Math.min(y2, yMid) - Math.max(y1, 0)),
+      rr: Math.max(0, Math.min(x2, c.length) - Math.max(x1, xMid)) * Math.max(0, Math.min(y2, c.width) - Math.max(y1, yMid)),
+    }
+    const coveredArea = areas.fl + areas.fr + areas.rl + areas.rr
+    if (coveredArea <= 0) continue
+    const weight = weightOf(p)
+    corners.fl += weight * areas.fl / coveredArea
+    corners.fr += weight * areas.fr / coveredArea
+    corners.rl += weight * areas.rl / coveredArea
+    corners.rr += weight * areas.rr / coveredArea
   }
   // Continuous moment-based imbalance: zero when CG is on the container centreline,
   // independent of which side a box centre happens to fall on.
@@ -66,6 +88,45 @@ export function analyzeWeight(
   const transverseOffset = total ? Math.abs(cg.y-c.width/2) * 2 * total / c.width : 0
   const dominantOffset = Math.max(longitudinalOffset, transverseOffset)
   const dominantDirection = dominantOffset < 0.5 ? 'balanced' : longitudinalOffset >= transverseOffset ? (cg.x < c.length/2 ? 'front' : 'rear') : (cg.y < c.width/2 ? 'left' : 'right')
+
+  // Analyse each distinct loading level separately. A perfectly centred total
+  // CG can otherwise conceal a badly offset upper layer counterbalanced by
+  // cargo on the floor.
+  const layerGroups: Array<{ z: number; items: PlacedCargo[] }> = []
+  for (const p of [...items].sort((a, b) => a.z - b.z)) {
+    let layer = layerGroups.find(group => Math.abs(group.z - p.z) <= 0.5)
+    if (!layer) {
+      layer = { z: p.z, items: [] }
+      layerGroups.push(layer)
+    }
+    layer.items.push(p)
+  }
+  const layers = layerGroups.map(layer => {
+    let layerWeight = 0
+    let xMoment = 0
+    let yMoment = 0
+    for (const p of layer.items) {
+      const d = dims(p)
+      const weight = weightOf(p)
+      layerWeight += weight
+      xMoment += weight * (p.x + d.length / 2)
+      yMoment += weight * (p.y + d.width / 2)
+    }
+    const layerCg = {
+      x: layerWeight > 0 ? xMoment / layerWeight : c.length / 2,
+      y: layerWeight > 0 ? yMoment / layerWeight : c.width / 2,
+    }
+    return {
+      z: layer.z,
+      total: layerWeight,
+      cg: layerCg,
+      transverseOffsetMm: Math.abs(layerCg.y - c.width / 2),
+      longitudinalOffset: layerWeight ? Math.abs(layerCg.x - c.length / 2) * 2 * layerWeight / c.length : 0,
+    }
+  })
+  const weightedLayers = layers.filter(layer => layer.total > 0)
+  const maxLayerTransverseOffsetMm = weightedLayers.reduce((max, layer) => Math.max(max, layer.transverseOffsetMm), 0)
+  const maxLayerLongitudinalOffset = weightedLayers.reduce((max, layer) => Math.max(max, layer.longitudinalOffset), 0)
 
   return {
     total,
@@ -80,5 +141,8 @@ export function analyzeWeight(
     transverseOffsetMm: Math.abs(cg.y - c.width / 2),
     dominantOffset,
     dominantDirection,
+    layers,
+    maxLayerTransverseOffsetMm,
+    maxLayerLongitudinalOffset,
   }
 }
