@@ -267,8 +267,18 @@ function App() {
   const tr = T[lang]
 
   useEffect(() => {
-    document.title = `${tr.title} Beta`
-    document.documentElement.lang = lang === 'zh' ? 'zh-CN' : 'en'
+    const isZh = lang === 'zh'
+    const title = isZh ? '铁路装柜模拟 Beta | 免费铁路货物装载规划工具' : 'Rail LoadForge Beta | Free Rail Cargo Loading Planner'
+    const description = isZh
+      ? '免费的铁路集装箱 3D 装载模拟工具。创建铁路集装箱装载方案，直观查看货物摆放，分析重量分布，并导出装载计划。'
+      : 'Free 3D rail cargo loading simulation software. Create railway container loading plans, visualize cargo placement, analyze weight distribution and export loading plans.'
+    document.title = title
+    document.documentElement.lang = isZh ? 'zh-CN' : 'en'
+    document.querySelector('meta[name="description"]')?.setAttribute('content', description)
+    document.querySelector('meta[property="og:title"]')?.setAttribute('content', title)
+    document.querySelector('meta[property="og:description"]')?.setAttribute('content', description)
+    document.querySelector('meta[name="twitter:title"]')?.setAttribute('content', title)
+    document.querySelector('meta[name="twitter:description"]')?.setAttribute('content', description)
   }, [lang, tr.title])
 
   const [containerId, setContainerId] = useState('40HQ')
