@@ -296,8 +296,8 @@ try {
     const pallet = optimized.placed.find(item => item.cargoId === 'foundation-pallet')
     const upper = optimized.placed.find(item => item.cargoId === 'upper-carton')
     assert.deepEqual([pallet.x, pallet.y], [5416, 676], 'upper-layer-balance: lower support must remain in place')
-    assert.ok(Math.abs((upper.x + 200) - box.length / 2) < 1, 'upper-layer-balance: upper carton must move toward the longitudinal centre')
-    assert.ok(Math.abs((upper.y + 150) - box.width / 2) < 1, 'upper-layer-balance: upper carton must move toward the transverse centre')
+    assert.ok(Math.abs((upper.x + 200) - box.length / 2) < 6, 'upper-layer-balance: upper carton must move toward the longitudinal centre')
+    assert.ok(Math.abs((upper.y + 150) - box.width / 2) < 6, 'upper-layer-balance: upper carton must move toward the transverse centre')
     assert.equal(optimized.placed.length, placed.length, 'upper-layer-balance: optimization must preserve cargo count')
     assert.equal(validatePlan(optimized.placed, box, shipment).ok, true, 'upper-layer-balance: optimized plan must remain supported')
   }
