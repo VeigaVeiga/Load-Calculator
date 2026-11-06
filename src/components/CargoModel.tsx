@@ -106,11 +106,26 @@ function CargoModel({ p, container, selected, onPointerDown, onPointerUp, onPoin
         {[-.34, 0, .34].map((t, i) => <MemoBox key={`runner-${i}`} position={[t * L, 0, -Math.min(120, Math.max(70, rawH * .08)) * S * .20]} size={[Math.max(55, rawL * .11) * S, W * .72, Math.min(120, Math.max(70, rawH * .08)) * S * .36]} color="#76502f" roughness={.88} opacity={ghostOpacity} />)}
       </group>
       <MemoBox size={[L, W, Math.max(1, rawH - Math.min(120, Math.max(70, rawH * .08))) * S]} position={[0, 0, (-rawH / 2 + Math.min(120, Math.max(70, rawH * .08)) + Math.max(1, rawH - Math.min(120, Math.max(70, rawH * .08))) / 2) * S]} color={mainColor} roughness={.68} eventProps={eventProps} outline opacity={ghostOpacity} />
-    </> : crate ? <>
-      {/* Lightweight legacy crate model; avoid dozens of overlapping detail meshes. */}
-      <MemoBox size={[L, W, H]} color="#9a6638" roughness={.82} eventProps={eventProps} outline opacity={ghostOpacity} />
-      {[-.38, -.13, .13, .38].map((t, i) => <MemoBox key={`sx${i}`} position={[0, t * W, 0]} size={[L * .96, Math.max(12, rawW * .045) * S, H * .96]} color="#c08a52" roughness={.84} opacity={ghostOpacity} />)}
-      {[-.40, 0, .40].map((t, i) => <MemoBox key={`sz${i}`} position={[t * L, 0, 0]} size={[Math.max(12, rawL * .045) * S, W * .96, H * .96]} color="#b97d46" roughness={.84} opacity={ghostOpacity} />)}
+    </> : crate ? (() => {
+      // Open timber export crate: corner uprights, perimeter rails, spaced slats and a skid base.
+      const postX = Math.max(35, rawL * .055) * S
+      const postY = Math.max(35, rawW * .055) * S
+      const railZ = Math.max(28, rawH * .055) * S
+      const railX = Math.max(30, rawL * .045) * S
+      const railY = Math.max(30, rawW * .045) * S
+      const board = Math.max(18, Math.min(rawL, rawW) * .035) * S
+      const zTop = H * .5 - railZ * .5
+      const zBottom = -H * .5 + railZ * .5
+      return <>
+        {[-1, 1].flatMap(x => [-1, 1].map(y => <MemoBox key={`crate-post-${x}-${y}`} position={[x * (L - postX) * .5, y * (W - postY) * .5, 0]} size={[postX, postY, H]} color="#85552f" roughness={.9} outline opacity={ghostOpacity}/>))}
+        {[-1, 1].flatMap(y => [-1, 1].map(z => <MemoBox key={`crate-long-rail-${y}-${z}`} position={[0, y * (W - railY) * .5, z > 0 ? zTop : zBottom]} size={[L - postX * .5, railY, railZ]} color="#b47a43" roughness={.88} outline opacity={ghostOpacity}/>))}
+        {[-1, 1].flatMap(x => [-1, 1].map(z => <MemoBox key={`crate-end-rail-${x}-${z}`} position={[x * (L - railX) * .5, 0, z > 0 ? zTop : zBottom]} size={[railX, W - postY * .5, railZ]} color="#a96f3b" roughness={.88} outline opacity={ghostOpacity}/>))}
+        {[-1, 1].flatMap(y => [ -.24, 0, .24 ].map((t, i) => <MemoBox key={`crate-side-slat-${y}-${i}`} position={[0, y * (W - board) * .5, t * H]} size={[L * .91, board, Math.max(24, rawH * .075) * S]} color="#c18b52" roughness={.9} opacity={ghostOpacity}/>))}
+        {[-1, 1].flatMap(x => [ -.24, 0, .24 ].map((t, i) => <MemoBox key={`crate-end-slat-${x}-${i}`} position={[x * (L - board) * .5, t * W, 0]} size={[board, W * .91, Math.max(24, rawH * .075) * S]} color="#bd844a" roughness={.9} opacity={ghostOpacity}/>))}
+        {[-.32, .32].map((y, i) => <MemoBox key={`crate-floor-${i}`} position={[0, y * W, zBottom - railZ * .35]} size={[L * .96, board, railZ * .7]} color="#79502e" roughness={.92} opacity={ghostOpacity}/> )}
+        <MemoBox size={[L * .98, W * .08, railZ * .8]} position={[0, 0, -H * .5 + railZ * .25]} color="#79502e" roughness={.92} opacity={ghostOpacity}/>
+      </>
+    })() : drum ? (() => {
     </>: drum ? (() => {
       const diameter = Math.min(rawL, rawW) * .91 * S
       const radius = diameter / 2
@@ -161,25 +176,48 @@ function CargoModel({ p, container, selected, onPointerDown, onPointerUp, onPoin
       {[-.43, .43].map((x, i) => [-.43, .43].map((y, j) => <MemoBox key={`ibc-corner-${i}-${j}`} position={[x * L, y * W, 0]} size={[detail(rawL * .035, 12), detail(rawW * .035, 12), H]} color="#89969a" roughness={.4} outline opacity={ghostOpacity} />))}
       <MemoBox size={[L * .2, W * .2, detail(rawH * .035, 12)]} position={[0, 0, H * .465]} color="#354247" roughness={.42} outline opacity={ghostOpacity} />
       <mesh position={[L * .08, -W * .12, H * .48]} raycast={() => null}><cylinderGeometry args={[detail(rawW * .045, 8), detail(rawW * .045, 8), detail(rawH * .025, 8), 12]} /><meshStandardMaterial color="#48575b" roughness={.5} /></mesh>
-    </> : vehicle ? <>
-      {/* A simplified but recognizable passenger vehicle: hood, cabin, glazing, wheels and lights. */}
-      <MemoBox size={[L * .96, W * .83, H * .3]} position={[L * .01, 0, -H * .12]} color={selected ? '#f2c94c' : '#477b9a'} roughness={.34} eventProps={eventProps} outline opacity={ghostOpacity} />
-      <MemoBox size={[L * .43, W * .7, H * .37]} position={[-L * .07, 0, H * .205]} color={selected ? '#f2c94c' : '#6e99ad'} roughness={.3} outline opacity={ghostOpacity} />
-      <MemoBox size={[L * .21, W * .72, H * .2]} position={[L * .31, 0, H * .02]} color={selected ? '#f2c94c' : '#477b9a'} roughness={.32} outline opacity={ghostOpacity} />
-      {[-1, 1].map(side => <MemoBox key={`windshield-side-${side}`} size={[L * .29, W * .018, H * .22]} position={[-L * .07, side * W * .355, H * .22]} color="#243c48" roughness={.26} opacity={ghostOpacity} />)}
-      <MemoBox size={[L * .19, W * .61, H * .025]} position={[-L * .07, 0, H * .395]} color="#b9d1d9" roughness={.32} opacity={ghostOpacity * .9} />
-      {[-.31, .31].flatMap((x, i) => [-1, 1].map((side, j) => {
-        const wheelR = Math.min(rawH * .145, rawW * .105) * S
-        const wheelW = Math.min(rawW * .085, rawH * .08) * S
-        return <group key={`wheel-${i}-${j}`} position={[x * L, side * (W * .405), -H * .29]}>
-          <mesh rotation={[Math.PI / 2, 0, 0]} raycast={() => null}><cylinderGeometry args={[wheelR, wheelR, wheelW, 20]} /><meshStandardMaterial color="#252a2c" roughness={.88} /></mesh>
-          <mesh position={[0, side * wheelW * .52, 0]} rotation={[Math.PI / 2, 0, 0]} raycast={() => null}><cylinderGeometry args={[wheelR * .52, wheelR * .52, wheelW * .12, 16]} /><meshStandardMaterial color="#aeb8ba" metalness={.6} roughness={.4} /></mesh>
-        </group>
-      }))}
-      {[-1, 1].map(side => <group key={`lights-${side}`}>
-        <MemoBox size={[detail(rawL * .035, 12), W * .13, H * .07]} position={[L * .475, side * W * .29, -H * .13]} color="#e8dfb9" roughness={.28} opacity={ghostOpacity} />
-        <MemoBox size={[detail(rawL * .035, 12), W * .13, H * .07]} position={[-L * .475, side * W * .29, -H * .13]} color="#c95849" roughness={.3} opacity={ghostOpacity} />
-      </group>)}
+    </> : vehicle ? (() => {
+      // More detailed compact passenger car with sculpted proportions, sloped cabin, glazing and alloy wheels.
+      const bodyColor = selected ? '#f2c94c' : '#477b9a'
+      const cabinGeometry = useMemo(() => {
+        const x0=-L*.31, x1=L*.28, xt0=-L*.19, xt1=L*.19
+        const z0=-H*.015, z1=H*.43, y=W*.335
+        const v=[
+          x0,-y,z0, x1,-y,z0, x1,y,z0, x0,y,z0,
+          xt0,-y*.91,z1, xt1,-y*.91,z1, xt1,y*.91,z1, xt0,y*.91,z1,
+        ]
+        const idx=[0,1,2,0,2,3, 4,7,6,4,6,5, 0,4,5,0,5,1, 1,5,6,1,6,2, 2,6,7,2,7,3, 3,7,4,3,4,0]
+        const g=new THREE.BufferGeometry()
+        g.setAttribute('position',new THREE.Float32BufferAttribute(v,3));g.setIndex(idx);g.computeVertexNormals()
+        return g
+      }, [L,W,H])
+      const wheelR=Math.min(rawH*.17,rawW*.115)*S
+      const wheelW=Math.min(rawW*.09,rawH*.085)*S
+      return <>
+        <MemoBox size={[L*.98,W*.82,H*.28]} position={[L*.01,0,-H*.16]} color={bodyColor} roughness={.3} eventProps={eventProps} outline opacity={ghostOpacity}/>
+        <MemoBox size={[L*.23,W*.79,H*.12]} position={[L*.36,0,-H*.08]} color={bodyColor} roughness={.3} opacity={ghostOpacity}/>
+        <mesh geometry={cabinGeometry} material={materialFor(selected ? '#f2c94c' : '#5d8da5',.3,ghostOpacity)} castShadow receiveShadow/>
+        {[-1,1].map(side=><group key={`car-glass-${side}`}>
+          <MemoBox position={[-L*.055,side*W*.338,H*.22]} size={[L*.31,W*.012,H*.16]} color="#203a49" roughness={.2} opacity={ghostOpacity}/>
+          <MemoBox position={[L*.17,side*W*.338,H*.20]} size={[L*.19,W*.012,H*.15]} color="#203a49" roughness={.2} opacity={ghostOpacity}/>
+          <MemoBox position={[-L*.055,side*W*.345,H*.315]} size={[L*.29,W*.012,H*.018]} color="#a9c7d3" roughness={.28} opacity={ghostOpacity}/>
+        </group>)}
+        <MemoBox size={[L*.19,W*.62,H*.018]} position={[-L*.06,0,H*.425]} color="#243e4b" roughness={.22} opacity={ghostOpacity}/>
+        <MemoBox size={[L*.14,W*.68,H*.018]} position={[L*.20,0,H*.40]} color="#243e4b" roughness={.22} opacity={ghostOpacity}/>
+        {[-.31,.31].flatMap((x,i)=>[-1,1].map((side,j)=><group key={`car-wheel-${i}-${j}`} position={[x*L,side*W*.405,-H*.28]}>
+          <mesh rotation={[Math.PI/2,0,0]} raycast={()=>null}><cylinderGeometry args={[wheelR,wheelR,wheelW,32]}/><meshStandardMaterial color="#171b1d" roughness={.9}/></mesh>
+          <mesh position={[0,side*wheelW*.53,0]} rotation={[Math.PI/2,0,0]} raycast={()=>null}><cylinderGeometry args={[wheelR*.62,wheelR*.62,wheelW*.14,24]}/><meshStandardMaterial color="#b5c0c4" metalness={.72} roughness={.28}/></mesh>
+          <mesh position={[0,side*wheelW*.62,0]} rotation={[Math.PI/2,0,0]} raycast={()=>null}><cylinderGeometry args={[wheelR*.18,wheelR*.18,wheelW*.16,16]}/><meshStandardMaterial color="#59666c" metalness={.65} roughness={.3}/></mesh>
+        </group>)))}
+        {[-1,1].map(side=><group key={`car-lamps-${side}`}>
+          <MemoBox size={[detail(rawL*.045,16),W*.17,H*.055]} position={[L*.475,side*W*.25,-H*.13]} color="#f2e6bd" roughness={.25} opacity={ghostOpacity}/>
+          <MemoBox size={[detail(rawL*.035,14),W*.16,H*.06]} position={[-L*.475,side*W*.25,-H*.13]} color="#c95149" roughness={.28} opacity={ghostOpacity}/>
+          <MemoBox size={[L*.11,detail(rawW*.018,10),H*.025]} position={[L*.30,side*W*.416,-H*.16]} color="#d7e0e2" roughness={.3} opacity={ghostOpacity}/>
+        </group>)}
+        <MemoBox size={[L*.08,W*.86,H*.045]} position={[L*.49,0,-H*.25]} color="#606c70" roughness={.55} opacity={ghostOpacity}/>
+        <MemoBox size={[L*.08,W*.86,H*.045]} position={[-L*.49,0,-H*.25]} color="#606c70" roughness={.55} opacity={ghostOpacity}/>
+      </>
+    })() : machinery ? <>
     </> : machinery ? <>
       <MemoBox size={[L * .96, W * .94, H * .72]} position={[0, 0, H * .04]} color={selected ? '#f2c94c' : '#7f8985'} roughness={.58} eventProps={eventProps} outline opacity={ghostOpacity} />
       <MemoBox size={[L * .99, W * .97, detail(rawH * .09, 24)]} position={[0, 0, -H * .42]} color="#515d59" roughness={.62} outline opacity={ghostOpacity} />
