@@ -72,26 +72,55 @@ function VehicleCargoModel({ length, width, height, selected, opacity, eventProp
   const { scene } = useGLTF('/models/passenger-sedan.glb')
   const fitted = useMemo(() => {
     const root = scene.clone(true)
-    // glTF assets are Y-up; the planner uses Z-up. Align the longest
-    // horizontal axis with the container length axis.
-    root.rotation.set(-Math.PI / 2, 0, 0)
-    root.updateMatrixWorld(true)
-    let bounds = new THREE.Box3().setFromObject(root)
-    let size = bounds.getSize(new THREE.Vector3())
-    if (size.y > size.x) {
-      root.rotation.set(-Math.PI / 2, 0, Math.PI / 2)
-      root.updateMatrixWorld(true)
-      bounds = new THREE.Box3().setFromObject(root)
-      size = bounds.getSize(new THREE.Vector3())
+    // The downloaded asset's up/forward axes are not consistent with the
+    // planner. Try all 24 right-handed 90-degree axis permutations and pick
+    // the one whose bounds are length >= width >= height (Z-up).
+    const permutations: number[][] = [
+      [0, 1, 2], [0, 2, 1], [1, 0, 2],
+      [1, 2, 0], [2, 0, 1], [2, 1, 0],
+    ]
+    const signs = [-1, 1]
+    let bestBounds = new THREE.Box3()
+    let bestScore = -Infinity
+    const axes = [
+      new THREE.Vector3(1, 0, 0),
+      new THREE.Vector3(0, 1, 0),
+      new THREE.Vector3(0, 0, 1),
+    ]
+    for (const permutation of permutations) {
+      for (const sx of signs) for (const sy of signs) for (const sz of signs) {
+        const basis = [
+          axes[permutation[0]].clone().multiplyScalar(sx),
+          axes[permutation[1]].clone().multiplyScalar(sy),
+          axes[permutation[2]].clone().multiplyScalar(sz),
+        ]
+        const rotation = new THREE.Matrix4().makeBasis(basis[0], basis[1], basis[2])
+        if (rotation.determinant() < 0) continue
+        root.quaternion.setFromRotationMatrix(rotation)
+        root.position.set(0, 0, 0)
+        root.updateMatrixWorld(true)
+        const candidateBounds = new THREE.Box3().setFromObject(root)
+        const candidateSize = candidateBounds.getSize(new THREE.Vector3())
+        const score = candidateSize.x * 100 + candidateSize.y * 10 - candidateSize.z
+        if (score > bestScore) {
+          bestScore = score
+          bestBounds.copy(candidateBounds)
+        }
+      }
     }
 
-    const scale = Math.min(
-      (length * .96) / Math.max(size.x, .0001),
-      (width * .90) / Math.max(size.y, .0001),
-      (height * .92) / Math.max(size.z, .0001),
+    const size = bestBounds.getSize(new THREE.Vector3())
+    // Match the cargo's declared outer dimensions exactly on all three axes.
+    // This prevents the vehicle model from floating inside an unrelated
+    // uniform-scale envelope or appearing larger/smaller than its dimensions.
+    const scale = new THREE.Vector3(
+      length / Math.max(size.x, .0001),
+      width / Math.max(size.y, .0001),
+      height / Math.max(size.z, .0001),
     )
-    const center = bounds.getCenter(new THREE.Vector3())
-    root.position.set(-center.x * scale, -center.y * scale, -center.z * scale)
+    const center = bestBounds.getCenter(new THREE.Vector3())
+    root.scale.copy(scale)
+    root.position.set(-center.x * scale.x, -center.y * scale.y, -center.z * scale.z)
 
     root.traverse(node => {
       const mesh = node as THREE.Mesh
@@ -113,11 +142,11 @@ function VehicleCargoModel({ length, width, height, selected, opacity, eventProp
         ? mesh.material.map(applyAppearance)
         : applyAppearance(mesh.material)
     })
-    return { root, scale }
+    return { root }
   }, [scene, length, width, height, selected, opacity])
 
   return <group {...eventProps}>
-    <primitive object={fitted.root} scale={fitted.scale} />
+    <primitive object={fitted.root} />
   </group>
 }
 
@@ -182,7 +211,7 @@ function CargoModel({ p, container, selected, onPointerDown, onPointerUp, onPoin
         {[-1, 1].flatMap(y => [-1, 1].map(z => <MemoBox key={`crate-long-rail-${y}-${z}`} position={[0, y * (W - railY) * .5, z > 0 ? zTop : zBottom]} size={[L - postX * .5, railY, railZ]} color="#b47a43" roughness={.88} outline opacity={ghostOpacity}/>))}
         {[-1, 1].flatMap(x => [-1, 1].map(z => <MemoBox key={`crate-end-rail-${x}-${z}`} position={[x * (L - railX) * .5, 0, z > 0 ? zTop : zBottom]} size={[railX, W - postY * .5, railZ]} color="#a96f3b" roughness={.88} outline opacity={ghostOpacity}/>))}
         {[-1, 1].flatMap(y => [ -.24, 0, .24 ].map((t, i) => <MemoBox key={`crate-side-slat-${y}-${i}`} position={[0, y * (W - board) * .5, t * H]} size={[L * .91, board, Math.max(24, rawH * .075) * S]} color="#c18b52" roughness={.9} opacity={ghostOpacity}/>))}
-        {[-1, 1].flatMap(x => [ -.24, 0, .24 ].map((t, i) => <MemoBox key={`crate-end-slat-${x}-${i}`} position={[x * (L - board) * .5, t * W, 0]} size={[board, W * .91, Math.max(24, rawH * .075) * S]} color="#bd844a" roughness={.9} opacity={ghostOpacity}/>))}
+        {[-1, 1].flatMap(x => [ -.24, 0, .24 ].map((t, i) => <MemoBox key={`crate-end-slat-${x}-${i}`} position={[x * (L - board) * .5, 0, t * H]} size={[board, W * .91, Math.max(24, rawH * .075) * S]} color="#bd844a" roughness={.9} opacity={ghostOpacity}/>))}
         {[-.32, .32].map((y, i) => <MemoBox key={`crate-floor-${i}`} position={[0, y * W, zBottom - railZ * .35]} size={[L * .96, board, railZ * .7]} color="#79502e" roughness={.92} opacity={ghostOpacity}/> )}
         <MemoBox size={[L * .98, W * .08, railZ * .8]} position={[0, 0, -H * .5 + railZ * .25]} color="#79502e" roughness={.92} opacity={ghostOpacity}/>
       </>
