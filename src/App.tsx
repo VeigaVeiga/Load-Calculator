@@ -29,7 +29,7 @@ const MAX_CARGO_VOLUME_CBM = 120
 
 const T = {
   zh: {
-    title: '铁路集装箱装柜模拟',
+    title: '铁路装柜模拟',
     cargo: '货物列表',
     add: '添加货物',
     carton: '纸箱',
@@ -118,7 +118,7 @@ const T = {
   },
 
   en: {
-    title: 'Railway Container Loading Simulator',
+    title: 'Rail LoadForge',
     cargo: 'Cargo List',
     add: 'Add Cargo',
     carton: 'Carton',
