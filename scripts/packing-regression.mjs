@@ -295,6 +295,7 @@ try {
     })
     const pallet = optimized.placed.find(item => item.cargoId === 'foundation-pallet')
     const upper = optimized.placed.find(item => item.cargoId === 'upper-carton')
+    console.log('upper-layer-balance debug', { pallet: [pallet.x, pallet.y], upper: [upper.x, upper.y], scoreBefore: optimized.scoreBefore, scoreAfter: optimized.scoreAfter })
     assert.deepEqual([pallet.x, pallet.y], [5416, 676], 'upper-layer-balance: lower support must remain in place')
     assert.ok(Math.abs((upper.x + 200) - box.length / 2) < 6, 'upper-layer-balance: upper carton must move toward the longitudinal centre')
     assert.ok(Math.abs((upper.y + 150) - box.width / 2) < 6, 'upper-layer-balance: upper carton must move toward the transverse centre')
