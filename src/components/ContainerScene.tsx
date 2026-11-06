@@ -17,6 +17,8 @@ export type View = 'iso' | 'top' | 'front' | 'left' | 'right'
 export type SceneTool = 'translate' | 'rotate' | 'scale'
 export type SelectionMode = 'single' | 'box'
 const S = .001
+const BATCH_HIGHLIGHT_EDGES = new THREE.EdgesGeometry(new THREE.BoxGeometry(1, 1, 1))
+const BATCH_HIGHLIGHT_MATERIAL = new THREE.LineBasicMaterial({ color: '#ffe45c', transparent: true, opacity: 1, depthTest: false, depthWrite: false, toneMapped: false })
 import { isLightIndustrialTheme } from '../theme'
 const MATERIAL_STAGE_GAP = 500
 const MATERIAL_STAGE_DEPTH = 3000
@@ -113,7 +115,10 @@ function CargoObject({ p, container, selected, onSelect, registerRef, showName, 
   // Sync only when the persisted cargo transform changes. Drag-state is intentionally
   // excluded: toggling it after TransformControls commits can replay stale React props.
   useLayoutEffect(() => { const o = ref.current; if (!o) return; const d = dims(p); o.position.set((p.x+d.length/2-container.length/2)*S,(p.y+d.width/2-container.width/2)*S,(p.z+p.height/2)*S); o.rotation.set(0,0,p.rotation*Math.PI/180) }, [p.x,p.y,p.z,p.rotation,p.length,p.width,p.height,container.length,container.width])
-  return <group ref={ref} onPointerDown={e=>{e.stopPropagation();onSelect()}} onClick={e=>{e.stopPropagation();onSelect()}}><CargoModel p={{...p,x:0,y:0,z:0}} container={container} selected={selected} hovered={false} showName={showName} ghost={ghost} local onPointerDown={e=>e.stopPropagation()} onPointerUp={e=>e.stopPropagation()} onPointerMove={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();onSelect()}}/></group>
+  return <group ref={ref} onPointerDown={e=>{e.stopPropagation();onSelect()}} onClick={e=>{e.stopPropagation();onSelect()}}>
+    <CargoModel p={{...p,x:0,y:0,z:0}} container={container} selected={selected} hovered={false} showName={showName} ghost={ghost} local onPointerDown={e=>e.stopPropagation()} onPointerUp={e=>e.stopPropagation()} onPointerMove={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();onSelect()}}/>
+    {selected&&ghost&&<lineSegments geometry={BATCH_HIGHLIGHT_EDGES} material={BATCH_HIGHLIGHT_MATERIAL} scale={[p.length*S*1.004,p.width*S*1.004,p.height*S*1.004]} raycast={()=>null} renderOrder={1100}/>}
+  </group>
 }
 
 function materialPlacement(item: SecuringItem, container: Container) { const maxX=Math.max(0,container.length-item.length),maxY=Math.max(0,container.width+MATERIAL_STAGE_GAP+MATERIAL_STAGE_DEPTH-item.width),maxZ=Math.max(0,container.height-item.height);return{x:Math.max(0,Math.min(maxX,item.x)),y:Math.max(0,Math.min(maxY,item.y)),z:Math.max(0,Math.min(maxZ,item.z))} }
