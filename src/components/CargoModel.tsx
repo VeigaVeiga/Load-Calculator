@@ -68,7 +68,7 @@ type VehicleCargoModelProps = {
   eventProps: any
 }
 
-function VehicleCargoModel({ length, width, height, selected, opacity, eventProps }: VehicleCargoModelProps) {
+function VehicleCargoModel({ length, height, selected, opacity, eventProps }: VehicleCargoModelProps) {
   const { scene } = useGLTF('/models/passenger-sedan.glb')
   const fitted = useMemo(() => {
     const root = scene.clone(true)
