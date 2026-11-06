@@ -119,8 +119,12 @@ function VehicleCargoModel({ length, width, height, selected, opacity, eventProp
       height / Math.max(size.z, .0001),
     )
     const center = bestBounds.getCenter(new THREE.Vector3())
-    root.scale.copy(scale)
-    root.position.set(-center.x * scale.x, -center.y * scale.y, -center.z * scale.z)
+    // Scale in planner/world axes after the orientation has been corrected.
+    // A parent fit group avoids applying X/Y/Z scaling in the asset's old axes.
+    root.position.copy(center).negate()
+    const fitRoot = new THREE.Group()
+    fitRoot.scale.copy(scale)
+    fitRoot.add(root)
 
     root.traverse(node => {
       const mesh = node as THREE.Mesh
@@ -142,7 +146,7 @@ function VehicleCargoModel({ length, width, height, selected, opacity, eventProp
         ? mesh.material.map(applyAppearance)
         : applyAppearance(mesh.material)
     })
-    return { root }
+    return { root: fitRoot }
   }, [scene, length, width, height, selected, opacity])
 
   return <group {...eventProps}>
