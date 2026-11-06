@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import * as THREE from 'three'
+import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
 import type { Container, SecuringItem } from '../types'
 
 const S = .001
@@ -108,31 +109,9 @@ export default function SecuringModel({ item, container, selected, registerRef, 
     const L = Math.max(300, item.length) * S
     const W = Math.max(180, item.width) * S
     const H = Math.max(160, item.height) * S
-    // Inflated dunnage bag: a soft, slightly irregular woven sack with pinched ends,
-    // a broad pillow-shaped face and shallow longitudinal fabric seams.
-    const geometry = (() => {
-      const g = new THREE.BufferGeometry()
-      const rings = 22, around = 20
-      const vertices: number[] = [], indices: number[] = []
-      for (let i = 0; i <= rings; i++) {
-        const t = i / rings, x = (t - .5) * L
-        const end = Math.pow(Math.max(0, Math.sin(Math.PI * t)), .24)
-        const asym = 1 + .035 * Math.sin(t * Math.PI * 5)
-        const ry = W * .48 * end * asym, rz = H * .46 * end * (1 + .025 * Math.cos(t * Math.PI * 4))
-        for (let j = 0; j <= around; j++) {
-          const a = j / around * Math.PI * 2
-          const pleat = 1 + .025 * Math.cos(a * 6 + t * 4)
-          vertices.push(x, Math.cos(a) * ry * pleat, Math.sin(a) * rz * pleat)
-        }
-      }
-      for (let i = 0; i < rings; i++) for (let j = 0; j < around; j++) {
-        const p = i * (around + 1) + j, q = p + around + 1
-        indices.push(p, q, p + 1, q, q + 1, p + 1)
-      }
-      g.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3))
-      g.setIndex(indices); g.computeVertexNormals()
-      return g
-    })()
+    // Rounded rectangular inflatable dunnage bag. Keep the measured outer
+    // dimensions exact while softening all twelve edges and eight corners.
+    const geometry = new RoundedBoxGeometry(L, W, H, 5, Math.min(L, W, H) * .12)
     body = <group>
       <mesh geometry={geometry} castShadow receiveShadow><meshStandardMaterial color={selected ? '#f4a23b' : '#39a85b'} roughness={.94} metalness={0} side={THREE.DoubleSide} /></mesh>
       <mesh position={[0, 0, H * .18]} scale={[L * .34, W * .012, H * .012]}><boxGeometry args={[1, 1, 1]} /><meshStandardMaterial color="#237b42" roughness={1} /></mesh>
