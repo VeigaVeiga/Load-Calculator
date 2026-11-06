@@ -202,6 +202,32 @@ try {
     assert.ok(analysis.transverseOffsetMm > 1, 'weight-analysis: transverse offset must not report zero')
   }
 
+  // Regression 6: every unit in a multi-level stack contributes its own 3D mass moment.
+  // Use stale zero-weight placement snapshots to ensure the authoritative cargo
+  // definition is applied to each placed unit, not once per SKU or floor layer.
+  {
+    const box = container()
+    const shipment = [cargo({
+      id: 'stacked-cartons',
+      quantity: 4,
+      length: 400,
+      width: 300,
+      height: 300,
+      weight: 10,
+    })]
+    const placed = [
+      { id: 'stack-1', cargoId: 'stacked-cartons', cargoType: 'carton', x: 1000, y: 200, z: 0, length: 400, width: 300, height: 300, rotation: 0, weight: 0, color: '#aaa', placementMode: 'automatic', locked: false },
+      { id: 'stack-2', cargoId: 'stacked-cartons', cargoType: 'carton', x: 1000, y: 200, z: 300, length: 400, width: 300, height: 300, rotation: 0, weight: 0, color: '#aaa', placementMode: 'automatic', locked: false },
+      { id: 'stack-3', cargoId: 'stacked-cartons', cargoType: 'carton', x: 1000, y: 200, z: 600, length: 400, width: 300, height: 300, rotation: 0, weight: 0, color: '#aaa', placementMode: 'automatic', locked: false },
+      { id: 'stack-4', cargoId: 'stacked-cartons', cargoType: 'carton', x: 5000, y: 1000, z: 900, length: 400, width: 300, height: 300, rotation: 0, weight: 0, color: '#aaa', placementMode: 'automatic', locked: false },
+    ]
+    const analysis = analyzeWeight(placed, box, shipment)
+    assert.equal(analysis.total, 40, 'stacked-weight: every stacked unit must contribute to total weight')
+    assert.equal(analysis.cg.x, 3100, 'stacked-weight: X CG must include all four units')
+    assert.equal(analysis.cg.y, 650, 'stacked-weight: Y CG must include all four units')
+    assert.equal(analysis.cg.z, 600, 'stacked-weight: Z CG must include all four vertical levels')
+  }
+
   console.log('Packing regression checks passed: homogeneous grid, mixed pallet/carton, payload limit, IBC + machinery, stacked-cargo weight analysis.');
 
 } finally {
