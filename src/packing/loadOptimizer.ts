@@ -74,7 +74,17 @@ function weightedDistributionScore(items: PlacedCargo[], container: Container, c
   // exactly on the centreline. Half-container buckets are only a weak
   // secondary signal because a centreline item must not be counted as an
   // entire-side imbalance merely due to a strict < comparison.
-  return cgX * 55 + cgY * 110 + quadrant * 3 + cgZ * 4 + endImbalance * 8
+  // Keep every loading level reasonably centred as well as the combined mass.
+  // This prevents opposing layer offsets from cancelling to a misleading zero
+  // in the overall CG while upper cargo remains visibly displaced.
+  const layerBalance = a.layers.reduce((sum, layer) => {
+    if (layer.total <= 0) return sum
+    const layerX = Math.abs(layer.cg.x - cx) / Math.max(1, cx)
+    const layerY = Math.abs(layer.cg.y - cy) / Math.max(1, cy)
+    return sum + (layerX * 0.5 + layerY) * (layer.total / total)
+  }, 0)
+
+  return cgX * 55 + cgY * 110 + quadrant * 3 + cgZ * 4 + endImbalance * 8 + layerBalance * 42
 }
 
 function objective(items: PlacedCargo[], container: Container, cargoWeights: Array<{ id: string; weight: number }> = []) {
@@ -86,62 +96,53 @@ function objective(items: PlacedCargo[], container: Container, cargoWeights: Arr
   return weightedDistributionScore(items, container, cargoWeights)
 }
 
-function buildSupportClusters(items: PlacedCargo[]) {
-  // Build the support graph once in O(n²), then move each connected vertical
-  // stack as a rigid group. This avoids both floating cargo and repeated BFS.
-  const parent = items.map((_, index) => index)
-  const find = (index: number): number => {
-    while (parent[index] !== index) {
-      parent[index] = parent[parent[index]]
-      index = parent[index]
-    }
-    return index
-  }
-  const unite = (a: number, b: number) => {
-    const rootA = find(a)
-    const rootB = find(b)
-    if (rootA !== rootB) parent[rootB] = rootA
-  }
-
+function buildAboveGroups(items: PlacedCargo[]) {
+  // Directional support graph: moving a cargo unit carries only the cargo
+  // stacked above it. Lower supports stay in place, allowing each upper layer
+  // to be balanced independently while candidate validation protects support.
+  const children = items.map(() => [] as number[])
   for (let i = 0; i < items.length; i += 1) {
-    const a = items[i]
-    const ad = dims(a)
-    for (let j = i + 1; j < items.length; j += 1) {
-      const b = items[j]
-      const verticalTouch =
-        Math.abs(a.z + a.height - b.z) <= EPS ||
-        Math.abs(b.z + b.height - a.z) <= EPS
-      if (!verticalTouch) continue
-      const bd = dims(b)
-      const footprintTouch =
-        a.x < b.x + bd.length - EPS &&
-        a.x + ad.length > b.x + EPS &&
-        a.y < b.y + bd.width - EPS &&
-        a.y + ad.width > b.y + EPS
-      if (footprintTouch) unite(i, j)
+    const lower = items[i]
+    const lowerDims = dims(lower)
+    for (let j = 0; j < items.length; j += 1) {
+      if (i === j) continue
+      const upper = items[j]
+      if (Math.abs(lower.z + lower.height - upper.z) > EPS) continue
+      const upperDims = dims(upper)
+      const overlaps =
+        lower.x < upper.x + upperDims.length - EPS &&
+        lower.x + lowerDims.length > upper.x + EPS &&
+        lower.y < upper.y + upperDims.width - EPS &&
+        lower.y + lowerDims.width > upper.y + EPS
+      if (overlaps) children[i].push(j)
     }
   }
 
-  const groups = new Map<number, number[]>()
-  for (let i = 0; i < items.length; i += 1) {
-    const root = find(i)
-    const group = groups.get(root) ?? []
-    group.push(i)
-    groups.set(root, group)
-  }
-  return items.map((_, i) => groups.get(find(i)) ?? [i])
+  return items.map((_, root) => {
+    const visited = new Set<number>([root])
+    const stack = [root]
+    while (stack.length) {
+      const current = stack.pop()!
+      for (const child of children[current]) {
+        if (visited.has(child)) continue
+        visited.add(child)
+        stack.push(child)
+      }
+    }
+    return [...visited]
+  })
 }
 
-function supportClusterIndices(items: PlacedCargo[], index: number) {
-  return buildSupportClusters(items)[index] ?? [index]
+function aboveGroupIndices(items: PlacedCargo[], index: number) {
+  return buildAboveGroups(items)[index] ?? [index]
 }
 
-function floorMovable(items: PlacedCargo[]) {
-  const clusters = buildSupportClusters(items)
+function movableItems(items: PlacedCargo[]) {
+  const groups = buildAboveGroups(items)
   return items
-    .map((p, i) => ({ p, i, members: clusters[i] }))
+    .map((p, i) => ({ p, i, members: groups[i] }))
     .filter(({ p, members }) =>
-      !p.locked && p.z <= EPS && !members.some(index => items[index].locked)
+      !p.locked && !members.some(index => items[index].locked)
     )
 }
 
@@ -153,13 +154,14 @@ function candidateTranslate(
   container: Container,
 ) {
   const p = items[index]
-  if (!p || p.locked || p.z > EPS) return null
-  const members = supportClusterIndices(items, index)
+  if (!p || p.locked) return null
+  const members = aboveGroupIndices(items, index)
   if (members.some(member => items[member].locked)) return null
   const targetX = Math.round(x / 10) * 10
   const targetY = Math.round(y / 10) * 10
   const dx = targetX - p.x
   const dy = targetY - p.y
+  if (Math.abs(dx) < EPS && Math.abs(dy) < EPS) return null
   for (const member of members) {
     const item = items[member]
     const d = dims(item)
@@ -177,7 +179,7 @@ function candidateSwap(items: PlacedCargo[], aIndex: number, bIndex: number) {
   const a = items[aIndex]
   const b = items[bIndex]
   if (!a || !b || a.locked || b.locked || a.z > EPS || b.z > EPS) return null
-  if (supportClusterIndices(items, aIndex).length > 1 || supportClusterIndices(items, bIndex).length > 1) return null
+  if (aboveGroupIndices(items, aIndex).length > 1 || aboveGroupIndices(items, bIndex).length > 1) return null
 
   const next = items.map((p) => ({ ...p }))
   next[aIndex] = {
@@ -201,7 +203,7 @@ function candidateSwap(items: PlacedCargo[], aIndex: number, bIndex: number) {
 function candidateRotate(items: PlacedCargo[], index: number, container: Container) {
   const p = items[index]
   if (!p || p.locked || p.z > EPS || p.rotatable === false || p.length === p.width) return null
-  if (supportClusterIndices(items, index).length > 1) return null
+  if (aboveGroupIndices(items, index).length > 1) return null
   const rotation = p.rotation % 180 === 0 ? 90 : 0
   const d = dims({ ...p, rotation })
   const x = Math.min(p.x, container.length - d.length)
@@ -250,7 +252,10 @@ function generateAnchors(
   add(p.x, container.width / 2 - d.width / 2)
 
   for (const q of items) {
-    if (q.id === p.id || q.z > EPS) continue
+    if (q.id === p.id) continue
+    const sameLevel = Math.abs(q.z - p.z) <= EPS
+    const directSupport = Math.abs(q.z + q.height - p.z) <= EPS
+    if (!sameLevel && !directSupport) continue
     const qd = dims(q)
     // Edge-adjacent placements only: preserve one coordinate while aligning
     // the other to a neighbour, plus a small set of corner combinations.
@@ -327,7 +332,7 @@ export async function optimizeLoad(
     }
   }
 
-  const movable = floorMovable(current)
+  const movable = movableItems(current)
   if (movable.length === 0) {
     return { placed: best, iterations: 0, improved: bestScore + 1e-9 < before, scoreBefore: before, scoreAfter: objective(best, container, options.cargoWeights) }
   }
@@ -362,7 +367,7 @@ export async function optimizeLoad(
   for (let iteration = 0; iteration < maxIterations; iteration += 1) {
     if (options.signal?.aborted) throw new Error('Load optimization cancelled')
 
-    const active = floorMovable(current)
+    const active = movableItems(current)
     if (!active.length) break
 
     const selected = active[Math.floor(rng() * active.length)]
