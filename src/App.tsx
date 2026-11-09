@@ -1248,7 +1248,7 @@ function App() {
     <div className={`app theme-portal theme-${theme} ${securingMode ? 'securing-mode' : ''}`}>
       <header className="topbar">
         <div className="hero-title">
-          <img src="/logo.svg" alt="Rail LoadForge logo" width="44" height="44" style={{ width: 44, height: 44, objectFit: 'contain', flexShrink: 0 }} />
+          <img src="/logo.png" alt="Rail LoadForge logo" width="44" height="44" style={{ width: 44, height: 44, objectFit: 'contain', flexShrink: 0 }} />
           <div className="hero-orbit" aria-hidden="true" />
           <div className="hero-rule" aria-hidden="true" />
           <h1>{tr.title} <span className="beta-badge">Beta</span></h1>
