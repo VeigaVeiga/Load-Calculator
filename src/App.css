@@ -1967,3 +1967,51 @@ body{overflow:hidden}
 .theme-portal.theme-light .tool-row:not(.cargo-secondary-actions) button:not(:first-child) {
  color:#3d5064!important;background:#fff!important;border-color:#cbd5df!important;
 }
+
+
+/* V20.2 — keep the original logo inline to the LEFT of the page title */
+.theme-portal .hero-title{
+  display:flex!important;
+  flex-direction:row!important;
+  align-items:center!important;
+  justify-content:flex-start!important;
+  gap:12px!important;
+  min-width:0!important;
+  width:auto!important;
+  height:54px!important;
+  min-height:54px!important;
+  padding:0!important;
+  border-left:0!important;
+  overflow:visible!important;
+}
+.theme-portal .hero-title > img{
+  display:block!important;
+  position:relative!important;
+  z-index:4!important;
+  width:48px!important;
+  height:48px!important;
+  flex:0 0 48px!important;
+  object-fit:contain!important;
+  margin:0!important;
+}
+.theme-portal .hero-title h1{
+  display:block!important;
+  flex:0 1 auto!important;
+  min-width:0!important;
+  margin:0!important;
+  white-space:nowrap!important;
+}
+@media(max-width:780px){
+  .theme-portal .hero-title{
+    width:auto!important;
+    height:46px!important;
+    min-height:46px!important;
+    gap:9px!important;
+  }
+  .theme-portal .hero-title > img{
+    width:40px!important;
+    height:40px!important;
+    flex-basis:40px!important;
+  }
+  .theme-portal .hero-title h1{font-size:20px!important}
+}
