@@ -1,13 +1,63 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url><loc>https://logisticslink.net/</loc></url>
-  <url><loc>https://logisticslink.net/china-europe-railway-loading-plan/</loc></url>
-  <url><loc>https://logisticslink.net/railway-cargo-securing/</loc></url>
-  <url><loc>https://logisticslink.net/container-centre-of-gravity/</loc></url>
-  <url><loc>https://logisticslink.net/container-load-imbalance/</loc></url>
-  <url><loc>https://logisticslink.net/zh-cn/china-europe-railway-loading-plan/</loc></url>
-  <url><loc>https://logisticslink.net/zh-cn/railway-cargo-securing/</loc></url>
-  <url><loc>https://logisticslink.net/zh-cn/container-centre-of-gravity/</loc></url>
-  <url><loc>https://logisticslink.net/zh-cn/container-load-imbalance/</loc></url>
-  <url><loc>https://logisticslink.net/zh-cn/</loc></url>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">
+  <url>
+    <loc>https://logisticslink.net/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://logisticslink.net/"/>
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://logisticslink.net/zh-cn/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://logisticslink.net/"/>
+  </url>
+  <url>
+    <loc>https://logisticslink.net/zh-cn/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://logisticslink.net/"/>
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://logisticslink.net/zh-cn/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://logisticslink.net/"/>
+  </url>
+  <url>
+    <loc>https://logisticslink.net/china-europe-railway-loading-plan/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://logisticslink.net/china-europe-railway-loading-plan/"/>
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://logisticslink.net/zh-cn/china-europe-railway-loading-plan/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://logisticslink.net/china-europe-railway-loading-plan/"/>
+  </url>
+  <url>
+    <loc>https://logisticslink.net/zh-cn/china-europe-railway-loading-plan/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://logisticslink.net/china-europe-railway-loading-plan/"/>
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://logisticslink.net/zh-cn/china-europe-railway-loading-plan/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://logisticslink.net/china-europe-railway-loading-plan/"/>
+  </url>
+  <url>
+    <loc>https://logisticslink.net/railway-cargo-securing/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://logisticslink.net/railway-cargo-securing/"/>
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://logisticslink.net/zh-cn/railway-cargo-securing/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://logisticslink.net/railway-cargo-securing/"/>
+  </url>
+  <url>
+    <loc>https://logisticslink.net/zh-cn/railway-cargo-securing/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://logisticslink.net/railway-cargo-securing/"/>
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://logisticslink.net/zh-cn/railway-cargo-securing/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://logisticslink.net/railway-cargo-securing/"/>
+  </url>
+  <url>
+    <loc>https://logisticslink.net/container-centre-of-gravity/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://logisticslink.net/container-centre-of-gravity/"/>
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://logisticslink.net/zh-cn/container-centre-of-gravity/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://logisticslink.net/container-centre-of-gravity/"/>
+  </url>
+  <url>
+    <loc>https://logisticslink.net/zh-cn/container-centre-of-gravity/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://logisticslink.net/container-centre-of-gravity/"/>
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://logisticslink.net/zh-cn/container-centre-of-gravity/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://logisticslink.net/container-centre-of-gravity/"/>
+  </url>
+  <url>
+    <loc>https://logisticslink.net/container-load-imbalance/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://logisticslink.net/container-load-imbalance/"/>
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://logisticslink.net/zh-cn/container-load-imbalance/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://logisticslink.net/container-load-imbalance/"/>
+  </url>
+  <url>
+    <loc>https://logisticslink.net/zh-cn/container-load-imbalance/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://logisticslink.net/container-load-imbalance/"/>
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://logisticslink.net/zh-cn/container-load-imbalance/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://logisticslink.net/container-load-imbalance/"/>
+  </url>
 </urlset>
